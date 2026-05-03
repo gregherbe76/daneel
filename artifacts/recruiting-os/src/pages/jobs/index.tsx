@@ -12,13 +12,13 @@ export default function JobsPage() {
     <div className="p-8 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Jobs</h1>
-          <p className="text-muted-foreground mt-1">Manage open positions and pipelines.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Client Missions</h1>
+          <p className="text-muted-foreground mt-1">Manage client missions and candidate pipelines.</p>
         </div>
         <Link href="/jobs/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
-            Create Job
+            Create Client Mission
           </Button>
         </Link>
       </div>
@@ -32,10 +32,10 @@ export default function JobsPage() {
           <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
             <Briefcase className="h-6 w-6 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold mb-1">No jobs yet</h3>
-          <p className="text-muted-foreground mb-4">Create your first job to start hiring.</p>
+          <h3 className="text-lg font-semibold mb-1">No client missions yet</h3>
+          <p className="text-muted-foreground mb-4">Create your first client mission to start shortlisting.</p>
           <Link href="/jobs/new">
-            <Button variant="outline">Create Job</Button>
+            <Button variant="outline">Create Client Mission</Button>
           </Link>
         </Card>
       ) : (

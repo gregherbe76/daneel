@@ -83,8 +83,10 @@ export type ScoreDimension = {
 export type ScoreBreakdown = {
   skillsMatch: ScoreDimension;
   experienceDepth: ScoreDimension;
+  communication: ScoreDimension;
+  clientFit: ScoreDimension;
+  stability: ScoreDimension;
   autonomy: ScoreDimension;
-  productMindset: ScoreDimension;
 };
 
 export type ShortlistEntry = {

@@ -24,7 +24,7 @@ function Router() {
         <Route path="/jobs/new" component={CreateJobPage} />
         <Route path="/jobs/:id/report" component={JobReportPage} />
         <Route path="/jobs/:id" component={JobDetailPage} />
-        <Route path="/jobs/:id/edit" component={() => <div className="p-8">Job Edit (WIP)</div>} />
+        <Route path="/jobs/:id/edit" component={() => <div className="p-8">Client Mission Edit (WIP)</div>} />
         <Route path="/candidates" component={CandidatesPage} />
         <Route path="/candidates/new" component={() => <div className="p-8">Candidate Create (WIP)</div>} />
         <Route path="/candidates/:id" component={() => <div className="p-8">Candidate Detail (WIP)</div>} />

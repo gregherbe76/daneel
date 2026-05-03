@@ -287,7 +287,7 @@ export function FindCandidatesModal({
             Find Candidates with AI
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Source candidates for <span className="font-medium text-foreground">{jobTitle}</span> via an external provider.
+            Source candidates for <span className="font-medium text-foreground">{jobTitle}</span> — your client mission — via an external provider.
             Results are saved to your pipeline automatically.
           </DialogDescription>
         </DialogHeader>
@@ -391,7 +391,7 @@ export function FindCandidatesModal({
             {/* Filters */}
             <div className="space-y-3">
               <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Filters <span className="font-normal normal-case">(optional — overrides job defaults)</span>
+                Filters <span className="font-normal normal-case">(optional — overrides mission defaults)</span>
               </Label>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">

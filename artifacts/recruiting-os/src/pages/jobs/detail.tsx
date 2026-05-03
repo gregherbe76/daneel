@@ -582,7 +582,7 @@ export default function JobDetailPage() {
                     {/* Job Understanding */}
                     {workflowData.insight && (
                       <div>
-                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Job Understanding</h3>
+                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Client Mission Understanding</h3>
                         <div className="grid md:grid-cols-2 gap-6">
                           <Card>
                             <CardHeader className="pb-2">

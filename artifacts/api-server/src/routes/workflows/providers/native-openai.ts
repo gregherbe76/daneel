@@ -92,7 +92,7 @@ Keep it concise and accurate. Return only valid JSON, no other text.`;
   /**
    * Step 2: Candidate Matching — the core scoring logic.
    *
-   * Each candidate is scored independently (concurrency: 3) across 4 weighted
+   * Each candidate is scored independently (concurrency: 3) across 6 weighted
    * dimensions. The weighted score is ALWAYS recomputed server-side after the
    * model responds — this prevents the model from drifting on arithmetic.
    *
@@ -100,10 +100,12 @@ Keep it concise and accurate. Return only valid JSON, no other text.`;
    *
    * Dimension       Weight   What it measures
    * ─────────────────────────────────────────────────────────────────────────
-   * skillsMatch      0.35    Coverage of required skills from the job description
-   * experienceDepth  0.30    Evidence of seniority-appropriate, hands-on depth
-   * autonomy         0.20    End-to-end ownership, self-direction, led initiatives
-   * productMindset   0.15    User/business impact awareness beyond pure execution
+   * skillsMatch      0.25    Coverage of required skills from the job description
+   * experienceDepth  0.20    Evidence of seniority-appropriate, hands-on depth
+   * communication    0.20    Clarity, professionalism, and stakeholder communication
+   * clientFit        0.20    Alignment with client culture, values, working style
+   * stability        0.10    Tenure patterns and long-term commitment signals
+   * autonomy         0.05    End-to-end ownership, self-direction, led initiatives
    *
    * Recommendation thresholds (also in the prompt):
    *   80–100 → Strong Yes
@@ -134,8 +136,8 @@ CANDIDATE: ${candidate.name}
 Skills: ${candidate.skills.length > 0 ? candidate.skills.join(", ") : "none listed"}
 Summary: ${candidate.summary ?? "No summary provided"}
 
-Score this candidate's FIT for the role across 4 weighted dimensions. Each dimension score is 0-100.
-The fitScore = round((skillsMatch * 0.35) + (experienceDepth * 0.30) + (autonomy * 0.20) + (productMindset * 0.15)).
+Score this candidate's FIT for the role across 6 weighted dimensions. Each dimension score is 0-100.
+The fitScore = round((skillsMatch * 0.25) + (experienceDepth * 0.20) + (communication * 0.20) + (clientFit * 0.20) + (stability * 0.10) + (autonomy * 0.05)).
 
 IMPORTANT — Fit scoring rules:
 - Score ONLY based on evidence present in the profile. Do NOT assume or invent qualifications.
@@ -144,10 +146,12 @@ IMPORTANT — Fit scoring rules:
 - Never fabricate experience or skills that are not explicitly listed.
 
 Dimension definitions:
-- skillsMatch (weight 0.35): Coverage of must-have skills from the job. Cite specific skill matches or gaps.
-- experienceDepth (weight 0.30): Evidence of seniority-appropriate, hands-on depth. Be explicit about what is missing or present.
-- autonomy (weight 0.20): Evidence the candidate has owned projects end-to-end, led initiatives, or worked without heavy direction. If no evidence, say so explicitly.
-- productMindset (weight 0.15): Evidence the candidate thinks about users, product impact, or business outcomes. Cite signals or flag absence.
+- skillsMatch (weight 0.25): Coverage of must-have skills from the job. Cite specific skill matches or gaps.
+- experienceDepth (weight 0.20): Evidence of seniority-appropriate, hands-on depth. Be explicit about what is missing or present.
+- communication (weight 0.20): Signals of clear written communication, stakeholder engagement, and professional presence. Cite observable evidence or flag absence.
+- clientFit (weight 0.20): Alignment with the client's culture, working style, and values inferred from the job description. Cite specific signals.
+- stability (weight 0.10): Tenure patterns across roles — evidence of commitment vs. high churn. Flag job-hopping or gaps explicitly.
+- autonomy (weight 0.05): Evidence the candidate has owned projects end-to-end, led initiatives, or worked without heavy direction. If no evidence, say so explicitly.
 
 Additional rules:
 - reasoning must be 1-2 specific sentences referencing actual candidate details
@@ -160,12 +164,14 @@ Additional rules:
 Return only valid JSON matching this exact structure:
 {
   "scoreBreakdown": {
-    "skillsMatch": { "score": <0-100>, "weight": 0.35, "reasoning": "<specific 1-2 sentences>" },
-    "experienceDepth": { "score": <0-100>, "weight": 0.30, "reasoning": "<specific 1-2 sentences>" },
-    "autonomy": { "score": <0-100>, "weight": 0.20, "reasoning": "<specific 1-2 sentences>" },
-    "productMindset": { "score": <0-100>, "weight": 0.15, "reasoning": "<specific 1-2 sentences>" }
+    "skillsMatch": { "score": <0-100>, "weight": 0.25, "reasoning": "<specific 1-2 sentences>" },
+    "experienceDepth": { "score": <0-100>, "weight": 0.20, "reasoning": "<specific 1-2 sentences>" },
+    "communication": { "score": <0-100>, "weight": 0.20, "reasoning": "<specific 1-2 sentences>" },
+    "clientFit": { "score": <0-100>, "weight": 0.20, "reasoning": "<specific 1-2 sentences>" },
+    "stability": { "score": <0-100>, "weight": 0.10, "reasoning": "<specific 1-2 sentences>" },
+    "autonomy": { "score": <0-100>, "weight": 0.05, "reasoning": "<specific 1-2 sentences>" }
   },
-  "fitScore": <integer 0-100, must equal round(skillsMatch*0.35 + experienceDepth*0.30 + autonomy*0.20 + productMindset*0.15)>,
+  "fitScore": <integer 0-100, must equal round(skillsMatch*0.25 + experienceDepth*0.20 + communication*0.20 + clientFit*0.20 + stability*0.10 + autonomy*0.05)>,
   "strengths": ["<specific strength citing candidate detail>", "<specific strength>"],
   "gaps": ["<specific gap naming missing skill or evidence>"],
   "risks": ["<concrete risk with specific evidence>"],
@@ -196,10 +202,12 @@ Return only valid JSON matching this exact structure:
         const bd = raw.scoreBreakdown;
         const fitScore = bd
           ? Math.round(
-              bd.skillsMatch.score * 0.35 +
-              bd.experienceDepth.score * 0.30 +
-              bd.autonomy.score * 0.20 +
-              bd.productMindset.score * 0.15,
+              bd.skillsMatch.score * 0.25 +
+              bd.experienceDepth.score * 0.20 +
+              (bd.communication?.score ?? 0) * 0.20 +
+              (bd.clientFit?.score ?? 0) * 0.20 +
+              (bd.stability?.score ?? 0) * 0.10 +
+              bd.autonomy.score * 0.05,
             )
           : (raw.fitScore ?? raw.score ?? 0);
 

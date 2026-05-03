@@ -84,9 +84,9 @@ interface Provider {
 }
 
 const WORKFLOW_STEPS: { key: WorkflowStep; label: string; description: string; comingSoon?: boolean }[] = [
-  { key: "job_understanding", label: "Job Understanding", description: "Analyzes the job posting and extracts requirements" },
-  { key: "candidate_matching", label: "Candidate Matching", description: "Scores all candidates against the job criteria" },
-  { key: "shortlist_generation", label: "Shortlist Generation", description: "Ranks top candidates and generates hiring summaries" },
+  { key: "job_understanding", label: "Client Mission Understanding", description: "Analyzes the client mission brief and extracts requirements" },
+  { key: "candidate_matching", label: "Candidate Matching", description: "Scores all candidates against the client mission criteria" },
+  { key: "shortlist_generation", label: "Shortlist Generation", description: "Ranks top candidates and generates client-ready summaries" },
   { key: "sourcing", label: "Sourcing", description: "Generate new candidate profiles before matching. Twin uses POST /workflow/sourcing" },
   { key: "enrichment", label: "Enrichment", description: "Enrich candidate profiles with additional signals before matching. Twin uses POST /workflow/enrichment" },
   { key: "sourcing_later", label: "Sourcing (future)", description: "Proactive outreach and external sourcing (coming soon)", comingSoon: true },

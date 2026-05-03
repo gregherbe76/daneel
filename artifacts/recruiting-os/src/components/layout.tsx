@@ -5,7 +5,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
   const navigation = [
-    { name: "Jobs", href: "/jobs", icon: Briefcase },
+    { name: "Client Missions", href: "/jobs", icon: Briefcase },
     { name: "Candidates", href: "/candidates", icon: Users },
   ];
 
@@ -18,7 +18,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <div className="w-64 border-r border-border bg-sidebar flex flex-col">
         <div className="p-6 border-b border-border">
-          <h1 className="text-xl font-bold text-sidebar-foreground">Recruiting OS</h1>
+          <h1 className="text-xl font-bold text-sidebar-foreground">ShortlistPro</h1>
+          <p className="text-[11px] text-sidebar-foreground/50 mt-1">AI shortlist engine for agencies</p>
         </div>
         <nav className="flex-1 p-4 space-y-1">
           {navigation.map((item) => {
@@ -40,6 +41,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="p-4 border-t border-border space-y-1">
+          <p className="px-3 pb-2 text-[10px] uppercase tracking-wider text-sidebar-foreground/40">
+            Powered by Daneel
+          </p>
           {settingsNavigation.map((item) => {
             const isActive = location.startsWith(item.href);
             return (

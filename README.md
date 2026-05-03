@@ -1,10 +1,21 @@
-# Agentic Recruiting OS
+# Daneel — Agentic Recruiting OS
 
-**Build your own agentic recruiting tool.**
+**The open-source agentic recruiting OS.** Build your own agentic recruiting tool.
 
 Use this repo as a template. Fork it, extend it, and own the logic end-to-end.
 
 Open-source · MIT licensed · production-ready starting point
+
+---
+
+## Daneel powers ShortlistPro
+
+This repo ships with **ShortlistPro** — an AI-powered shortlist product for recruitment agencies — built on top of the Daneel engine.
+
+- **ShortlistPro** = the product (UI, reports, agency workflow). What recruiters see.
+- **Daneel** = the engine (workflow runtime, providers, agents). What builders fork.
+
+Think Vercel ↔ Next.js: agencies use ShortlistPro, builders extend Daneel.
 
 ---
 

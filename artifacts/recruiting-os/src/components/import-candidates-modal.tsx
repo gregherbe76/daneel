@@ -225,7 +225,7 @@ export function ImportCandidatesModal({
           </DialogTitle>
           {jobTitle && (
             <DialogDescription className="text-xs mt-0.5">
-              Candidates will be added to this job's pipeline.
+              Candidates will be added to this client mission's pipeline.
             </DialogDescription>
           )}
           {!jobTitle && <DialogDescription className="sr-only">Import candidates via CV, LinkedIn, or CSV.</DialogDescription>}

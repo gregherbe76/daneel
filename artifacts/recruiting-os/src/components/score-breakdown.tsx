@@ -10,8 +10,10 @@ export type ScoreDimension = {
 export type ScoreBreakdown = {
   skillsMatch: ScoreDimension;
   experienceDepth: ScoreDimension;
+  communication: ScoreDimension;
+  clientFit: ScoreDimension;
+  stability: ScoreDimension;
   autonomy: ScoreDimension;
-  productMindset: ScoreDimension;
 };
 
 const DIMENSIONS: {
@@ -26,28 +28,42 @@ const DIMENSIONS: {
     label: "Skills Match",
     abbr: "Skills",
     description: "Technical skill coverage vs. must-haves",
-    weight: 0.35,
+    weight: 0.25,
   },
   {
     key: "experienceDepth",
     label: "Experience Depth",
     abbr: "Experience",
     description: "Depth and relevance of hands-on experience",
-    weight: 0.30,
-  },
-  {
-    key: "autonomy",
-    label: "Autonomy & Ownership",
-    abbr: "Autonomy",
-    description: "Evidence of owning projects end-to-end",
     weight: 0.20,
   },
   {
-    key: "productMindset",
-    label: "Product Mindset",
-    abbr: "Product",
-    description: "User/business focus beyond technical execution",
-    weight: 0.15,
+    key: "communication",
+    label: "Communication",
+    abbr: "Comm.",
+    description: "Clarity, professionalism, and stakeholder communication signals",
+    weight: 0.20,
+  },
+  {
+    key: "clientFit",
+    label: "Client Fit",
+    abbr: "Client",
+    description: "Alignment with client culture, values, and working style",
+    weight: 0.20,
+  },
+  {
+    key: "stability",
+    label: "Stability",
+    abbr: "Stability",
+    description: "Tenure patterns and likelihood of long-term commitment",
+    weight: 0.10,
+  },
+  {
+    key: "autonomy",
+    label: "Autonomy",
+    abbr: "Autonomy",
+    description: "Evidence of owning projects end-to-end without heavy direction",
+    weight: 0.05,
   },
 ];
 

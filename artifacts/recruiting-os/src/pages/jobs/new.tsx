@@ -57,11 +57,11 @@ export default function CreateJobPage() {
       {
         onSuccess: (data) => {
           queryClient.invalidateQueries({ queryKey: getListJobsQueryKey() });
-          toast({ title: "Job created successfully" });
+          toast({ title: "Client Mission created successfully" });
           setLocation(`/jobs/${data.id}`);
         },
         onError: () => {
-          toast({ title: "Failed to create job", variant: "destructive" });
+          toast({ title: "Failed to create client mission", variant: "destructive" });
         },
       }
     );
@@ -80,8 +80,8 @@ export default function CreateJobPage() {
   return (
     <div className="p-8 max-w-3xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Create Job</h1>
-        <p className="text-muted-foreground mt-1">Add a new position to your pipeline.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Create Client Mission</h1>
+        <p className="text-muted-foreground mt-1">Add a new client mission to your pipeline.</p>
       </div>
 
       <Card>
@@ -93,7 +93,7 @@ export default function CreateJobPage() {
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Job Title</FormLabel>
+                    <FormLabel>Mission Title</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. Senior Frontend Engineer" {...field} />
                     </FormControl>
@@ -195,7 +195,7 @@ export default function CreateJobPage() {
                   <FormItem>
                     <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Job description..." className="h-32" {...field} />
+                      <Textarea placeholder="Client mission brief..." className="h-32" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -208,7 +208,7 @@ export default function CreateJobPage() {
               </Button>
               <Button type="submit" disabled={createJob.isPending}>
                 {createJob.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Job
+                Create Client Mission
               </Button>
             </CardFooter>
           </form>

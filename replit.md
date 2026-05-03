@@ -29,8 +29,13 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 ## Architecture
 
 ### Artifacts
-- `artifacts/api-server` — Express 5 REST API, port 8080, path `/api`
-- `artifacts/recruiting-os` — React + Vite frontend, path `/`
+- `artifacts/api-server` — Express 5 REST API, port 8080, path `/api` (Daneel engine: workflow runtime, providers, agents)
+- `artifacts/recruiting-os` — React + Vite frontend, path `/` (ShortlistPro UI layer; package name `@workspace/recruiting-os` is the engine codename and stays unchanged)
+
+### Product positioning
+- **ShortlistPro** is the user-facing product (UI copy, reports, "Client Mission" terminology, agency-oriented branding).
+- **Daneel** is the underlying engine (kept in code naming, internal types, README, and the "Powered by Daneel" attribution shown in the sidebar and exported reports).
+- Do NOT rename internal modules, package names, type names, or the engine architecture to "ShortlistPro" — only UI-visible strings and reports use the ShortlistPro brand.
 
 ### Shared Libraries
 - `lib/db` — Drizzle ORM schema + DB client (`@workspace/db`)
