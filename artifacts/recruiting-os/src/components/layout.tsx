@@ -55,20 +55,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { name: "Jobs", href: "/jobs", icon: Briefcase },
     { name: "Candidates", href: "/candidates", icon: Users },
     { name: "Mentions", href: "/mentions", icon: AtSign, badge: <MentionsBadge /> },
-    {
-      name: "Workflow",
-      href: "/jobs",
-      icon: PlayCircle,
-      caption: "Run AI on a job",
-      match: "__never__",
-    },
-    {
-      name: "Shortlist",
-      href: "/jobs",
-      icon: ListChecks,
-      caption: "View top candidates",
-      match: "__never__",
-    },
   ];
 
   return (

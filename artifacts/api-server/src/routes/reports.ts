@@ -70,7 +70,7 @@ async function buildReport(jobId: number, runId?: number) {
       .find((s) => s.candidateId === e!.candidateId) ?? null;
     const candidateName = candidateMap.get(e!.candidateId)?.name ?? "This candidate";
     const generatedNarrative = summary
-      ? `We believe ${candidateName} is a strong fit for your client's mission. ${summary.whyRelevant} Based on our assessment, ${summary.finalRecommendation.charAt(0).toLowerCase()}${summary.finalRecommendation.slice(1)}`
+      ? `We believe ${candidateName} is a strong fit for this role. ${summary.whyRelevant} Based on our assessment, ${summary.finalRecommendation.charAt(0).toLowerCase()}${summary.finalRecommendation.slice(1)}`
       : null;
     const override = e!.clientFitNarrativeOverride ?? null;
     return {

@@ -416,7 +416,7 @@ function ClientFitNarrativeEditor({
             onChange={(e) => setDraft(e.target.value)}
             rows={5}
             className="text-sm bg-white text-blue-950 leading-relaxed"
-            placeholder="Write a personalised narrative for your client…"
+            placeholder="Write a personalised narrative for this role…"
           />
           <div className="flex items-center justify-end gap-2">
             <Button
