@@ -63,6 +63,8 @@ export interface Job {
   location: string;
   seniority: Seniority;
   mustHaveSkills: string[];
+  clientName?: string | null;
+  clientLogoUrl?: string | null;
   scoringWeights: ScoringWeights;
   createdAt: string;
   updatedAt: string;

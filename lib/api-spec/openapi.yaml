@@ -1052,6 +1052,12 @@ components:
           type: array
           items:
             type: string
+        clientName:
+          type: string
+          nullable: true
+        clientLogoUrl:
+          type: string
+          nullable: true
         scoringWeights:
           $ref: "#/components/schemas/ScoringWeights"
         createdAt:

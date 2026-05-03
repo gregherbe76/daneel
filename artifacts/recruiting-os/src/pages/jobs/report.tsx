@@ -98,7 +98,7 @@ type JobInsight = {
 type HiringReport = {
   generatedAt: string;
   run: ReportRunMeta;
-  job: { id: number; title: string; description: string; location: string; seniority: string; mustHaveSkills: string[] };
+  job: { id: number; title: string; description: string; location: string; seniority: string; mustHaveSkills: string[]; clientName?: string | null; clientLogoUrl?: string | null };
   insight: JobInsight | null;
   top5: ReportEvaluation[];
   evaluations: ReportEvaluation[];
@@ -106,6 +106,24 @@ type HiringReport = {
   interviewFocusAreas: string[];
   risks: string[];
 };
+
+// ── ClientLogo ────────────────────────────────────────────────────────────────
+// Renders a client logo image; falls back to nothing if it fails to load so the
+// surrounding text (client name) remains as the readable label.
+
+function ClientLogo({ src, alt, className }: { src: string; alt: string; className?: string }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [src]);
+  if (failed) return null;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -698,6 +716,13 @@ export default function JobReportPage() {
             </Button>
           </Link>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          {report.job.clientLogoUrl && (
+            <ClientLogo
+              src={report.job.clientLogoUrl}
+              alt={report.job.clientName ?? "Client logo"}
+              className="h-6 w-6 rounded object-contain bg-white border border-border shrink-0"
+            />
+          )}
           <span className="text-sm font-medium truncate">{report.job.title}</span>
           <Badge variant="outline" className="text-xs shrink-0">Hiring Report</Badge>
           {run.dataMode === "real" && (
@@ -885,22 +910,39 @@ export default function JobReportPage() {
 
         {/* ── Header Card ── */}
         <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
-          <div className="bg-gradient-to-r from-slate-900 to-slate-700 px-8 py-6 text-white">
-            <div className="flex items-center gap-3 mb-1">
-              <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">
-                {branding.productName}
-              </span>
-            </div>
-            <h1 className="text-2xl font-bold mb-1">{report.job.title}</h1>
-            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-              <span className="flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5" />
-                {report.job.location}
-              </span>
-              <span>·</span>
-              <span>{vc?.seniority ?? report.job.seniority}</span>
-              <span>·</span>
-              <span>Run {new Date(run.runDate).toLocaleDateString("en-US", { dateStyle: "medium" })}</span>
+          <div className="bg-gradient-to-r from-slate-900 to-slate-700 px-8 py-6 text-white flex items-start gap-5">
+            {report.job.clientLogoUrl && (
+              <ClientLogo
+                src={report.job.clientLogoUrl}
+                alt={report.job.clientName ?? "Client logo"}
+                className="h-16 w-16 rounded-lg object-contain bg-white p-1.5 shrink-0 ring-1 ring-white/20 shadow"
+              />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">
+                  {branding.productName}
+                </span>
+                {report.job.clientName && (
+                  <>
+                    <span className="text-slate-500">·</span>
+                    <span className="text-xs font-semibold text-slate-200 uppercase tracking-wide">
+                      {report.job.clientName}
+                    </span>
+                  </>
+                )}
+              </div>
+              <h1 className="text-2xl font-bold mb-1">{report.job.title}</h1>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5" />
+                  {report.job.location}
+                </span>
+                <span>·</span>
+                <span>{vc?.seniority ?? report.job.seniority}</span>
+                <span>·</span>
+                <span>Run {new Date(run.runDate).toLocaleDateString("en-US", { dateStyle: "medium" })}</span>
+              </div>
             </div>
           </div>
           <div className="px-8 py-4 bg-muted/20 border-t border-border flex flex-wrap gap-6 text-sm">

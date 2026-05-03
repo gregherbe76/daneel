@@ -42,6 +42,8 @@ export const ListJobsResponseItem = zod.object({
     "VP",
   ]),
   mustHaveSkills: zod.array(zod.string()),
+  clientName: zod.string().nullish(),
+  clientLogoUrl: zod.string().nullish(),
   scoringWeights: zod
     .object({
       autonomy: zod
@@ -145,6 +147,8 @@ export const GetJobResponse = zod.object({
     "VP",
   ]),
   mustHaveSkills: zod.array(zod.string()),
+  clientName: zod.string().nullish(),
+  clientLogoUrl: zod.string().nullish(),
   scoringWeights: zod
     .object({
       autonomy: zod
@@ -244,6 +248,8 @@ export const UpdateJobResponse = zod.object({
     "VP",
   ]),
   mustHaveSkills: zod.array(zod.string()),
+  clientName: zod.string().nullish(),
+  clientLogoUrl: zod.string().nullish(),
   scoringWeights: zod
     .object({
       autonomy: zod
@@ -321,6 +327,8 @@ export const GetJobApplicationsResponseItem = zod.object({
       "VP",
     ]),
     mustHaveSkills: zod.array(zod.string()),
+    clientName: zod.string().nullish(),
+    clientLogoUrl: zod.string().nullish(),
     scoringWeights: zod
       .object({
         autonomy: zod
@@ -612,6 +620,8 @@ export const GetCandidateApplicationsResponseItem = zod.object({
       "VP",
     ]),
     mustHaveSkills: zod.array(zod.string()),
+    clientName: zod.string().nullish(),
+    clientLogoUrl: zod.string().nullish(),
     scoringWeights: zod
       .object({
         autonomy: zod
@@ -718,6 +728,8 @@ export const ListApplicationsResponseItem = zod.object({
       "VP",
     ]),
     mustHaveSkills: zod.array(zod.string()),
+    clientName: zod.string().nullish(),
+    clientLogoUrl: zod.string().nullish(),
     scoringWeights: zod
       .object({
         autonomy: zod
@@ -840,6 +852,8 @@ export const GetApplicationResponse = zod.object({
       "VP",
     ]),
     mustHaveSkills: zod.array(zod.string()),
+    clientName: zod.string().nullish(),
+    clientLogoUrl: zod.string().nullish(),
     scoringWeights: zod
       .object({
         autonomy: zod
@@ -2216,6 +2230,8 @@ export const GetJobReportForRunResponse = zod.object({
       "VP",
     ]),
     mustHaveSkills: zod.array(zod.string()),
+    clientName: zod.string().nullish(),
+    clientLogoUrl: zod.string().nullish(),
     scoringWeights: zod
       .object({
         autonomy: zod
@@ -2423,6 +2439,8 @@ export const GetJobReportResponse = zod.object({
       "VP",
     ]),
     mustHaveSkills: zod.array(zod.string()),
+    clientName: zod.string().nullish(),
+    clientLogoUrl: zod.string().nullish(),
     scoringWeights: zod
       .object({
         autonomy: zod

@@ -32,6 +32,8 @@ export const jobsTable = pgTable("jobs", {
   location: text("location").notNull(),
   seniority: seniorityEnum("seniority").notNull(),
   mustHaveSkills: text("must_have_skills").array().notNull().default([]),
+  clientName: text("client_name"),
+  clientLogoUrl: text("client_logo_url"),
   scoringWeights: jsonb("scoring_weights")
     .$type<ScoringWeights>()
     .notNull()
