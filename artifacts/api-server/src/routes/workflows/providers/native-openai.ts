@@ -1,8 +1,25 @@
+/**
+ * NativeOpenAIProvider
+ *
+ * The built-in provider for all core workflow steps. Uses OpenAI GPT via
+ * the shared integrations package. This is where the recruiting logic lives:
+ * prompts, scoring rubric, recommendation thresholds, and shortlist format.
+ *
+ * CUSTOMIZATION GUIDE:
+ *   - To change scoring dimensions or weights → edit runCandidateMatching()
+ *   - To change recommendation thresholds    → edit the recommendation line in the matching prompt
+ *   - To change job understanding output     → edit runJobUnderstanding()
+ *   - To change shortlist summaries          → edit runShortlistGeneration()
+ *   - For role-specific rubrics              → see examples/custom-scoring-rubric.md
+ *   - To swap the model                      → change the `model` field in openai.chat.completions.create()
+ */
+
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { batchProcess } from "@workspace/integrations-openai-ai-server/batch";
 import type { AgentProvider, AgentProviderRunInput, WorkflowStep } from "./interface";
 import type { JobInsightResult, CandidateMatchResult, ShortlistResult, ScoreBreakdown } from "../engine-types";
 
+/** Parse JSON from model output, stripping markdown code fences if present. */
 function json<T>(content: string): T {
   const match = content.match(/```json\s*([\s\S]*?)\s*```/);
   return JSON.parse(match ? match[1] : content);
@@ -34,6 +51,15 @@ export class NativeOpenAIProvider implements AgentProvider {
     }
   }
 
+  /**
+   * Step 1: Job Understanding
+   *
+   * Converts a raw job description into structured evaluation criteria.
+   * Output is stored in job_insights and used by the matching step.
+   *
+   * To add new fields to the insight (e.g. preferredBackground, teamContext),
+   * add them to the prompt and to the JobInsightResult type in engine-types.ts.
+   */
   private async runJobUnderstanding(payload: JobUnderstandingPayload): Promise<JobInsightResult> {
     const { job } = payload;
     const prompt = `You are a technical recruiter assistant. Analyze this job posting and return a JSON object.
@@ -63,6 +89,34 @@ Keep it concise and accurate. Return only valid JSON, no other text.`;
     return json<JobInsightResult>(response.choices[0]?.message?.content ?? "{}");
   }
 
+  /**
+   * Step 2: Candidate Matching — the core scoring logic.
+   *
+   * Each candidate is scored independently (concurrency: 3) across 4 weighted
+   * dimensions. The weighted score is ALWAYS recomputed server-side after the
+   * model responds — this prevents the model from drifting on arithmetic.
+   *
+   * ── SCORING RUBRIC ────────────────────────────────────────────────────────
+   *
+   * Dimension       Weight   What it measures
+   * ─────────────────────────────────────────────────────────────────────────
+   * skillsMatch      0.35    Coverage of required skills from the job description
+   * experienceDepth  0.30    Evidence of seniority-appropriate, hands-on depth
+   * autonomy         0.20    End-to-end ownership, self-direction, led initiatives
+   * productMindset   0.15    User/business impact awareness beyond pure execution
+   *
+   * Recommendation thresholds (also in the prompt):
+   *   80–100 → Strong Yes
+   *   60–79  → Yes
+   *   40–59  → Maybe
+   *   0–39   → No
+   *
+   * To customize:
+   *   - Change weights: update the prompt AND the recomputation block below
+   *   - Add/rename dimensions: add to the prompt + scoreBreakdown + recomputation
+   *   - Change thresholds: edit the recommendation line in the prompt
+   *   - See examples/custom-scoring-rubric.md for a full walkthrough
+   */
   private async runCandidateMatching(payload: CandidateMatchingPayload): Promise<CandidateMatchResult[]> {
     const { job, insight, candidates } = payload;
     const results = await batchProcess(
@@ -120,7 +174,8 @@ Return only valid JSON matching this exact structure:
           response.choices[0]?.message?.content ?? "{}",
         );
 
-        // Recompute weighted score server-side to ensure consistency
+        // Recompute weighted score server-side to ensure arithmetic consistency.
+        // If you change dimension weights in the prompt, update these multipliers too.
         const bd = raw.scoreBreakdown;
         const weightedScore = bd
           ? Math.round(
@@ -143,6 +198,15 @@ Return only valid JSON matching this exact structure:
     return results;
   }
 
+  /**
+   * Step 3: Shortlist Generation
+   *
+   * Takes the top-5 evaluated candidates and generates a hiring summary for
+   * each. This is the final output shown to the hiring manager in the report.
+   *
+   * To change the shortlist format, edit the prompt below.
+   * To change how many candidates are shortlisted, change the .slice(0, 5) limit.
+   */
   private async runShortlistGeneration(payload: ShortlistPayload): Promise<ShortlistResult[]> {
     const { job, insight, evaluations } = payload;
     const top5 = [...evaluations].sort((a, b) => b.score - a.score).slice(0, 5);
@@ -192,6 +256,8 @@ Return only valid JSON array.`;
 }
 
 // ── Payload types ────────────────────────────────────────────────────────────
+// These define the shape of input.payload for each step handled by this provider.
+// Keep in sync with the payload shapes sent by engine.ts.
 
 export type JobUnderstandingPayload = {
   job: {
