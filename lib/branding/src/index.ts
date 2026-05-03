@@ -17,10 +17,17 @@
 import { branding as hiringai } from "./templates/hiringai/branding";
 import { branding as hireflow } from "./templates/hireflow/branding";
 import { branding as shortlistpro } from "./templates/shortlistpro/branding";
+import { prompts as hiringaiPrompts } from "./templates/hiringai/prompts";
+import { prompts as hireflowPrompts } from "./templates/hireflow/prompts";
+import { prompts as shortlistproPrompts } from "./templates/shortlistpro/prompts";
 
 export type TemplateName = "hiringai" | "hireflow" | "shortlistpro";
 
-const TEMPLATES = { hiringai, hireflow, shortlistpro } as const;
+const TEMPLATES = {
+  hiringai: { ...hiringai, prompts: hiringaiPrompts },
+  hireflow: { ...hireflow, prompts: hireflowPrompts },
+  shortlistpro: { ...shortlistpro, prompts: shortlistproPrompts },
+} as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const g = globalThis as any;
@@ -47,8 +54,12 @@ function resolveTemplateName(): TemplateName {
 
 export const TEMPLATE_NAME: TemplateName = resolveTemplateName();
 
-/** The full template object (rich schema: terms, fonts, stageLabels, featureFlags, …). */
+/** The full template object (rich schema: terms, fonts, stageLabels, featureFlags, prompts, …). */
 export const template = TEMPLATES[TEMPLATE_NAME];
+
+/** Prompt builders for the active template — used by the workflow engine. */
+export const prompts = template.prompts;
+export type { Prompts } from "./templates/hiringai/prompts";
 
 /**
  * Back-compat flattened branding used by existing report/UI consumers.
