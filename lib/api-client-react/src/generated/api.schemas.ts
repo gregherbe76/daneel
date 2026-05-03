@@ -500,16 +500,31 @@ export interface RunVariantBody {
   runEnrichment?: boolean;
 }
 
-export interface JobRunSummary {
-  id: number;
-  jobId: number;
-  status: RunStatus;
-  dataMode: DataMode;
-  runSourcing: boolean;
-  variantOf?: number | null;
-  variantLabel?: string | null;
-  variantCriteria?: VariantCriteria | null;
-  createdAt: string;
+/**
+ * Optional per-run summary stats a sourcing provider can return alongside the candidate list. Lets the UI explain WHY a run returned few/no results.
+
+ */
+export interface SourcingStats {
+  /** Raw hit count reported by upstream search (e.g. GitHub total_count). */
+  searchTotalCount?: number;
+  /** Number of candidates the provider actually fetched and inspected. */
+  consideredCount?: number;
+  /** Number of candidates the LLM successfully extracted from raw search results. */
+  extractedCount?: number;
+  /** Dropped because the provider's "must have a bio" filter rejected them. */
+  droppedNoBio?: number;
+  /** Dropped because the provider's "active within N months" filter rejected them. */
+  droppedStale?: number;
+  /** Dropped because of a transient per-candidate fetch failure. */
+  droppedFetchError?: number;
+  /** Dropped because no usable profile URL could be extracted (web-search providers). */
+  droppedNoProfile?: number;
+  /** Dropped because the URL or evidence looked fabricated by the LLM. */
+  droppedFabricated?: number;
+  /** Dropped because the row failed schema/quality validation. */
+  droppedInvalid?: number;
+  /** Final count of candidates returned to the engine. */
+  returnedCount?: number;
 }
 
 export type StepStatus = (typeof StepStatus)[keyof typeof StepStatus];
@@ -520,6 +535,27 @@ export const StepStatus = {
   completed: "completed",
   failed: "failed",
 } as const;
+
+export interface JobRunSummary {
+  id: number;
+  jobId: number;
+  status: RunStatus;
+  dataMode: DataMode;
+  runSourcing: boolean;
+  variantOf?: number | null;
+  variantLabel?: string | null;
+  variantCriteria?: VariantCriteria | null;
+  createdAt: string;
+  /** Per-run sourcing filter breakdown (search hits, dropped for empty bio, dropped for stale activity, etc.) when the run included a sourcing step. Null for runs without sourcing or when the provider did not report stats.
+   */
+  sourcingStats?: SourcingStats | null;
+  /** Status of the sourcing step for this run, if any. */
+  sourcingStatus?: StepStatus | null;
+  /** Number of new candidates saved by the sourcing step. */
+  sourcingSaved?: number | null;
+  /** Error message if the sourcing step failed. */
+  sourcingError?: string | null;
+}
 
 export interface AgentLog {
   id: number;

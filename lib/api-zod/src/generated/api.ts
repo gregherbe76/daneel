@@ -2257,6 +2257,84 @@ export const ListJobRunsResponseItem = zod.object({
     })
     .nullish(),
   createdAt: zod.coerce.date(),
+  sourcingStats: zod
+    .object({
+      searchTotalCount: zod
+        .number()
+        .optional()
+        .describe(
+          "Raw hit count reported by upstream search (e.g. GitHub total_count).",
+        ),
+      consideredCount: zod
+        .number()
+        .optional()
+        .describe(
+          "Number of candidates the provider actually fetched and inspected.",
+        ),
+      extractedCount: zod
+        .number()
+        .optional()
+        .describe(
+          "Number of candidates the LLM successfully extracted from raw search results.",
+        ),
+      droppedNoBio: zod
+        .number()
+        .optional()
+        .describe(
+          'Dropped because the provider\'s \"must have a bio\" filter rejected them.',
+        ),
+      droppedStale: zod
+        .number()
+        .optional()
+        .describe(
+          'Dropped because the provider\'s \"active within N months\" filter rejected them.',
+        ),
+      droppedFetchError: zod
+        .number()
+        .optional()
+        .describe(
+          "Dropped because of a transient per-candidate fetch failure.",
+        ),
+      droppedNoProfile: zod
+        .number()
+        .optional()
+        .describe(
+          "Dropped because no usable profile URL could be extracted (web-search providers).",
+        ),
+      droppedFabricated: zod
+        .number()
+        .optional()
+        .describe(
+          "Dropped because the URL or evidence looked fabricated by the LLM.",
+        ),
+      droppedInvalid: zod
+        .number()
+        .optional()
+        .describe("Dropped because the row failed schema\/quality validation."),
+      returnedCount: zod
+        .number()
+        .optional()
+        .describe("Final count of candidates returned to the engine."),
+    })
+    .describe(
+      "Optional per-run summary stats a sourcing provider can return alongside the candidate list. Lets the UI explain WHY a run returned few\/no results.\n",
+    )
+    .nullish()
+    .describe(
+      "Per-run sourcing filter breakdown (search hits, dropped for empty bio, dropped for stale activity, etc.) when the run included a sourcing step. Null for runs without sourcing or when the provider did not report stats.\n",
+    ),
+  sourcingStatus: zod
+    .enum(["pending", "running", "completed", "failed"])
+    .nullish()
+    .describe("Status of the sourcing step for this run, if any."),
+  sourcingSaved: zod
+    .number()
+    .nullish()
+    .describe("Number of new candidates saved by the sourcing step."),
+  sourcingError: zod
+    .string()
+    .nullish()
+    .describe("Error message if the sourcing step failed."),
 });
 export const ListJobRunsResponse = zod.array(ListJobRunsResponseItem);
 

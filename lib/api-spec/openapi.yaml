@@ -1773,7 +1773,67 @@ components:
         createdAt:
           type: string
           format: date-time
+        sourcingStats:
+          nullable: true
+          description: >
+            Per-run sourcing filter breakdown (search hits, dropped for empty
+            bio, dropped for stale activity, etc.) when the run included a
+            sourcing step. Null for runs without sourcing or when the provider
+            did not report stats.
+          allOf:
+            - $ref: "#/components/schemas/SourcingStats"
+        sourcingStatus:
+          nullable: true
+          description: Status of the sourcing step for this run, if any.
+          allOf:
+            - $ref: "#/components/schemas/StepStatus"
+        sourcingSaved:
+          type: integer
+          nullable: true
+          description: Number of new candidates saved by the sourcing step.
+        sourcingError:
+          type: string
+          nullable: true
+          description: Error message if the sourcing step failed.
       required: [id, jobId, status, dataMode, runSourcing, createdAt]
+
+    SourcingStats:
+      type: object
+      description: >
+        Optional per-run summary stats a sourcing provider can return
+        alongside the candidate list. Lets the UI explain WHY a run returned
+        few/no results.
+      properties:
+        searchTotalCount:
+          type: integer
+          description: Raw hit count reported by upstream search (e.g. GitHub total_count).
+        consideredCount:
+          type: integer
+          description: Number of candidates the provider actually fetched and inspected.
+        extractedCount:
+          type: integer
+          description: Number of candidates the LLM successfully extracted from raw search results.
+        droppedNoBio:
+          type: integer
+          description: Dropped because the provider's "must have a bio" filter rejected them.
+        droppedStale:
+          type: integer
+          description: Dropped because the provider's "active within N months" filter rejected them.
+        droppedFetchError:
+          type: integer
+          description: Dropped because of a transient per-candidate fetch failure.
+        droppedNoProfile:
+          type: integer
+          description: Dropped because no usable profile URL could be extracted (web-search providers).
+        droppedFabricated:
+          type: integer
+          description: Dropped because the URL or evidence looked fabricated by the LLM.
+        droppedInvalid:
+          type: integer
+          description: Dropped because the row failed schema/quality validation.
+        returnedCount:
+          type: integer
+          description: Final count of candidates returned to the engine.
 
     DataMode:
       type: string

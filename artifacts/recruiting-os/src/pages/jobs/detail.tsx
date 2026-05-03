@@ -10,6 +10,7 @@ import {
   getGetLatestJobWorkflowQueryKey,
   useRunVariantWorkflow,
   useImproveAndRerun,
+  useListJobRuns,
   getListJobRunsQueryKey,
   useListProviderStepSettings,
   usePreviewGithubQuery,
@@ -319,6 +320,14 @@ export default function JobDetailPage() {
         return (status === 'running' || status === 'pending') ? 3000 : false;
       }
     }
+  });
+
+  // All runs for this job — used to show the sourcing filter breakdown for
+  // *historical* runs too, not just the latest one. The list is descending by
+  // createdAt; we drop the most recent so we don't duplicate the latest-run
+  // panel rendered above.
+  const { data: jobRuns } = useListJobRuns(jobId, {
+    query: { enabled: !!jobId, queryKey: getListJobRunsQueryKey(jobId) },
   });
 
   const runWorkflow = useRunWorkflow();
@@ -999,6 +1008,154 @@ export default function JobDetailPage() {
                                 )}
                               </div>
                             )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Past sourcing runs — same filter breakdown as the
+                        latest-run panel above, but for historical runs so
+                        recruiters can compare which filter was the bottleneck
+                        across runs (e.g. did loosening activeWithinMonths help?). */}
+                    {(() => {
+                      const latestRunId = workflowData.run.id;
+                      const pastSourcingRuns = (jobRuns ?? []).filter(
+                        (r) => r.id !== latestRunId && r.runSourcing,
+                      );
+                      if (pastSourcingRuns.length === 0) return null;
+                      return (
+                        <div>
+                          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                            Past Sourcing Runs
+                          </h3>
+                          <div className="space-y-2">
+                            {pastSourcingRuns.map((r) => {
+                              const stats = r.sourcingStats ?? null;
+                              const status = r.sourcingStatus ?? r.status;
+                              const saved = r.sourcingSaved ?? null;
+                              const totalDropped =
+                                (stats?.droppedNoBio ?? 0) +
+                                (stats?.droppedStale ?? 0) +
+                                (stats?.droppedFetchError ?? 0) +
+                                (stats?.droppedInvalid ?? 0) +
+                                (stats?.droppedNoProfile ?? 0) +
+                                (stats?.droppedFabricated ?? 0);
+                              const date = new Date(r.createdAt).toLocaleString(
+                                "en-US",
+                                { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" },
+                              );
+                              const isVariantRun = !!r.variantOf;
+                              const label = r.variantLabel
+                                ? r.variantLabel
+                                : isVariantRun
+                                ? "Variant run"
+                                : "Baseline";
+                              return (
+                                <div
+                                  key={r.id}
+                                  className={`rounded-md border p-3 ${
+                                    status === "failed"
+                                      ? "border-destructive/30 bg-destructive/5"
+                                      : "border-border bg-muted/20"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      {isVariantRun ? (
+                                        <GitBranch className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                                      ) : (
+                                        <Zap className="h-3.5 w-3.5 text-purple-600 shrink-0" />
+                                      )}
+                                      <span className="text-xs font-medium truncate">{label}</span>
+                                      <span className="text-[11px] text-muted-foreground shrink-0">· {date}</span>
+                                    </div>
+                                    <Badge
+                                      variant="outline"
+                                      className={`text-[10px] capitalize shrink-0 ${
+                                        status === "completed"
+                                          ? "bg-green-500/10 text-green-700 border-green-200"
+                                          : status === "failed"
+                                          ? "bg-destructive/10 text-destructive border-destructive/30"
+                                          : "bg-muted text-muted-foreground"
+                                      }`}
+                                    >
+                                      {status === "completed" && saved != null
+                                        ? `${saved} saved`
+                                        : status}
+                                    </Badge>
+                                  </div>
+                                  {status === "failed" && r.sourcingError && (
+                                    <p className="text-[11px] text-destructive">{r.sourcingError}</p>
+                                  )}
+                                  {stats ? (
+                                    <div className="flex flex-wrap gap-1.5 text-[11px]">
+                                      {stats.searchTotalCount != null && (
+                                        <Badge variant="outline" className="bg-background">
+                                          {stats.searchTotalCount.toLocaleString()} search hits
+                                        </Badge>
+                                      )}
+                                      {stats.consideredCount != null && (
+                                        <Badge variant="outline" className="bg-background">
+                                          {stats.consideredCount} inspected
+                                        </Badge>
+                                      )}
+                                      {stats.extractedCount != null &&
+                                        stats.extractedCount !== stats.consideredCount && (
+                                          <Badge variant="outline" className="bg-background">
+                                            {stats.extractedCount} extracted
+                                          </Badge>
+                                        )}
+                                      {stats.returnedCount != null && (
+                                        <Badge variant="outline" className="bg-purple-500/10 text-purple-700 border-purple-200">
+                                          {stats.returnedCount} returned
+                                        </Badge>
+                                      )}
+                                      {(stats.droppedNoBio ?? 0) > 0 && (
+                                        <Badge variant="outline" className="bg-amber-500/10 text-amber-800 border-amber-200">
+                                          {stats.droppedNoBio} dropped: empty bio
+                                        </Badge>
+                                      )}
+                                      {(stats.droppedStale ?? 0) > 0 && (
+                                        <Badge variant="outline" className="bg-amber-500/10 text-amber-800 border-amber-200">
+                                          {stats.droppedStale} dropped: stale activity
+                                        </Badge>
+                                      )}
+                                      {(stats.droppedNoProfile ?? 0) > 0 && (
+                                        <Badge variant="outline" className="bg-amber-500/10 text-amber-800 border-amber-200">
+                                          {stats.droppedNoProfile} dropped: no profile URL
+                                        </Badge>
+                                      )}
+                                      {(stats.droppedFabricated ?? 0) > 0 && (
+                                        <Badge variant="outline" className="bg-amber-500/10 text-amber-800 border-amber-200">
+                                          {stats.droppedFabricated} dropped: fabricated
+                                        </Badge>
+                                      )}
+                                      {(stats.droppedInvalid ?? 0) > 0 && (
+                                        <Badge variant="outline" className="bg-amber-500/10 text-amber-800 border-amber-200">
+                                          {stats.droppedInvalid} dropped: invalid row
+                                        </Badge>
+                                      )}
+                                      {(stats.droppedFetchError ?? 0) > 0 && (
+                                        <Badge variant="outline" className="bg-muted text-muted-foreground">
+                                          {stats.droppedFetchError} dropped: fetch error
+                                        </Badge>
+                                      )}
+                                      {totalDropped > 0 && (saved ?? 0) === 0 && (
+                                        <span className="basis-full text-[11px] text-amber-800 mt-0.5">
+                                          Quality filters dropped every candidate.
+                                        </span>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    status === "completed" && (
+                                      <p className="text-[11px] text-muted-foreground">
+                                        No filter breakdown reported by this provider.
+                                      </p>
+                                    )
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );

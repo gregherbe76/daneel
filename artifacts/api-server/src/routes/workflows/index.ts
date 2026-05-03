@@ -8,7 +8,7 @@ import {
   shortlistsTable,
   candidatesTable,
 } from "@workspace/db";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, and } from "drizzle-orm";
 import { RunWorkflowBody } from "@workspace/api-zod";
 import type { DataMode } from "@workspace/db";
 import { z } from "zod";
@@ -96,7 +96,10 @@ router.get("/workflows/runs", async (_req, res) => {
   res.json(runs);
 });
 
-// GET /workflows/jobs/:jobId/runs — list all runs for a job
+// GET /workflows/jobs/:jobId/runs — list all runs for a job.
+// We also attach the sourcing-step breakdown (search hits / dropped / returned)
+// for each run that included sourcing, so the UI can show the same filter
+// drop-off explanation on historical runs — not just the latest one.
 router.get("/workflows/jobs/:jobId/runs", async (req, res) => {
   const jobId = parseInt(req.params.jobId, 10);
   const runs = await db
@@ -104,7 +107,73 @@ router.get("/workflows/jobs/:jobId/runs", async (req, res) => {
     .from(agentRunsTable)
     .where(eq(agentRunsTable.jobId, jobId))
     .orderBy(desc(agentRunsTable.createdAt));
-  res.json(runs);
+
+  const sourcingRunIds = runs.filter((r) => r.runSourcing).map((r) => r.id);
+  type SourcingLogRow = {
+    runId: number;
+    status: string;
+    output: unknown;
+    createdAt: Date;
+    id: number;
+  };
+  let sourcingLogs: SourcingLogRow[] = [];
+  if (sourcingRunIds.length > 0) {
+    // Restrict to the sourcing step explicitly — a run may have multiple
+    // completed step logs (insight, sourcing, scoring, …) and we only want
+    // sourcing's output. Order by createdAt/id so selection is deterministic.
+    sourcingLogs = (await db
+      .select({
+        runId: agentLogsTable.runId,
+        status: agentLogsTable.status,
+        output: agentLogsTable.output,
+        createdAt: agentLogsTable.createdAt,
+        id: agentLogsTable.id,
+      })
+      .from(agentLogsTable)
+      .where(
+        and(
+          inArray(agentLogsTable.runId, sourcingRunIds),
+          eq(agentLogsTable.step, "sourcing"),
+        ),
+      )
+      .orderBy(agentLogsTable.createdAt, agentLogsTable.id)) as SourcingLogRow[];
+  }
+  // Pick the most informative sourcing log per run (completed > failed >
+  // running > pending). Ties are broken by the most recent row, which is
+  // deterministic because the query above is ordered.
+  const stepRank: Record<string, number> = {
+    completed: 4,
+    failed: 3,
+    running: 2,
+    pending: 1,
+  };
+  const sourcingByRun = new Map<number, SourcingLogRow>();
+  for (const row of sourcingLogs) {
+    const prev = sourcingByRun.get(row.runId);
+    if (!prev || (stepRank[row.status] ?? 0) >= (stepRank[prev.status] ?? 0)) {
+      sourcingByRun.set(row.runId, row);
+    }
+  }
+
+  const enriched = runs.map((r) => {
+    if (!r.runSourcing) return r;
+    const log = sourcingByRun.get(r.id);
+    if (!log) return r;
+    const out = (log.output ?? null) as {
+      stats?: unknown;
+      saved?: number;
+      error?: string;
+    } | null;
+    return {
+      ...r,
+      sourcingStatus: log.status,
+      sourcingStats: out?.stats ?? null,
+      sourcingSaved: typeof out?.saved === "number" ? out.saved : null,
+      sourcingError: typeof out?.error === "string" ? out.error : null,
+    };
+  });
+
+  res.json(enriched);
 });
 
 // GET /workflows/runs/:id — get run with logs
