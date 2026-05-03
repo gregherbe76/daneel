@@ -267,7 +267,7 @@ router.post("/candidates/import/batch", async (req, res) => {
     return;
   }
 
-  const createdCandidates: { id: number; name: string; email: string }[] = [];
+  const createdCandidates: { id: number; name: string; email: string | null }[] = [];
   let skipped = 0;
 
   for (const row of candidates) {
@@ -354,11 +354,21 @@ router.post("/candidates/source", async (req, res) => {
       return;
     }
     provider = providerFromRow(row);
-    sourceTag = row.type === "twin_webhook" || row.type === "custom_webhook" ? "Twin" : "Mock";
+    sourceTag =
+      row.type === "github"
+        ? "GitHub Agent"
+        : row.type === "twin_webhook" || row.type === "custom_webhook"
+        ? "Twin"
+        : "Mock";
   } else {
     const resolved = await resolveSourcingProvider();
     provider = resolved.provider;
-    sourceTag = resolved.isTwin ? "Twin" : "Mock";
+    sourceTag =
+      resolved.provider.type === "github"
+        ? "GitHub Agent"
+        : resolved.isTwin
+        ? "Twin"
+        : "Mock";
   }
 
   logger.info({ jobId, provider: provider.name, sourceTag, count: clampedCount }, "Direct sourcing requested");
@@ -402,28 +412,43 @@ router.post("/candidates/source", async (req, res) => {
     return;
   }
 
-  // Deduplicate against existing candidates
-  const existingRows = await db.select({ email: candidatesTable.email }).from(candidatesTable);
-  const existingEmails = new Set(existingRows.map((r) => r.email.toLowerCase()));
+  // Deduplicate against existing candidates by githubUrl OR email — either
+  // signal alone is enough to identify the same person. GitHub-sourced rows
+  // may have no email; legacy imports may have no github URL.
+  const existingRows = await db
+    .select({ email: candidatesTable.email, githubUrl: candidatesTable.githubUrl })
+    .from(candidatesTable);
+  const existingEmails = new Set(
+    existingRows.map((r) => r.email?.toLowerCase()).filter((v): v is string => !!v),
+  );
+  const existingGithub = new Set(
+    existingRows.map((r) => r.githubUrl?.toLowerCase()).filter((v): v is string => !!v),
+  );
 
   const created: {
-    id: number; name: string; email: string;
+    id: number; name: string; email: string | null;
     headline: string | null; location: string | null; currentCompany: string | null;
     skills: string[]; summary: string | null; source: string | null;
+    githubUrl: string | null; githubUsername: string | null; sourcingConfidence: number | null;
   }[] = [];
   let skipped = 0;
 
   for (const c of raw) {
-    const emailKey = c.email?.toLowerCase();
-    if (!emailKey || existingEmails.has(emailKey)) { skipped++; continue; }
-    existingEmails.add(emailKey);
+    const emailKey = c.email?.toLowerCase() ?? null;
+    const githubKey = c.githubUrl?.toLowerCase() || null;
+    // Need at least one identity signal
+    if (!emailKey && !githubKey) { skipped++; continue; }
+    if (githubKey && existingGithub.has(githubKey)) { skipped++; continue; }
+    if (emailKey && existingEmails.has(emailKey)) { skipped++; continue; }
+    if (emailKey) existingEmails.add(emailKey);
+    if (githubKey) existingGithub.add(githubKey);
 
     try {
       const [inserted] = await db
         .insert(candidatesTable)
         .values({
           name: c.name,
-          email: c.email,
+          email: c.email || null,
           linkedIn: c.linkedinUrl || null,
           summary: c.summary || null,
           skills: Array.isArray(c.skills) ? c.skills : [],
@@ -431,6 +456,8 @@ router.post("/candidates/source", async (req, res) => {
           location: c.location || null,
           currentCompany: c.currentCompany || null,
           githubUrl: c.githubUrl || null,
+          githubUsername: c.username || null,
+          sourcingConfidence: c.confidence ?? null,
           source: sourceTag,
         })
         .returning({
@@ -443,6 +470,9 @@ router.post("/candidates/source", async (req, res) => {
           skills: candidatesTable.skills,
           summary: candidatesTable.summary,
           source: candidatesTable.source,
+          githubUrl: candidatesTable.githubUrl,
+          githubUsername: candidatesTable.githubUsername,
+          sourcingConfidence: candidatesTable.sourcingConfidence,
         });
 
       if (inserted) {
@@ -548,7 +578,7 @@ router.post(
     }
 
     const jobId = req.body.jobId ? Number(req.body.jobId) : undefined;
-    const results = { created: 0, skipped: 0, failed: 0, candidates: [] as { name: string; email: string }[] };
+    const results = { created: 0, skipped: 0, failed: 0, candidates: [] as { name: string; email: string | null }[] };
     const createdIds: number[] = [];
 
     for (const file of files) {

@@ -58,11 +58,12 @@ import {
   Cpu,
   Webhook,
   Zap,
+  Github,
 } from "lucide-react";
 
 // ── types ────────────────────────────────────────────────────────────────────
 
-type ProviderType = "native_openai" | "custom_webhook" | "twin_webhook";
+type ProviderType = "native_openai" | "custom_webhook" | "twin_webhook" | "github";
 type WorkflowStep =
   | "job_understanding"
   | "candidate_matching"
@@ -96,19 +97,21 @@ const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
   native_openai: "Native OpenAI",
   custom_webhook: "Custom Webhook",
   twin_webhook: "Twin Webhook",
+  github: "GitHub Agent",
 };
 
 const PROVIDER_TYPE_ICONS: Record<ProviderType, React.ComponentType<{ className?: string }>> = {
   native_openai: Cpu,
   custom_webhook: Webhook,
   twin_webhook: Zap,
+  github: Github,
 };
 
 // ── form schema ──────────────────────────────────────────────────────────────
 
 const providerSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  type: z.enum(["native_openai", "custom_webhook", "twin_webhook"]),
+  type: z.enum(["native_openai", "custom_webhook", "twin_webhook", "github"]),
   baseUrl: z.string().optional(),
   webhookUrl: z.string().optional(),
   apiKeyPlaceholder: z.string().optional(),
@@ -435,6 +438,12 @@ function ProviderDialog({
                     <span className="text-xs text-muted-foreground">Connect to a Twin agent via base URL</span>
                   </span>
                 </SelectItem>
+                <SelectItem value="github">
+                  <span className="flex flex-col">
+                    <span className="font-medium">GitHub Agent</span>
+                    <span className="text-xs text-muted-foreground">Source real public GitHub users via the GitHub REST API</span>
+                  </span>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -471,6 +480,12 @@ function ProviderDialog({
           {providerType === "native_openai" && (
             <div className="rounded-md bg-muted/50 border border-border p-3 text-sm text-muted-foreground">
               No configuration needed. This provider uses your Replit AI Integrations OpenAI connection automatically.
+            </div>
+          )}
+
+          {providerType === "github" && (
+            <div className="rounded-md bg-muted/50 border border-border p-3 text-sm text-muted-foreground">
+              Sources candidates from the public GitHub REST API. Set the <code className="text-xs">GITHUB_TOKEN</code> secret to raise rate limits — the agent works without it but is limited to ~60 requests/hour.
             </div>
           )}
 

@@ -5,7 +5,7 @@ import { logger } from "../../../lib/logger";
 export type EnrichmentCandidate = {
   id: number;
   name: string;
-  email: string;
+  email: string | null;
   skills: string[];
   summary: string | null;
   headline: string | null;
@@ -74,7 +74,7 @@ Must-Have Skills: ${jobContext.mustHaveSkills.join(", ")}
 CANDIDATES:
 ${candidates.map((c, i) => `[${i}] id=${c.id}
   name: "${c.name}"
-  email: "${c.email}"
+  email: "${c.email ?? "(none)"}"
   headline: "${c.headline ?? "(none)"}"
   currentCompany: "${c.currentCompany ?? "(none)"}"
   location: "${c.location ?? "(none)"}"

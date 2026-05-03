@@ -1039,6 +1039,7 @@ components:
           type: string
         email:
           type: string
+          nullable: true
         linkedIn:
           type: string
           nullable: true
@@ -1060,6 +1061,12 @@ components:
           nullable: true
         githubUrl:
           type: string
+          nullable: true
+        githubUsername:
+          type: string
+          nullable: true
+        sourcingConfidence:
+          type: number
           nullable: true
         source:
           type: string
@@ -1084,7 +1091,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, name, email, skills, createdAt, updatedAt]
+      required: [id, name, skills, createdAt, updatedAt]
 
     CreateCandidateBody:
       type: object
@@ -1292,7 +1299,7 @@ components:
     # ── PROVIDERS ──
     ProviderType:
       type: string
-      enum: [native_openai, custom_webhook, twin_webhook]
+      enum: [native_openai, custom_webhook, twin_webhook, github]
 
     WorkflowStepName:
       type: string

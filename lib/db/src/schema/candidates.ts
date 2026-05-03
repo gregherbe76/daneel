@@ -5,7 +5,7 @@ import { z } from "zod/v4";
 export const candidatesTable = pgTable("candidates", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  email: text("email").notNull().unique(),
+  email: text("email").unique(),
   linkedIn: text("linked_in"),
   summary: text("summary"),
   skills: text("skills").array().notNull().default([]),
@@ -14,6 +14,8 @@ export const candidatesTable = pgTable("candidates", {
   location: text("location"),
   currentCompany: text("current_company"),
   githubUrl: text("github_url"),
+  githubUsername: text("github_username"),
+  sourcingConfidence: real("sourcing_confidence"),
   source: text("source"),
   // Enrichment fields
   enrichedAt: timestamp("enriched_at"),

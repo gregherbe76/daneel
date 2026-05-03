@@ -12,6 +12,7 @@ export const providerTypeEnum = pgEnum("provider_type", [
   "native_openai",
   "custom_webhook",
   "twin_webhook",
+  "github",
 ]);
 
 export const workflowStepEnum = pgEnum("workflow_step", [

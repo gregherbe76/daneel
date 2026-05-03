@@ -82,24 +82,39 @@ async function runSourcing(
       payload: { job, insight },
     })) as SourcingCandidate[];
 
-    // Deduplicate by email against existing candidates
-    const existing = await db.select({ email: candidatesTable.email }).from(candidatesTable);
-    const existingEmails = new Set(existing.map((c) => c.email.toLowerCase()));
+    // Deduplicate by githubUrl OR email against existing candidates.
+    // Either signal is enough to identify the same person; GitHub-sourced rows
+    // may have no email, while imported rows may have no github URL.
+    const existing = await db
+      .select({ email: candidatesTable.email, githubUrl: candidatesTable.githubUrl })
+      .from(candidatesTable);
+    const existingEmails = new Set(
+      existing.map((c) => c.email?.toLowerCase()).filter((v): v is string => !!v),
+    );
+    const existingGithub = new Set(
+      existing.map((c) => c.githubUrl?.toLowerCase()).filter((v): v is string => !!v),
+    );
 
     const newCandidateIds: number[] = [];
     for (const c of candidates) {
-      const emailKey = c.email.toLowerCase();
-      if (existingEmails.has(emailKey)) {
+      const emailKey = c.email?.toLowerCase() ?? null;
+      const githubKey = c.githubUrl?.toLowerCase() || null;
+      if (githubKey && existingGithub.has(githubKey)) {
+        logger.warn({ githubUrl: c.githubUrl }, "Sourcing skipped duplicate github URL");
+        continue;
+      }
+      if (emailKey && existingEmails.has(emailKey)) {
         logger.warn({ email: c.email }, "Sourcing skipped duplicate email");
         continue;
       }
-      existingEmails.add(emailKey);
+      if (emailKey) existingEmails.add(emailKey);
+      if (githubKey) existingGithub.add(githubKey);
 
       const [inserted] = await db
         .insert(candidatesTable)
         .values({
           name: c.name,
-          email: c.email,
+          email: c.email || null,
           linkedIn: c.linkedinUrl || null,
           summary: c.summary || null,
           skills: c.skills,
@@ -107,6 +122,8 @@ async function runSourcing(
           location: c.location || null,
           currentCompany: c.currentCompany || null,
           githubUrl: c.githubUrl || null,
+          githubUsername: c.username || null,
+          sourcingConfidence: c.confidence ?? null,
           source: sourceTag,
         })
         .returning({ id: candidatesTable.id });
@@ -433,7 +450,7 @@ async function runCandidateMatching(
   candidates: Array<{
     id: number;
     name: string;
-    email: string;
+    email: string | null;
     skills: string[];
     summary: string | null;
     enrichmentStatus: string | null;
@@ -659,16 +676,17 @@ export async function runWorkflowEngine(
       const { provider: sourcingProvider, isTwin } = await resolveSourcingProvider();
 
       if (dataMode === "real") {
-        // Real mode: only Twin providers are allowed for sourcing
+        // Real mode: only "real" providers are allowed for sourcing (Twin/custom_webhook/github)
         if (!isTwin) {
-          logger.warn({ runId }, "Real mode: no Twin provider assigned to sourcing — skipping sourcing step");
+          logger.warn({ runId }, "Real mode: no real provider assigned to sourcing — skipping sourcing step");
           await logStep(runId, "sourcing", "failed", null, {
-            note: "Skipped: real data mode requires a Twin webhook provider for sourcing. Assign one in Settings → Providers.",
+            note: "Skipped: real data mode requires a real sourcing provider (Twin webhook or GitHub Agent). Assign one in Settings → Providers.",
           });
         } else {
-          // Real mode with Twin provider → source and tag as "Twin"
+          // Real mode with a real provider → tag with provider-specific source
+          const realSourceTag = sourcingProvider.type === "github" ? "GitHub Agent" : SOURCE_TWIN;
           try {
-            await runSourcing(runId, jobId, effectiveJob, insight, SOURCE_TWIN, sourcingProvider);
+            await runSourcing(runId, jobId, effectiveJob, insight, realSourceTag, sourcingProvider);
           } catch (err) {
             // Twin sourcing failed in real mode → demote to fallback
             logger.error({ runId, err }, "Real mode: Twin sourcing failed — demoting run to fallback mode");

@@ -27,6 +27,7 @@ import {
   Building2,
   Zap,
   Play,
+  Github,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -34,14 +35,14 @@ import {
 type Provider = {
   id: number;
   name: string;
-  type: "native_openai" | "custom_webhook" | "twin_webhook";
+  type: "native_openai" | "custom_webhook" | "twin_webhook" | "github";
   enabled: boolean;
 };
 
 type SourcingResult = {
   id: number;
   name: string;
-  email: string;
+  email: string | null;
   headline: string | null;
   location: string | null;
   currentCompany: string | null;
@@ -84,6 +85,14 @@ function SourceBadge({ source }: { source: string | null }) {
       <Badge variant="outline" className="text-[10px] bg-purple-500/10 text-purple-700 border-purple-200 shrink-0">
         <Zap className="h-2.5 w-2.5 mr-1" />
         Twin
+      </Badge>
+    );
+  }
+  if (source === "GitHub Agent") {
+    return (
+      <Badge variant="outline" className="text-[10px] bg-slate-500/10 text-slate-700 border-slate-200 shrink-0">
+        <Github className="h-2.5 w-2.5 mr-1" />
+        GitHub
       </Badge>
     );
   }
@@ -150,7 +159,7 @@ function ProviderCard({
   description: string;
   selected: boolean;
   onClick: () => void;
-  tag?: "twin" | "mock";
+  tag?: "twin" | "mock" | "github";
 }) {
   return (
     <button
@@ -177,6 +186,11 @@ function ProviderCard({
           {tag === "mock" && (
             <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 border-amber-200">
               Demo
+            </Badge>
+          )}
+          {tag === "github" && (
+            <Badge variant="outline" className="text-[10px] bg-slate-500/10 text-slate-700 border-slate-200">
+              <Github className="h-2.5 w-2.5 mr-1" />GitHub
             </Badge>
           )}
         </div>
@@ -225,9 +239,11 @@ export function FindCandidatesModal({
       .then((data: Provider[]) => {
         const enabled = (data ?? []).filter((p) => p.enabled);
         setProviders(enabled);
-        // auto-select: prefer twin/webhook, fall back to native
-        const twin = enabled.find((p) => p.type === "twin_webhook" || p.type === "custom_webhook");
-        setSelectedProviderId(twin ? twin.id : null);
+        // auto-select: prefer external real providers (github/twin/webhook), fall back to native
+        const real = enabled.find(
+          (p) => p.type === "github" || p.type === "twin_webhook" || p.type === "custom_webhook",
+        );
+        setSelectedProviderId(real ? real.id : null);
       })
       .catch(() => setProviders([]))
       .finally(() => setLoadingProviders(false));
@@ -267,12 +283,17 @@ export function FindCandidatesModal({
 
   const nativeOption = { id: null, label: "Native AI (demo)", description: "Generates realistic mock candidates using GPT. Not real people.", tag: "mock" as const };
   const externalOptions = providers
-    .filter((p) => p.type === "twin_webhook" || p.type === "custom_webhook")
+    .filter((p) => p.type === "twin_webhook" || p.type === "custom_webhook" || p.type === "github")
     .map((p) => ({
       id: p.id,
       label: p.name,
-      description: p.type === "twin_webhook" ? "Twin webhook — real external candidates." : "Custom webhook provider.",
-      tag: "twin" as const,
+      description:
+        p.type === "github"
+          ? "GitHub Agent — real public GitHub users matching the role."
+          : p.type === "twin_webhook"
+          ? "Twin webhook — real external candidates."
+          : "Custom webhook provider.",
+      tag: (p.type === "github" ? "github" : "twin") as "github" | "twin",
     }));
 
   const canFind = status !== "loading";

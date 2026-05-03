@@ -31,6 +31,7 @@ import { NativeOpenAIProvider } from "./native-openai";
 import { NativeOpenAIEnrichmentProvider } from "./native-openai-enrichment";
 import { CustomWebhookProvider } from "./custom-webhook";
 import { TwinWebhookProvider } from "./twin-webhook";
+import { GithubSourcingProvider } from "./github";
 import { logger } from "../../../lib/logger";
 
 /**
@@ -60,6 +61,8 @@ function buildProvider(row: typeof agentProvidersTable.$inferSelect): AgentProvi
     case "twin_webhook":
       if (!row.baseUrl) throw new Error(`Provider "${row.name}" is missing baseUrl`);
       return new TwinWebhookProvider(row.id, row.name, row.baseUrl, row.apiKeyEncryptedPlaceholder ?? undefined);
+    case "github":
+      return new GithubSourcingProvider(row.id, row.name);
     default:
       throw new Error(`Unknown provider type: ${row.type}`);
   }
@@ -101,8 +104,11 @@ export async function resolveSourcingProvider(): Promise<{ provider: AgentProvid
       return nativeFallback;
     }
 
-    // twin_webhook and custom_webhook are considered "real" providers
-    const isTwin = providerRow.type === "twin_webhook" || providerRow.type === "custom_webhook";
+    // twin_webhook, custom_webhook and github are considered "real" providers
+    const isTwin =
+      providerRow.type === "twin_webhook" ||
+      providerRow.type === "custom_webhook" ||
+      providerRow.type === "github";
     return { provider: buildProvider(providerRow), isTwin };
   } catch (err) {
     logger.error({ step: "sourcing", err }, "Failed to resolve sourcing provider — falling back to native");

@@ -90,7 +90,7 @@ export const CandidateEnrichmentStatus = {
 export interface Candidate {
   id: number;
   name: string;
-  email: string;
+  email?: string | null;
   linkedIn?: string | null;
   summary?: string | null;
   skills: string[];
@@ -98,6 +98,8 @@ export interface Candidate {
   location?: string | null;
   currentCompany?: string | null;
   githubUrl?: string | null;
+  githubUsername?: string | null;
+  sourcingConfidence?: number | null;
   source?: string | null;
   enrichedAt?: string | null;
   enrichmentSource?: string | null;
@@ -212,6 +214,7 @@ export const ProviderType = {
   native_openai: "native_openai",
   custom_webhook: "custom_webhook",
   twin_webhook: "twin_webhook",
+  github: "github",
 } as const;
 
 export type WorkflowStepName =

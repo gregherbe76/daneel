@@ -95,6 +95,7 @@ Results are fetched via `GET /api/workflows/jobs/:jobId/latest`.
 - `NativeOpenAISourcingProvider` — handles the sourcing step specifically
 - `CustomWebhookProvider` — delegates to any external HTTP endpoint
 - `TwinWebhookProvider` — extends CustomWebhook with twinContext metadata
+- `GithubSourcingProvider` — sources real public GitHub users via the public REST API (`/search/users`, `/users/{login}`, `/users/{login}/repos`); validateConnection hits `/rate_limit`; never fabricates email/name (leaves them null/empty when GitHub does not expose them); populates first-class `githubUsername` and `sourcingConfidence` columns; tagged as `source="GitHub Agent"`. Uses optional `GITHUB_TOKEN` for higher rate limits.
 - `resolveProvider(step)` — looks up DB setting, falls back to native
 - `resolveSourcingProvider()` — same but defaults to NativeOpenAISourcingProvider
 

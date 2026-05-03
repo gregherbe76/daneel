@@ -7,14 +7,24 @@ export type SourcingCandidate = {
   headline: string;
   location: string;
   currentCompany: string;
-  email: string;
+  /**
+   * Email may be empty/null when the upstream source (e.g. GitHub) has no public
+   * email. We never fabricate one — recruiters need to know if a contact email
+   * is missing.
+   */
+  email: string | null;
   linkedinUrl: string;
   githubUrl: string;
+  /** GitHub login when sourced from GitHub; otherwise null. */
+  username: string | null;
+  /** Confidence 0..1 derived by the provider; null if not computed. */
+  confidence: number | null;
   skills: string[];
   summary: string;
   evidence: string;
   potentialRisks: string;
-  source: "AI Generated / Mock Sourcing";
+  /** "AI Generated / Mock Sourcing" for native, "GitHub Agent" for github, etc. */
+  source: string;
 };
 
 export type SourcingPayload = {
@@ -87,7 +97,10 @@ IMPORTANT:
       messages: [{ role: "user", content: prompt }],
     });
 
-    return json<SourcingCandidate[]>(response.choices[0]?.message?.content ?? "[]");
+    const raw = json<Array<Omit<SourcingCandidate, "username" | "confidence"> & { username?: string | null; confidence?: number | null }>>(
+      response.choices[0]?.message?.content ?? "[]",
+    );
+    return raw.map((c) => ({ ...c, username: c.username ?? null, confidence: c.confidence ?? null }));
   }
 
   async validateConnection(): Promise<{ ok: boolean; error?: string }> {

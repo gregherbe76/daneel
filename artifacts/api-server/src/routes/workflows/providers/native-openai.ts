@@ -202,7 +202,7 @@ export type JobUnderstandingPayload = {
 export type CandidateMatchingPayload = {
   job: { title: string; description: string; mustHaveSkills: string[]; seniority: string; scoringWeights?: ScoringWeights };
   insight: JobInsightResult;
-  candidates: Array<{ id: number; name: string; email: string; skills: string[]; summary: string | null }>;
+  candidates: Array<{ id: number; name: string; email: string | null; skills: string[]; summary: string | null }>;
 };
 
 export type ShortlistPayload = {

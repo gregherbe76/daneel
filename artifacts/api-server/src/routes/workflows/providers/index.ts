@@ -6,4 +6,5 @@ export { NativeOpenAIEnrichmentProvider } from "./native-openai-enrichment";
 export type { EnrichmentResult, EnrichmentCandidate } from "./native-openai-enrichment";
 export { CustomWebhookProvider } from "./custom-webhook";
 export { TwinWebhookProvider } from "./twin-webhook";
+export { GithubSourcingProvider } from "./github";
 export { resolveProvider, resolveSourcingProvider, resolveEnrichmentProvider, providerFromRow } from "./registry";
