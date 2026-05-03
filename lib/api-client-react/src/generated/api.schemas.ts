@@ -253,6 +253,22 @@ export interface MentionEntry {
   jobTitle: string;
 }
 
+/**
+ * A regression in a candidate's email validation status — surfaced in the recruiter inbox so a previously verified address can't silently go bad.
+ */
+export interface EmailStatusChange {
+  id: number;
+  candidateId: number;
+  candidateName: string;
+  candidateEmail?: string | null;
+  previousStatus: string;
+  newStatus: string;
+  previousReason?: string | null;
+  newReason?: string | null;
+  changedAt: string;
+  notifiedAt?: string | null;
+}
+
 export type ProviderType = (typeof ProviderType)[keyof typeof ProviderType];
 
 export const ProviderType = {
@@ -746,4 +762,20 @@ export type ListMentionsForMemberParams = {
    * ISO timestamp; only return comments newer than this
    */
   since?: string;
+};
+
+export type ListEmailStatusChangesParams = {
+  /**
+   * When true, only return rows that have not been marked read.
+   */
+  unread?: boolean;
+  /**
+   * When set, only return rows for this candidate.
+   */
+  candidateId?: number;
+  limit?: number;
+};
+
+export type MarkAllEmailStatusChangesRead200 = {
+  updated: number;
 };

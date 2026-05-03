@@ -2930,6 +2930,74 @@ export const ListMentionsForMemberResponse = zod.array(
 );
 
 /**
+ * @summary List recent email validation regressions
+ */
+export const listEmailStatusChangesQueryLimitDefault = 50;
+
+export const ListEmailStatusChangesQueryParams = zod.object({
+  unread: zod.coerce
+    .boolean()
+    .optional()
+    .describe("When true, only return rows that have not been marked read."),
+  candidateId: zod.coerce
+    .number()
+    .optional()
+    .describe("When set, only return rows for this candidate."),
+  limit: zod.coerce.number().default(listEmailStatusChangesQueryLimitDefault),
+});
+
+export const ListEmailStatusChangesResponseItem = zod
+  .object({
+    id: zod.number(),
+    candidateId: zod.number(),
+    candidateName: zod.string(),
+    candidateEmail: zod.string().nullish(),
+    previousStatus: zod.string(),
+    newStatus: zod.string(),
+    previousReason: zod.string().nullish(),
+    newReason: zod.string().nullish(),
+    changedAt: zod.coerce.date(),
+    notifiedAt: zod.coerce.date().nullish(),
+  })
+  .describe(
+    "A regression in a candidate's email validation status — surfaced in the recruiter inbox so a previously verified address can't silently go bad.",
+  );
+export const ListEmailStatusChangesResponse = zod.array(
+  ListEmailStatusChangesResponseItem,
+);
+
+/**
+ * @summary Mark a single regression row as read
+ */
+export const MarkEmailStatusChangeReadParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const MarkEmailStatusChangeReadResponse = zod
+  .object({
+    id: zod.number(),
+    candidateId: zod.number(),
+    candidateName: zod.string(),
+    candidateEmail: zod.string().nullish(),
+    previousStatus: zod.string(),
+    newStatus: zod.string(),
+    previousReason: zod.string().nullish(),
+    newReason: zod.string().nullish(),
+    changedAt: zod.coerce.date(),
+    notifiedAt: zod.coerce.date().nullish(),
+  })
+  .describe(
+    "A regression in a candidate's email validation status — surfaced in the recruiter inbox so a previously verified address can't silently go bad.",
+  );
+
+/**
+ * @summary Mark every unread regression row as read
+ */
+export const MarkAllEmailStatusChangesReadResponse = zod.object({
+  updated: zod.number(),
+});
+
+/**
  * @summary Get pipeline summary - counts per stage across all jobs
  */
 export const GetPipelineSummaryResponse = zod.object({

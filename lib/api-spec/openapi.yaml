@@ -28,6 +28,8 @@ tags:
     description: Lightweight team roster used for @mentions
   - name: settings
     description: Admin-tunable application settings
+  - name: email-status-changes
+    description: Inbox of regressions in candidate email validation status
 paths:
   /healthz:
     get:
@@ -1017,6 +1019,79 @@ paths:
                 items:
                   $ref: "#/components/schemas/MentionEntry"
 
+  # ── EMAIL STATUS CHANGES (regressions inbox) ───────────────────────────────
+  /email-status-changes:
+    get:
+      operationId: listEmailStatusChanges
+      tags: [email-status-changes]
+      summary: List recent email validation regressions
+      parameters:
+        - name: unread
+          in: query
+          required: false
+          description: When true, only return rows that have not been marked read.
+          schema:
+            type: boolean
+        - name: candidateId
+          in: query
+          required: false
+          description: When set, only return rows for this candidate.
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Email status change rows joined with candidate context
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmailStatusChange"
+
+  /email-status-changes/{id}/mark-read:
+    post:
+      operationId: markEmailStatusChangeRead
+      tags: [email-status-changes]
+      summary: Mark a single regression row as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated row
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailStatusChange"
+        "404":
+          description: Not found
+
+  /email-status-changes/mark-all-read:
+    post:
+      operationId: markAllEmailStatusChangesRead
+      tags: [email-status-changes]
+      summary: Mark every unread regression row as read
+      responses:
+        "200":
+          description: Number of rows updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: integer
+                required: [updated]
+
   /pipeline/summary:
     get:
       operationId: getPipelineSummary
@@ -1407,6 +1482,44 @@ components:
         jobTitle:
           type: string
       required: [comment, candidateName, jobTitle]
+
+    EmailStatusChange:
+      type: object
+      description: A regression in a candidate's email validation status — surfaced in the recruiter inbox so a previously verified address can't silently go bad.
+      properties:
+        id:
+          type: integer
+        candidateId:
+          type: integer
+        candidateName:
+          type: string
+        candidateEmail:
+          type: string
+          nullable: true
+        previousStatus:
+          type: string
+        newStatus:
+          type: string
+        previousReason:
+          type: string
+          nullable: true
+        newReason:
+          type: string
+          nullable: true
+        changedAt:
+          type: string
+          format: date-time
+        notifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - id
+        - candidateId
+        - candidateName
+        - previousStatus
+        - newStatus
+        - changedAt
 
     # ── PROVIDERS ──
     ProviderType:

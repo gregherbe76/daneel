@@ -33,6 +33,7 @@ import type {
   CreateJobBody,
   CreateProviderBody,
   EmailRevalidationSettings,
+  EmailStatusChange,
   HealthStatus,
   HiringReport,
   ImproveAndRerunBody,
@@ -42,7 +43,9 @@ import type {
   JobWorkflowResult,
   ListCandidateCommentsParams,
   ListCandidateNotesParams,
+  ListEmailStatusChangesParams,
   ListMentionsForMemberParams,
+  MarkAllEmailStatusChangesRead200,
   MentionEntry,
   PipelineSummary,
   PreviewGithubQueryBody,
@@ -4405,6 +4408,277 @@ export function useListMentionsForMember<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List recent email validation regressions
+ */
+export const getListEmailStatusChangesUrl = (
+  params?: ListEmailStatusChangesParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/email-status-changes?${stringifiedParams}`
+    : `/api/email-status-changes`;
+};
+
+export const listEmailStatusChanges = async (
+  params?: ListEmailStatusChangesParams,
+  options?: RequestInit,
+): Promise<EmailStatusChange[]> => {
+  return customFetch<EmailStatusChange[]>(
+    getListEmailStatusChangesUrl(params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListEmailStatusChangesQueryKey = (
+  params?: ListEmailStatusChangesParams,
+) => {
+  return [`/api/email-status-changes`, ...(params ? [params] : [])] as const;
+};
+
+export const getListEmailStatusChangesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listEmailStatusChanges>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListEmailStatusChangesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listEmailStatusChanges>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListEmailStatusChangesQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listEmailStatusChanges>>
+  > = ({ signal }) =>
+    listEmailStatusChanges(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listEmailStatusChanges>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListEmailStatusChangesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listEmailStatusChanges>>
+>;
+export type ListEmailStatusChangesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List recent email validation regressions
+ */
+
+export function useListEmailStatusChanges<
+  TData = Awaited<ReturnType<typeof listEmailStatusChanges>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListEmailStatusChangesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listEmailStatusChanges>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListEmailStatusChangesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Mark a single regression row as read
+ */
+export const getMarkEmailStatusChangeReadUrl = (id: number) => {
+  return `/api/email-status-changes/${id}/mark-read`;
+};
+
+export const markEmailStatusChangeRead = async (
+  id: number,
+  options?: RequestInit,
+): Promise<EmailStatusChange> => {
+  return customFetch<EmailStatusChange>(getMarkEmailStatusChangeReadUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getMarkEmailStatusChangeReadMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof markEmailStatusChangeRead>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof markEmailStatusChangeRead>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["markEmailStatusChangeRead"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof markEmailStatusChangeRead>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return markEmailStatusChangeRead(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type MarkEmailStatusChangeReadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof markEmailStatusChangeRead>>
+>;
+
+export type MarkEmailStatusChangeReadMutationError = ErrorType<void>;
+
+/**
+ * @summary Mark a single regression row as read
+ */
+export const useMarkEmailStatusChangeRead = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof markEmailStatusChangeRead>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof markEmailStatusChangeRead>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getMarkEmailStatusChangeReadMutationOptions(options));
+};
+
+/**
+ * @summary Mark every unread regression row as read
+ */
+export const getMarkAllEmailStatusChangesReadUrl = () => {
+  return `/api/email-status-changes/mark-all-read`;
+};
+
+export const markAllEmailStatusChangesRead = async (
+  options?: RequestInit,
+): Promise<MarkAllEmailStatusChangesRead200> => {
+  return customFetch<MarkAllEmailStatusChangesRead200>(
+    getMarkAllEmailStatusChangesReadUrl(),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getMarkAllEmailStatusChangesReadMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof markAllEmailStatusChangesRead>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof markAllEmailStatusChangesRead>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["markAllEmailStatusChangesRead"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof markAllEmailStatusChangesRead>>,
+    void
+  > = () => {
+    return markAllEmailStatusChangesRead(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type MarkAllEmailStatusChangesReadMutationResult = NonNullable<
+  Awaited<ReturnType<typeof markAllEmailStatusChangesRead>>
+>;
+
+export type MarkAllEmailStatusChangesReadMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Mark every unread regression row as read
+ */
+export const useMarkAllEmailStatusChangesRead = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof markAllEmailStatusChangesRead>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof markAllEmailStatusChangesRead>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getMarkAllEmailStatusChangesReadMutationOptions(options));
+};
 
 /**
  * @summary Get pipeline summary - counts per stage across all jobs

@@ -1,7 +1,8 @@
-import { and, isNotNull, lt, or, isNull, sql, eq } from "drizzle-orm";
+import { and, isNotNull, lt, or, isNull, sql, eq, desc, gt } from "drizzle-orm";
 import {
   db,
   candidatesTable,
+  emailStatusChangesTable,
   emailRevalidationSettingsTable,
   type EmailRevalidationSettings,
 } from "@workspace/db";
@@ -100,9 +101,39 @@ export async function updateEmailRevalidationSettings(input: {
 }
 
 /**
+ * Window during which we collapse repeated regressions for the same candidate
+ * into a single inbox row. If the candidate's email flaps multiple times in
+ * one day, the recruiter only sees one unread item.
+ */
+const REGRESSION_DEDUPE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A regression is a downgrade in the recruiter's confidence that an email is
+ * deliverable. We notify on these transitions only — upgrades and first checks
+ * (`unchecked → anything`) don't matter for outreach trust.
+ *
+ * Note: the validator emits "invalid" for undeliverable; the UI labels it
+ * "Undeliverable". Status values stored here mirror the validator (`valid`,
+ * `invalid`, `risky`, `unchecked`).
+ */
+function isRegression(previous: string | null, next: string): boolean {
+  if (!previous) return false;
+  if (previous === next) return false;
+  if (previous === "valid" && (next === "invalid" || next === "risky" || next === "unchecked")) {
+    return true;
+  }
+  if (previous === "risky" && next === "invalid") return true;
+  return false;
+}
+
+/**
  * Re-run the MX-record validator for a single candidate and persist the
  * refreshed status. Returns the updated candidate row, or `null` if the
  * candidate has no email on file (in which case nothing to do).
+ *
+ * If the new status is a regression compared to the prior status (e.g. a
+ * previously verified address is now undeliverable), this also records an
+ * `email_status_changes` row so recruiters get a heads-up in their inbox.
  */
 export async function revalidateCandidateEmail(candidateId: number) {
   const [candidate] = await db
@@ -114,18 +145,61 @@ export async function revalidateCandidateEmail(candidateId: number) {
   if (!candidate.email) return candidate;
 
   const result = await validateEmail(candidate.email);
-  const [updated] = await db
-    .update(candidatesTable)
-    .set({
-      emailValidationStatus: result.status,
-      emailValidationReason: result.reason,
-      emailValidatedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(sql`${candidatesTable.id} = ${candidateId}`)
-    .returning();
+  const previousStatus = candidate.emailValidationStatus;
+  const previousReason = candidate.emailValidationReason;
 
-  return updated ?? candidate;
+  return await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(candidatesTable)
+      .set({
+        emailValidationStatus: result.status,
+        emailValidationReason: result.reason,
+        emailValidatedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(sql`${candidatesTable.id} = ${candidateId}`)
+      .returning();
+
+    if (isRegression(previousStatus, result.status)) {
+      // Collapse repeated regressions in the same 24h window — if the candidate
+      // flaps valid → invalid → valid → invalid in one day we only want one
+      // unread inbox row, refreshed in place.
+      const dedupeCutoff = new Date(Date.now() - REGRESSION_DEDUPE_WINDOW_MS);
+      const [recent] = await tx
+        .select()
+        .from(emailStatusChangesTable)
+        .where(
+          and(
+            eq(emailStatusChangesTable.candidateId, candidateId),
+            isNull(emailStatusChangesTable.notifiedAt),
+            gt(emailStatusChangesTable.changedAt, dedupeCutoff),
+          ),
+        )
+        .orderBy(desc(emailStatusChangesTable.changedAt))
+        .limit(1);
+
+      if (recent) {
+        await tx
+          .update(emailStatusChangesTable)
+          .set({
+            newStatus: result.status,
+            newReason: result.reason,
+            changedAt: new Date(),
+          })
+          .where(eq(emailStatusChangesTable.id, recent.id));
+      } else {
+        await tx.insert(emailStatusChangesTable).values({
+          candidateId,
+          previousStatus: previousStatus ?? "unchecked",
+          newStatus: result.status,
+          previousReason: previousReason ?? null,
+          newReason: result.reason,
+        });
+      }
+    }
+
+    return updated ?? candidate;
+  });
 }
 
 /**

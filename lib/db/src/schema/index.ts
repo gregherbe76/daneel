@@ -6,3 +6,4 @@ export * from "./ai-evaluations";
 export * from "./agent-providers";
 export * from "./candidate-notes";
 export * from "./email-revalidation-settings";
+export * from "./email-status-changes";

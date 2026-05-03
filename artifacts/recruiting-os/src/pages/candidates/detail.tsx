@@ -6,8 +6,11 @@ import {
   useGetCandidateApplications,
   useListJobs,
   useRecheckCandidateEmail,
+  useListEmailStatusChanges,
+  useMarkEmailStatusChangeRead,
   getGetCandidateQueryKey,
   getGetCandidateApplicationsQueryKey,
+  getListEmailStatusChangesQueryKey,
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +32,8 @@ import {
   Loader2,
   User,
   RefreshCw,
+  MailWarning,
+  X,
 } from "lucide-react";
 import { CandidateNotesPanel } from "@/components/candidate-notes-panel";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
@@ -73,6 +78,27 @@ export default function CandidateDetailPage() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetCandidateQueryKey(candidateId) });
+        queryClient.invalidateQueries({ queryKey: ["/api/email-status-changes"] });
+      },
+    },
+  });
+
+  const candidateRegressionParams = {
+    unread: true,
+    candidateId,
+    limit: 1,
+  } as const;
+  const regressionsQuery = useListEmailStatusChanges(candidateRegressionParams, {
+    query: {
+      queryKey: getListEmailStatusChangesQueryKey(candidateRegressionParams),
+      enabled: !!candidateId,
+    },
+  });
+  const candidateRegression = regressionsQuery.data?.[0];
+  const dismissRegression = useMarkEmailStatusChangeRead({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/email-status-changes"] });
       },
     },
   });
@@ -150,6 +176,34 @@ export default function CandidateDetailPage() {
                     Re-check
                   </button>
                 </span>
+              )}
+              {candidateRegression && (
+                <div
+                  className="basis-full mt-1 inline-flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900"
+                  data-testid="candidate-email-regression-callout"
+                >
+                  <MailWarning className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                  <span>Email status changed:</span>
+                  <EmailValidationBadge status={candidateRegression.previousStatus} />
+                  <span>→</span>
+                  <EmailValidationBadge
+                    status={candidateRegression.newStatus}
+                    reason={candidateRegression.newReason}
+                  />
+                  <span className="text-amber-800/80">
+                    on {new Date(candidateRegression.changedAt).toLocaleDateString()}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => dismissRegression.mutate({ id: candidateRegression.id })}
+                    disabled={dismissRegression.isPending}
+                    className="ml-1 inline-flex items-center gap-0.5 text-amber-800 hover:text-amber-950 disabled:opacity-50"
+                    title="Dismiss this email status alert"
+                    data-testid="dismiss-candidate-regression"
+                  >
+                    <X className="h-3 w-3" /> Dismiss
+                  </button>
+                </div>
               )}
               {candidate.location && (
                 <span className="flex items-center gap-1">

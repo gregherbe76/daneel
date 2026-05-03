@@ -3,11 +3,13 @@ import { Briefcase, Users, PlayCircle, ListChecks, AtSign, Settings as SettingsI
 import {
   useListTeamMembers,
   useListMentionsForMember,
+  useListEmailStatusChanges,
+  getListEmailStatusChangesQueryKey,
 } from "@workspace/api-client-react";
 import { branding } from "@workspace/branding";
 import { useCurrentUser, useMentionsLastRead } from "@/lib/current-user";
 
-function MentionsBadge() {
+function InboxBadge() {
   const teamQuery = useListTeamMembers();
   const user = useCurrentUser(teamQuery.data);
   const userId = user?.id ?? "";
@@ -22,13 +24,26 @@ function MentionsBadge() {
   });
   const items = mentionsQuery.data ?? [];
 
-  const unread = items.filter((m) => {
+  const regressionsQuery = useListEmailStatusChanges(
+    { unread: true, limit: 50 },
+    {
+      query: {
+        queryKey: getListEmailStatusChangesQueryKey({ unread: true, limit: 50 }),
+        refetchInterval: 15000,
+      },
+    },
+  );
+  const regressions = regressionsQuery.data ?? [];
+
+  const unreadMentions = items.filter((m) => {
     const iso =
       typeof m.comment.createdAt === "string"
         ? m.comment.createdAt
         : new Date(m.comment.createdAt).toISOString();
     return !lastRead || new Date(iso) > new Date(lastRead);
   }).length;
+
+  const unread = unreadMentions + regressions.length;
 
   if (unread === 0) return null;
   return (
@@ -54,7 +69,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   }> = [
     { name: "Jobs", href: "/jobs", icon: Briefcase },
     { name: "Candidates", href: "/candidates", icon: Users },
-    { name: "Mentions", href: "/mentions", icon: AtSign, badge: <MentionsBadge /> },
+    { name: "Inbox", href: "/mentions", icon: AtSign, badge: <InboxBadge /> },
     { name: "Settings", href: "/settings/providers", icon: SettingsIcon, match: undefined },
   ];
 
