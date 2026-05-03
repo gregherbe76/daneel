@@ -107,7 +107,7 @@ export class TwinWebhookProvider extends CustomWebhookProvider {
  * { candidates, stats }, validate each row, and synthesise stats when the
  * upstream omitted them so recruiters always see drop counts.
  */
-function normaliseSourcingResponse(raw: unknown): SourcingRunResult {
+export function normaliseSourcingResponse(raw: unknown): SourcingRunResult {
   let rawCandidates: unknown[] = [];
   let upstreamStats: SourcingStats | undefined;
 
