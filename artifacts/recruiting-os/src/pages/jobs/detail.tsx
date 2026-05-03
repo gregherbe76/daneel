@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useKickoffDefaults } from "./use-kickoff-defaults";
 import {
   useGetJob,
   useGetJobApplications,
@@ -345,48 +346,32 @@ export default function JobDetailPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const [isInsightsOpen, setIsInsightsOpen] = useState(true);
+  const [isAllEvalsOpen, setIsAllEvalsOpen] = useState(false);
+  const [isSourcedOpen, setIsSourcedOpen] = useState(true);
+  // Workflow kickoff defaults — the hook auto-promotes to Real + Run
+  // Sourcing on once the job loads with a real sourcing provider
+  // configured (GitHub Agent or Web Search), and freezes the moment
+  // the user explicitly clicks either toggle. See use-kickoff-defaults.ts.
+  const realSourcingAvailable = job?.hasRealSourcingProvider ?? false;
+  const {
+    dataMode,
+    runSourcing,
+    userTouched: userTouchedToggles,
+    setDataMode,
+    setRunSourcing,
+    resetTouchFlag,
+  } = useKickoffDefaults(realSourcingAvailable, !!job);
+  const [runEnrichment, setRunEnrichment] = useState(false);
+
   useEffect(() => {
     if (jobId) markJobRunsSeen(jobId);
     // Reset the "user explicitly chose toggle values" flag when switching
     // to a different job, so the new job's defaulting kicks in fresh.
-    userTouchedToggles.current = false;
+    resetTouchFlag();
+    // resetTouchFlag is a stable closure-bound setter; intentionally omitted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
-
-  const [isInsightsOpen, setIsInsightsOpen] = useState(true);
-  const [isAllEvalsOpen, setIsAllEvalsOpen] = useState(false);
-  const [isSourcedOpen, setIsSourcedOpen] = useState(true);
-  // Default to mock + sourcing-off until the job query resolves; the effect
-  // below promotes both to "real" when the job has an enabled real sourcing
-  // provider (GitHub Agent, Web Search, Twin/custom webhook). Once the user
-  // touches either toggle we stop auto-defaulting so we never silently
-  // override an explicit choice on a later refetch.
-  const [dataMode, setDataModeState] = useState<"real" | "mock">("mock");
-  const [runSourcing, setRunSourcingState] = useState(false);
-  const [runEnrichment, setRunEnrichment] = useState(false);
-  const userTouchedToggles = useRef(false);
-  const setDataMode = (v: "real" | "mock") => {
-    userTouchedToggles.current = true;
-    setDataModeState(v);
-  };
-  const setRunSourcing = (v: boolean) => {
-    userTouchedToggles.current = true;
-    setRunSourcingState(v);
-  };
-  // Promote the kickoff defaults to Real + Run Sourcing on whenever the
-  // job query resolves and reports a real sourcing provider is configured,
-  // unless the user has already touched either toggle for this job.
-  const realSourcingAvailable = job?.hasRealSourcingProvider ?? false;
-  useEffect(() => {
-    if (!job) return;
-    if (userTouchedToggles.current) return;
-    if (realSourcingAvailable) {
-      setDataModeState("real");
-      setRunSourcingState(true);
-    } else {
-      setDataModeState("mock");
-      setRunSourcingState(false);
-    }
-  }, [job, realSourcingAvailable]);
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isFindOpen, setIsFindOpen] = useState(false);
@@ -825,7 +810,7 @@ export default function JobDetailPage() {
                 {/* Default-source hint — explains why these toggles are
                     pre-selected the way they are, so recruiters know whether
                     to expect real sourcing or mock data on the next run. */}
-                {!userTouchedToggles.current && realSourcingAvailable && (
+                {!userTouchedToggles && realSourcingAvailable && (
                   <p
                     data-testid="kickoff-default-hint-real"
                     className="text-[10px] text-muted-foreground"
@@ -833,7 +818,7 @@ export default function JobDetailPage() {
                     Defaulted to real because this job has a real sourcing provider configured.
                   </p>
                 )}
-                {!userTouchedToggles.current && !realSourcingAvailable && (
+                {!userTouchedToggles && !realSourcingAvailable && (
                   <p
                     data-testid="kickoff-default-hint-mock"
                     className="text-[10px] text-muted-foreground"

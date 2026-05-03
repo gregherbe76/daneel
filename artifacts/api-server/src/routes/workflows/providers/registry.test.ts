@@ -74,10 +74,21 @@ describe("hasRealSourcingProvider", () => {
     expect(await hasRealSourcingProvider()).toBe(true);
   });
 
-  it("returns true when an enabled Twin webhook is assigned to sourcing", async () => {
+  it("returns false when only a Twin webhook is assigned (real for engine, but not auto-defaulted in UI)", async () => {
+    // Twin/custom webhooks are real providers for the engine's runtime
+    // dispatch (isTwin=true), but the kickoff modal deliberately does NOT
+    // auto-promote them to default-on, because their webhook config may
+    // not be correctly wired in every environment. Recruiters can still
+    // flip the toggle manually.
     const p = await seedProvider({ type: "twin_webhook", baseUrl: "https://twin.example.com" });
     await assignToSourcing(p.id);
-    expect(await hasRealSourcingProvider()).toBe(true);
+    expect(await hasRealSourcingProvider()).toBe(false);
+  });
+
+  it("returns false when a custom webhook is assigned (engine-real, UI-conservative)", async () => {
+    const p = await seedProvider({ type: "custom_webhook", webhookUrl: "https://hook.example.com" });
+    await assignToSourcing(p.id);
+    expect(await hasRealSourcingProvider()).toBe(false);
   });
 
   it("returns false when only a native_openai provider is assigned (mock generator)", async () => {

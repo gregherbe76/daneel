@@ -72,9 +72,9 @@ function buildProvider(row: typeof agentProvidersTable.$inferSelect): AgentProvi
 }
 
 /**
- * Provider types that count as "real" sourcing (vs. the native mock generator).
- * Single source of truth used by both `resolveSourcingProvider` (runtime
- * dispatch) and `hasRealSourcingProvider` (UI default hint).
+ * Provider types that the engine treats as "real" sourcing for runtime
+ * dispatch (vs. the native mock generator). Used by `resolveSourcingProvider`
+ * to set the `isTwin` flag.
  */
 const REAL_SOURCING_TYPES = new Set([
   "twin_webhook",
@@ -84,12 +84,24 @@ const REAL_SOURCING_TYPES = new Set([
 ]);
 
 /**
+ * Narrower set used to drive the kickoff modal's "auto-default to Real +
+ * Run Sourcing on" UX. Restricted to first-class real sourcing providers
+ * (`github` and `web_search`) — Twin/custom webhooks remain valid real
+ * providers for the engine but aren't safe to silently auto-promote the
+ * UI to, since they require manual webhook configuration that may not
+ * be wired up correctly in every environment. Recruiters with a Twin
+ * webhook can still flip the toggle manually.
+ */
+const UI_DEFAULT_REAL_SOURCING_TYPES = new Set(["github", "web_search"]);
+
+/**
  * Returns true when the sourcing step is configured with an enabled
- * "real" provider (Twin/custom webhook/GitHub Agent/Web Search).
+ * first-class real provider (GitHub Agent or Web Search).
  *
  * Used by the frontend to decide whether to default the workflow kickoff
  * modal to Real + Run Sourcing on, instead of the historical Mock + off
- * defaults. Mirrors the resolution logic of `resolveSourcingProvider`.
+ * defaults. Deliberately narrower than `resolveSourcingProvider`'s
+ * `isTwin` check.
  */
 export async function hasRealSourcingProvider(): Promise<boolean> {
   try {
@@ -108,7 +120,7 @@ export async function hasRealSourcingProvider(): Promise<boolean> {
       .limit(1);
 
     if (!providerRow || !providerRow.enabled) return false;
-    return REAL_SOURCING_TYPES.has(providerRow.type);
+    return UI_DEFAULT_REAL_SOURCING_TYPES.has(providerRow.type);
   } catch (err) {
     logger.error({ err }, "Failed to check for real sourcing provider — assuming none");
     return false;
