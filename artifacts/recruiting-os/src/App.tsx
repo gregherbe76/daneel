@@ -7,6 +7,7 @@ import { Layout } from "@/components/layout";
 import { PendingRunsWatcher } from "@/lib/pending-runs";
 
 // Pages
+import LandingPage from "./pages/landing";
 import JobsPage from "./pages/jobs/index";
 import CreateJobPage from "./pages/jobs/new";
 import EditJobPage from "./pages/jobs/edit";
@@ -19,11 +20,10 @@ import MentionsPage from "./pages/mentions";
 
 const queryClient = new QueryClient();
 
-function Router() {
+function AppRoutes() {
   return (
     <Layout>
       <Switch>
-        <Route path="/" component={() => <Redirect to="/jobs" />} />
         <Route path="/jobs" component={JobsPage} />
         <Route path="/jobs/new" component={CreateJobPage} />
         <Route path="/jobs/:id/report" component={JobReportPage} />
@@ -50,7 +50,10 @@ function App() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <PendingRunsWatcher />
-          <Router />
+          <Switch>
+            <Route path="/" component={LandingPage} />
+            <Route component={AppRoutes} />
+          </Switch>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
