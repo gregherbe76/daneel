@@ -749,6 +749,25 @@ export interface PipelineSummary {
   byStage: StageCount[];
 }
 
+/**
+ * Resolved branding values (overrides merged with template defaults)
+ */
+export interface BrandingSettings {
+  productName: string;
+  companyName: string;
+  logoUrl: string;
+  updatedAt?: string | null;
+}
+
+/**
+ * Partial branding update. Pass empty string to clear back to template default.
+ */
+export interface UpdateBrandingSettingsBody {
+  productName?: string;
+  companyName?: string;
+  logoUrl?: string;
+}
+
 export type ListCandidateNotesParams = {
   jobId?: number;
 };

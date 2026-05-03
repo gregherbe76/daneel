@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRoute, Link, useLocation, useSearch } from "wouter";
 import { useGetJob, useListJobRuns, useImproveAndRerun, getListJobRunsQueryKey } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
-import { branding } from "@workspace/branding";
+import { useBranding } from "@/lib/branding";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -482,6 +482,7 @@ function ClientFitNarrativeEditor({
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function JobReportPage() {
+  const branding = useBranding();
   const [, params] = useRoute("/jobs/:id/report");
   const jobId = parseInt(params?.id || "0", 10);
   const search = useSearch();

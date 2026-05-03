@@ -2772,6 +2772,44 @@ export const GetJobReportPdfParams = zod.object({
 });
 
 /**
+ * @summary Get the current global branding (with template defaults filled in)
+ */
+export const GetBrandingSettingsResponse = zod
+  .object({
+    productName: zod.string(),
+    companyName: zod.string(),
+    logoUrl: zod.string(),
+    updatedAt: zod.coerce.date().nullish(),
+  })
+  .describe(
+    "Resolved branding values (overrides merged with template defaults)",
+  );
+
+/**
+ * @summary Update global branding overrides (productName, companyName, logoUrl)
+ */
+export const UpdateBrandingSettingsBody = zod
+  .object({
+    productName: zod.string().optional(),
+    companyName: zod.string().optional(),
+    logoUrl: zod.string().optional(),
+  })
+  .describe(
+    "Partial branding update. Pass empty string to clear back to template default.",
+  );
+
+export const UpdateBrandingSettingsResponse = zod
+  .object({
+    productName: zod.string(),
+    companyName: zod.string(),
+    logoUrl: zod.string(),
+    updatedAt: zod.coerce.date().nullish(),
+  })
+  .describe(
+    "Resolved branding values (overrides merged with template defaults)",
+  );
+
+/**
  * @summary List recruiter notes for a candidate (optionally scoped to a job)
  */
 export const ListCandidateNotesParams = zod.object({

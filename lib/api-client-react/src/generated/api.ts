@@ -22,6 +22,7 @@ import type {
   AgentRunWithLogs,
   Application,
   ApplicationWithDetails,
+  BrandingSettings,
   Candidate,
   CandidateComment,
   CandidateNote,
@@ -56,6 +57,7 @@ import type {
   TeamMember,
   ToggleProviderBody,
   UpdateApplicationBody,
+  UpdateBrandingSettingsBody,
   UpdateEmailRevalidationSettingsBody,
   UpsertStepSettingBody,
 } from "./api.schemas";
@@ -3613,6 +3615,168 @@ export function useGetJobReportPdf<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Get the current global branding (with template defaults filled in)
+ */
+export const getGetBrandingSettingsUrl = () => {
+  return `/api/branding`;
+};
+
+export const getBrandingSettings = async (
+  options?: RequestInit,
+): Promise<BrandingSettings> => {
+  return customFetch<BrandingSettings>(getGetBrandingSettingsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBrandingSettingsQueryKey = () => {
+  return [`/api/branding`] as const;
+};
+
+export const getGetBrandingSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBrandingSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getBrandingSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBrandingSettingsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBrandingSettings>>
+  > = ({ signal }) => getBrandingSettings({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBrandingSettings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBrandingSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBrandingSettings>>
+>;
+export type GetBrandingSettingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the current global branding (with template defaults filled in)
+ */
+
+export function useGetBrandingSettings<
+  TData = Awaited<ReturnType<typeof getBrandingSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getBrandingSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBrandingSettingsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update global branding overrides (productName, companyName, logoUrl)
+ */
+export const getUpdateBrandingSettingsUrl = () => {
+  return `/api/branding`;
+};
+
+export const updateBrandingSettings = async (
+  updateBrandingSettingsBody: UpdateBrandingSettingsBody,
+  options?: RequestInit,
+): Promise<BrandingSettings> => {
+  return customFetch<BrandingSettings>(getUpdateBrandingSettingsUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateBrandingSettingsBody),
+  });
+};
+
+export const getUpdateBrandingSettingsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateBrandingSettings>>,
+    TError,
+    { data: BodyType<UpdateBrandingSettingsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateBrandingSettings>>,
+  TError,
+  { data: BodyType<UpdateBrandingSettingsBody> },
+  TContext
+> => {
+  const mutationKey = ["updateBrandingSettings"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateBrandingSettings>>,
+    { data: BodyType<UpdateBrandingSettingsBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateBrandingSettings(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateBrandingSettingsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateBrandingSettings>>
+>;
+export type UpdateBrandingSettingsMutationBody =
+  BodyType<UpdateBrandingSettingsBody>;
+export type UpdateBrandingSettingsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update global branding overrides (productName, companyName, logoUrl)
+ */
+export const useUpdateBrandingSettings = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateBrandingSettings>>,
+    TError,
+    { data: BodyType<UpdateBrandingSettingsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateBrandingSettings>>,
+  TError,
+  { data: BodyType<UpdateBrandingSettingsBody> },
+  TContext
+> => {
+  return useMutation(getUpdateBrandingSettingsMutationOptions(options));
+};
 
 /**
  * @summary List recruiter notes for a candidate (optionally scoped to a job)

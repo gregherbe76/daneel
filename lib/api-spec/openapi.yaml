@@ -30,6 +30,8 @@ tags:
     description: Admin-tunable application settings
   - name: email-status-changes
     description: Inbox of regressions in candidate email validation status
+  - name: branding
+    description: Runtime-editable global product branding (product name, company name, logo URL)
 paths:
   /healthz:
     get:
@@ -835,6 +837,37 @@ paths:
                 format: binary
         "404":
           description: No completed run found
+
+  # ── BRANDING ───────────────────────────────────────────────────────────────
+  /branding:
+    get:
+      operationId: getBrandingSettings
+      tags: [branding]
+      summary: Get the current global branding (with template defaults filled in)
+      responses:
+        "200":
+          description: Resolved branding values
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingSettings"
+    put:
+      operationId: updateBrandingSettings
+      tags: [branding]
+      summary: Update global branding overrides (productName, companyName, logoUrl)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBrandingSettingsBody"
+      responses:
+        "200":
+          description: Branding updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingSettings"
 
   # ── NOTES & COMMENTS ────────────────────────────────────────────────────────
   /candidates/{candidateId}/notes:
@@ -2371,3 +2404,31 @@ components:
           items:
             $ref: "#/components/schemas/StageCount"
       required: [totalJobs, totalCandidates, totalApplications, byStage]
+
+    # ── BRANDING ──
+    BrandingSettings:
+      type: object
+      description: Resolved branding values (overrides merged with template defaults)
+      properties:
+        productName:
+          type: string
+        companyName:
+          type: string
+        logoUrl:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [productName, companyName, logoUrl]
+
+    UpdateBrandingSettingsBody:
+      type: object
+      description: Partial branding update. Pass empty string to clear back to template default.
+      properties:
+        productName:
+          type: string
+        companyName:
+          type: string
+        logoUrl:
+          type: string

@@ -17,6 +17,7 @@ import CandidatesPage from "./pages/candidates/index";
 import CandidateDetailPage from "./pages/candidates/detail";
 import AgentProvidersPage from "./pages/settings/providers";
 import EmailRevalidationSettingsPage from "./pages/settings/email-revalidation";
+import BrandingSettingsPage from "./pages/settings/branding";
 import MentionsPage from "./pages/mentions";
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ function AppRoutes() {
         <Route path="/settings" component={() => <Redirect to="/settings/providers" />} />
         <Route path="/settings/providers" component={AgentProvidersPage} />
         <Route path="/settings/email-revalidation" component={EmailRevalidationSettingsPage} />
+        <Route path="/settings/branding" component={BrandingSettingsPage} />
         
         <Route component={NotFound} />
       </Switch>

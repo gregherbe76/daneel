@@ -1,8 +1,10 @@
 import { Link } from "wouter";
 import { ArrowRight } from "lucide-react";
-import { branding, template } from "@workspace/branding";
+import { template } from "@workspace/branding";
+import { useBranding } from "@/lib/branding";
 
 export default function LandingPage() {
+  const branding = useBranding();
   const initial = branding.productName.charAt(0);
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">

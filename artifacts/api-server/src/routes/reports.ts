@@ -12,7 +12,9 @@ import {
 import { eq, desc, and } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { logger } from "../lib/logger";
-import { branding } from "@workspace/branding";
+import { branding as defaultBranding } from "@workspace/branding";
+import { loadBrandingSettings } from "./branding";
+import { safeFetchLogoBytes } from "../lib/safe-fetch";
 
 const router = Router();
 
@@ -225,10 +227,11 @@ router.get("/reports/job/:jobId/latest/markdown", async (req, res) => {
     .map(([k, v]) => `${k}: ${v}`)
     .join(" | ");
 
+  const branding = await loadBrandingSettings();
   const clientDisplayName = branding.companyName;
   const md: string[] = [];
 
-  md.push(`# HiringAI Shortlist Report — ${job.title}`);
+  md.push(`# ${branding.productName} Shortlist Report — ${job.title}`);
   md.push(`**Prepared for:** ${clientDisplayName}  `);
   md.push(`**Location:** ${job.location} | **Seniority:** ${job.seniority}  `);
   md.push(`**Report Date:** ${new Date(generatedAt).toLocaleDateString("en-US", { dateStyle: "long" })}  `);
@@ -357,28 +360,22 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-  // ── Fetch logo image from central HiringAI branding
+  // ── Fetch logo image from runtime branding settings (DB), with template fallback.
+  // The fetch is routed through `safeFetchLogoBytes` which enforces https +
+  // public-IP only, so a user-pasted logo URL can't be used to SSRF internal
+  // services or cloud metadata endpoints.
+  const branding = await loadBrandingSettings();
   const logoUrl = branding.logoUrl || null;
-  let logoBuffer: Buffer | null = null;
-  if (logoUrl) {
-    try {
-      const imgRes = await fetch(logoUrl, { signal: AbortSignal.timeout(4000) });
-      if (imgRes.ok) {
-        logoBuffer = Buffer.from(await imgRes.arrayBuffer());
-      }
-    } catch {
-      // Logo fetch failed — continue without image
-    }
-  }
+  const logoBuffer: Buffer | null = logoUrl ? await safeFetchLogoBytes(logoUrl) : null;
 
   const doc = new PDFDocument({ margin: 50, size: "A4" });
   doc.pipe(res);
 
-  // ── Color palette (from branding config)
-  const PRIMARY: string = branding.colors.primary;
-  const MUTED: string = branding.colors.muted;
-  const ACCENT: string = branding.colors.accent;
-  const DIVIDER: string = branding.colors.divider;
+  // ── Color palette (template defaults — colors aren't user-tunable yet)
+  const PRIMARY: string = defaultBranding.colors.primary;
+  const MUTED: string = defaultBranding.colors.muted;
+  const ACCENT: string = defaultBranding.colors.accent;
+  const DIVIDER: string = defaultBranding.colors.divider;
   const GREEN = "#16a34a";
   const AMBER = "#d97706";
   const RED = "#dc2626";

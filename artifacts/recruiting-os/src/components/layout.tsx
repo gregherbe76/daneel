@@ -6,8 +6,8 @@ import {
   useListEmailStatusChanges,
   getListEmailStatusChangesQueryKey,
 } from "@workspace/api-client-react";
-import { branding } from "@workspace/branding";
 import { useCurrentUser, useMentionsLastRead } from "@/lib/current-user";
+import { useBranding } from "@/lib/branding";
 
 function InboxBadge() {
   const teamQuery = useListTeamMembers();
@@ -58,6 +58,7 @@ function InboxBadge() {
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const branding = useBranding();
 
   const navigation: Array<{
     name: string;
