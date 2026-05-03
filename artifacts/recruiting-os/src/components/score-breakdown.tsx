@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Info } from "lucide-react";
 
 export type ScoreDimension = {
   score: number;
@@ -14,6 +14,10 @@ export type ScoreBreakdown = {
   clientFit: ScoreDimension;
   stability: ScoreDimension;
   autonomy: ScoreDimension;
+  productMindset: ScoreDimension;
+  softSkills: ScoreDimension;
+  cultureFit: ScoreDimension;
+  longTermPotential: ScoreDimension;
 };
 
 const DIMENSIONS: {
@@ -27,43 +31,50 @@ const DIMENSIONS: {
     key: "skillsMatch",
     label: "Skills Match",
     abbr: "Skills",
-    description: "Technical skill coverage vs. must-haves",
-    weight: 0.25,
+    description: "How well the candidate's skills line up with the must-haves you listed for this role.",
+    weight: 0.23,
   },
   {
     key: "experienceDepth",
     label: "Experience Depth",
     abbr: "Experience",
-    description: "Depth and relevance of hands-on experience",
+    description: "Whether their past hands-on experience matches the seniority you need.",
     weight: 0.20,
   },
   {
-    key: "communication",
-    label: "Communication",
-    abbr: "Comm.",
-    description: "Clarity, professionalism, and stakeholder communication signals",
-    weight: 0.20,
-  },
-  {
-    key: "clientFit",
-    label: "Client Fit",
-    abbr: "Client",
-    description: "Alignment with client culture, values, and working style",
-    weight: 0.20,
-  },
-  {
-    key: "stability",
-    label: "Stability",
-    abbr: "Stability",
-    description: "Tenure patterns and likelihood of long-term commitment",
-    weight: 0.10,
+    key: "softSkills",
+    label: "Soft Skills",
+    abbr: "Soft",
+    description: "Communication, empathy and adaptability shown in their profile.",
+    weight: 0.15,
   },
   {
     key: "autonomy",
-    label: "Autonomy",
+    label: "Autonomy & Ownership",
     abbr: "Autonomy",
-    description: "Evidence of owning projects end-to-end without heavy direction",
-    weight: 0.05,
+    description: "Evidence they can run with projects and make decisions on their own.",
+    weight: 0.13,
+  },
+  {
+    key: "cultureFit",
+    label: "Culture Fit",
+    abbr: "Culture",
+    description: "How aligned they look with your team's stated values and ways of working.",
+    weight: 0.10,
+  },
+  {
+    key: "longTermPotential",
+    label: "Long-Term Potential",
+    abbr: "Growth",
+    description: "Their growth trajectory and learning agility — how far they could go on your team.",
+    weight: 0.10,
+  },
+  {
+    key: "productMindset",
+    label: "Product Mindset",
+    abbr: "Product",
+    description: "Whether they think about users and business impact, not just execution.",
+    weight: 0.09,
   },
 ];
 
@@ -111,8 +122,12 @@ export function ScoreBreakdownDisplay({
             <div key={dim.key}>
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-xs font-medium text-foreground truncate">
+                  <span
+                    className="text-xs font-medium text-foreground truncate inline-flex items-center gap-1"
+                    title={dim.description}
+                  >
                     {dim.label}
+                    <Info className="h-3 w-3 text-muted-foreground shrink-0" />
                   </span>
                   <span className="text-[10px] text-muted-foreground shrink-0">
                     {Math.round(dim.weight * 100)}% weight

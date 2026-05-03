@@ -326,7 +326,7 @@ export function FindCandidatesModal({
               </Button>
               <Button className="flex-1 bg-primary/90 hover:bg-primary" onClick={() => onOpenChange(false)}>
                 <Play className="mr-2 h-3.5 w-3.5" />
-                Run AI Workflow
+                Run Smart Screening
               </Button>
             </div>
           </div>

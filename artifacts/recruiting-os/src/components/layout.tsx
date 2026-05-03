@@ -20,12 +20,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="w-64 border-r border-border bg-sidebar flex flex-col">
         <div className="p-6 border-b border-border">
           <div className="flex items-center gap-2.5">
-            <LogoMark className="h-8 w-8 rounded-md shrink-0" />
+            <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center shrink-0">
+              <span className="text-primary-foreground font-bold text-sm">H</span>
+            </div>
             <h1 className="text-xl font-bold text-sidebar-foreground tracking-tight">
-              Shortlist<span className="text-[#FF3C00]">Pro</span>
+              HireFlow
             </h1>
           </div>
-          <p className="text-[11px] text-sidebar-foreground/50 mt-2">AI shortlist engine for agencies</p>
+          <p className="text-[11px] text-sidebar-foreground/50 mt-2">AI hiring workflow platform for teams</p>
         </div>
         <nav className="flex-1 p-4 space-y-1">
           {navigation.map((item) => {
@@ -47,9 +49,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="p-4 border-t border-border space-y-1">
-          <p className="px-3 pb-2 text-[10px] uppercase tracking-wider text-sidebar-foreground/40">
-            Powered by Daneel
-          </p>
           {settingsNavigation.map((item) => {
             const isActive = location.startsWith(item.href);
             return (

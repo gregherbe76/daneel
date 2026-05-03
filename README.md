@@ -1,8 +1,11 @@
-# Daneel — Agentic Recruiting OS
+# HireFlow
 
-**The open-source agentic recruiting OS.** Build your own agentic recruiting tool.
+**The AI hiring workflow platform for teams.**
 
-Use this repo as a template. Fork it, extend it, and own the logic end-to-end.
+Run your hiring workflows with AI. From job to shortlist, in one flow.
+
+> HireFlow is built on top of **Daneel**, an open-source agentic workflow engine.
+> HireFlow is the product. Daneel is the engine.
 
 Open-source · MIT licensed · production-ready starting point
 
@@ -21,20 +24,22 @@ Think Vercel ↔ Next.js: agencies use ShortlistPro, builders extend Daneel.
 
 ## What this is
 
-A workflow engine with a recruiting interface — designed to be customized by builders.
+A guided HR app for small teams, powered by an agentic workflow engine.
 
 ```
-Job Brief → Workflow Engine → Shortlist → Report
+Job Brief → Smart Screening → Top Picks → Hiring Report
 ```
 
 The system:
-- Understands the job (structured criteria from your description)
-- Scores every candidate with explainable, weighted reasoning
-- Sources new candidates via your AI provider (real or mock)
-- Enriches profiles with additional signals before scoring
-- Produces a ranked shortlist and a shareable hiring report
+- **Understands the job** — pulls structured criteria from your description
+- **Smart Screening** — scores every candidate across 7 hiring dimensions
+  (skills, experience, soft skills, autonomy, culture fit, long-term potential, product mindset)
+- **Sourcing** — brings new candidates into the pipeline before screening
+- **Profile Lookup** — fills in missing details (skills, headline, summary) before scoring
+- **Top Picks** — produces a ranked shortlist and a shareable hiring report
+- **Notes & team discussion** — leave private notes and threaded comments per candidate, scoped per role
 
-You define the criteria. The agents do the work. Every step is logged.
+You define the criteria. The engine does the work. Every step is logged.
 
 ---
 

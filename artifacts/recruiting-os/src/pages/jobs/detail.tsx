@@ -30,6 +30,7 @@ import { addPendingImproveRun, markJobRunsSeen } from "@/lib/pending-runs";
 import { ImportCandidatesModal } from "@/components/import-candidates-modal";
 import { FindCandidatesModal } from "@/components/find-candidates-modal";
 import { ImproveRerunModal, type ImproveRerunCandidate } from "@/components/improve-rerun-modal";
+import { OnboardingWizard } from "@/components/onboarding-wizard";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -392,7 +393,7 @@ export default function JobDetailPage() {
                   ) : (
                     <Sparkles className="mr-2 h-4 w-4" />
                   )}
-                  {workflowRunning ? "Running…" : "Run AI Workflow"}
+                  {workflowRunning ? "Screening…" : "Run Smart Screening"}
                 </Button>
                 <button
                   type="button"
@@ -412,13 +413,13 @@ export default function JobDetailPage() {
                   <Link href={`/jobs/${job.id}/report`}>
                     <Button variant="outline" className="whitespace-nowrap border-green-300 text-green-800 hover:bg-green-50">
                       <FileText className="mr-2 h-4 w-4" />
-                      View Shortlist
+                      View Top Picks
                     </Button>
                   </Link>
                 ) : (
                   <Button variant="outline" disabled className="opacity-40 whitespace-nowrap">
                     <FileText className="mr-2 h-4 w-4" />
-                    View Shortlist
+                    View Top Picks
                   </Button>
                 )}
                 {workflowData?.run?.status === "completed" && (
@@ -503,9 +504,9 @@ export default function JobDetailPage() {
                   <div>
                     <Label htmlFor="run-enrichment" className="text-xs font-medium cursor-pointer flex items-center gap-1.5">
                       <Sparkles className="h-3 w-3 text-blue-600" />
-                      Enrich candidates before scoring
+                      Profile Lookup before scoring
                     </Label>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Requires an enrichment provider in Workflow Step Assignments. No native fallback.</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Pulls richer details on each candidate (skills, headline, summary). Needs a Profile Lookup provider configured in Settings.</p>
                   </div>
                 </div>
                 {/* Edit job */}
@@ -523,38 +524,28 @@ export default function JobDetailPage() {
         </div>
       </div>
 
-      {/* ── Onboarding banner — show only before first run ── */}
-      {!workflowData?.run && !isLoadingWorkflow && (
-        <div className="border-b border-border bg-primary/[0.03] px-8 py-3 flex-shrink-0">
-          <div className="max-w-7xl mx-auto flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">Get started:</span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold shrink-0">1</span>
-              Add candidates
-            </span>
-            <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-            <span className="flex items-center gap-1.5">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold shrink-0">2</span>
-              Run AI Workflow
-            </span>
-            <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-            <span className="flex items-center gap-1.5">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold shrink-0">3</span>
-              View your shortlist
-            </span>
-          </div>
-        </div>
-      )}
-
       <div className="flex-1 overflow-auto bg-background">
         <div className="p-8 max-w-7xl mx-auto space-y-8">
 
-          {/* ── AI WORKFLOW INSIGHTS ── */}
+          {/* ── Persistent guided wizard ── */}
+          {!isLoadingWorkflow && (
+            <OnboardingWizard
+              jobId={jobId}
+              hasProviders={true}
+              hasCandidates={(applications?.length ?? 0) > 0}
+              hasCompletedRun={workflowData?.run?.status === "completed"}
+              onAddCandidates={() => setIsImportOpen(true)}
+              onRunScreening={handleRunWorkflow}
+              onConfigureProviders={() => { window.location.href = `${import.meta.env.BASE_URL}settings/providers`; }}
+            />
+          )}
+
+          {/* ── SMART SCREENING INSIGHTS ── */}
           <Collapsible open={isInsightsOpen} onOpenChange={setIsInsightsOpen} className="border border-border rounded-lg bg-card shadow-sm">
             <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20">
               <div className="flex items-center gap-2 flex-wrap">
                 <BrainCircuit className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold">AI Workflow Insights</h2>
+                <h2 className="text-lg font-semibold">Smart Screening Insights</h2>
                 {workflowData?.run && (
                   <Badge variant="outline" className={`ml-2 capitalize ${
                     workflowData.run.status === 'completed' ? 'border-green-500 text-green-600' :
@@ -606,7 +597,7 @@ export default function JobDetailPage() {
                     </div>
                     <h3 className="font-semibold text-lg">Ready to find your best candidates?</h3>
                     <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                      Run the AI workflow to score and rank everyone in your pipeline against this role.
+                      Run Smart Screening — we'll read every profile and rank them against this role across 7 hiring dimensions.
                     </p>
                     <Button
                       onClick={handleRunWorkflow}
@@ -614,7 +605,7 @@ export default function JobDetailPage() {
                       className="mt-2 bg-primary/90 hover:bg-primary"
                     >
                       <Sparkles className="mr-2 h-4 w-4" />
-                      Run AI Workflow
+                      Run Smart Screening
                     </Button>
                   </div>
                 ) : workflowRunning ? (
@@ -1078,7 +1069,7 @@ export default function JobDetailPage() {
               setTimeout(() => setHighlightStep2(false), 3000);
               toast({
                 title: `${created} candidate${created !== 1 ? "s" : ""} added`,
-                description: "Pipeline refreshed. Run AI Workflow to score them.",
+                description: "Pipeline refreshed. Run Smart Screening to score them.",
               });
             }
           }}
@@ -1111,7 +1102,7 @@ export default function JobDetailPage() {
             if (created > 0) {
               toast({
                 title: `${created} candidate${created !== 1 ? "s" : ""} sourced`,
-                description: "They've been added to your pipeline. Run AI Workflow to score them.",
+                description: "They've been added to your pipeline. Run Smart Screening to score them.",
               });
             }
           }}

@@ -1,6 +1,6 @@
 export const branding = {
-  productName: "ShortlistPro",
-  companyName: "ShortlistPro",
+  productName: "HireFlow",
+  companyName: "HireFlow",
   logoUrl: "",
   colors: {
     primary: "#1e293b",

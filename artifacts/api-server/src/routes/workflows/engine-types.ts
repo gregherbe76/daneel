@@ -12,12 +12,13 @@ export type ScoreDimension = {
 };
 
 export type ScoreBreakdown = {
-  skillsMatch: ScoreDimension;       // weight: 0.25
-  experienceDepth: ScoreDimension;   // weight: 0.20
-  communication: ScoreDimension;     // weight: 0.20
-  clientFit: ScoreDimension;         // weight: 0.20
-  stability: ScoreDimension;         // weight: 0.10
-  autonomy: ScoreDimension;          // weight: 0.05
+  skillsMatch: ScoreDimension;        // weight: 0.23
+  experienceDepth: ScoreDimension;    // weight: 0.20
+  autonomy: ScoreDimension;           // weight: 0.13
+  productMindset: ScoreDimension;     // weight: 0.09
+  softSkills: ScoreDimension;         // weight: 0.15
+  cultureFit: ScoreDimension;         // weight: 0.10
+  longTermPotential: ScoreDimension;  // weight: 0.10
 };
 
 export type CandidateMatchResult = {

@@ -7,6 +7,7 @@ import applicationsRouter from "./applications";
 import workflowsRouter from "./workflows";
 import providersRouter from "./providers";
 import reportsRouter from "./reports";
+import candidateNotesRouter from "./candidate-notes";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(applicationsRouter);
 router.use(workflowsRouter);
 router.use(providersRouter);
 router.use(reportsRouter);
+router.use(candidateNotesRouter);
 
 export default router;

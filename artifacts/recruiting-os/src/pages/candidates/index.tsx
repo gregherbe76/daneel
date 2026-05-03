@@ -31,7 +31,7 @@ export default function CandidatesPage() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Candidates</h1>
-          <p className="text-muted-foreground mt-1">Manage talent pool and profiles.</p>
+          <p className="text-muted-foreground mt-1">Everyone in your talent pool, in one place.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setImportOpen(true)}>

@@ -3,7 +3,7 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: Recruiting OS API
+  description: HireFlow API
 servers:
   - url: /api
     description: Base API path
@@ -22,6 +22,8 @@ tags:
     description: Agent provider management
   - name: reports
     description: Hiring manager report exports
+  - name: notes
+    description: Recruiter notes and threaded team comments on candidates
 paths:
   /healthz:
     get:
@@ -746,6 +748,145 @@ paths:
         "404":
           description: No completed run found
 
+  # ── NOTES & COMMENTS ────────────────────────────────────────────────────────
+  /candidates/{candidateId}/notes:
+    get:
+      operationId: listCandidateNotes
+      tags: [notes]
+      summary: List recruiter notes for a candidate (optionally scoped to a job)
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: jobId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Notes for the candidate
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CandidateNote"
+    post:
+      operationId: createCandidateNote
+      tags: [notes]
+      summary: Add a recruiter note to a candidate
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCandidateNoteBody"
+      responses:
+        "201":
+          description: Note created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CandidateNote"
+
+  /candidates/{candidateId}/notes/{noteId}:
+    delete:
+      operationId: deleteCandidateNote
+      tags: [notes]
+      summary: Delete a recruiter note
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: noteId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /candidates/{candidateId}/comments:
+    get:
+      operationId: listCandidateComments
+      tags: [notes]
+      summary: List threaded team comments for a candidate (optionally scoped to a job)
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: jobId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comments for the candidate
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CandidateComment"
+    post:
+      operationId: createCandidateComment
+      tags: [notes]
+      summary: Add a comment (top-level or reply) to a candidate
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCandidateCommentBody"
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CandidateComment"
+
+  /candidates/{candidateId}/comments/{commentId}:
+    delete:
+      operationId: deleteCandidateComment
+      tags: [notes]
+      summary: Delete a comment
+      parameters:
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   /pipeline/summary:
     get:
       operationId: getPipelineSummary
@@ -980,6 +1121,71 @@ components:
           type: string
           nullable: true
       required: [stage]
+
+    # ── NOTES & COMMENTS ──
+    CandidateNote:
+      type: object
+      properties:
+        id:
+          type: integer
+        candidateId:
+          type: integer
+        jobId:
+          type: integer
+        author:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, candidateId, jobId, author, body, createdAt]
+
+    CreateCandidateNoteBody:
+      type: object
+      properties:
+        jobId:
+          type: integer
+        author:
+          type: string
+        body:
+          type: string
+      required: [jobId, author, body]
+
+    CandidateComment:
+      type: object
+      properties:
+        id:
+          type: integer
+        candidateId:
+          type: integer
+        jobId:
+          type: integer
+        parentId:
+          type: integer
+          nullable: true
+        author:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, candidateId, jobId, author, body, createdAt]
+
+    CreateCandidateCommentBody:
+      type: object
+      properties:
+        jobId:
+          type: integer
+        parentId:
+          type: integer
+          nullable: true
+        author:
+          type: string
+        body:
+          type: string
+      required: [jobId, author, body]
 
     # ── PROVIDERS ──
     ProviderType:

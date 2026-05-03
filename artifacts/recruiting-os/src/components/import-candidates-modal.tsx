@@ -67,7 +67,7 @@ function parseLinkedInURLs(raw: string): PendingCandidate[] {
       skills: [],
       source: "LinkedIn Paste",
       linkedIn: url.startsWith("http") ? url : `https://${url}`,
-      summary: "Imported from LinkedIn URL. Enrichment required.",
+      summary: "Imported from LinkedIn URL. Profile Lookup required.",
     });
   }
   return out;
@@ -192,7 +192,7 @@ export function ImportCandidatesModal({
                   }}
                 >
                   <Sparkles className="h-4 w-4" />
-                  Run AI Workflow on these candidates
+                  Run Smart Screening on these candidates
                 </Button>
                 <Button variant="outline" className="w-full" onClick={() => { reset(); }}>
                   Import more
@@ -529,8 +529,8 @@ function LinkedInTab({
         <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/40 rounded-lg p-3">
           <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
           <span>
-            Names are derived from the URL slug. Run AI Workflow after import to enrich profiles
-            with skills and summaries.
+            Names are derived from the URL slug. Run Smart Screening after import to fill in
+            skills and summaries via Profile Lookup.
           </span>
         </div>
       )}

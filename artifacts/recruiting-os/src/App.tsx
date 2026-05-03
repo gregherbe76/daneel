@@ -13,6 +13,7 @@ import EditJobPage from "./pages/jobs/edit";
 import JobDetailPage from "./pages/jobs/detail";
 import JobReportPage from "./pages/jobs/report";
 import CandidatesPage from "./pages/candidates/index";
+import CandidateDetailPage from "./pages/candidates/detail";
 import AgentProvidersPage from "./pages/settings/providers";
 
 const queryClient = new QueryClient();
@@ -29,7 +30,7 @@ function Router() {
         <Route path="/jobs/:id/edit" component={EditJobPage} />
         <Route path="/candidates" component={CandidatesPage} />
         <Route path="/candidates/new" component={() => <div className="p-8">Candidate Create (WIP)</div>} />
-        <Route path="/candidates/:id" component={() => <div className="p-8">Candidate Detail (WIP)</div>} />
+        <Route path="/candidates/:id" component={CandidateDetailPage} />
         <Route path="/candidates/:id/edit" component={() => <div className="p-8">Candidate Edit (WIP)</div>} />
         <Route path="/pipeline" component={() => <div className="p-8">Pipeline (WIP)</div>} />
         <Route path="/settings" component={() => <Redirect to="/settings/providers" />} />

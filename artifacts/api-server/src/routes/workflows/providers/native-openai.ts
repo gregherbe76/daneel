@@ -92,39 +92,34 @@ Keep it concise and accurate. Return only valid JSON, no other text.`;
   /**
    * Step 2: Candidate Matching — the core scoring logic.
    *
-   * Each candidate is scored independently (concurrency: 3) across 6 weighted
+   * Each candidate is scored independently (concurrency: 3) across 7 weighted
    * dimensions. The weighted score is ALWAYS recomputed server-side after the
    * model responds — this prevents the model from drifting on arithmetic.
    *
-   * ── SCORING RUBRIC ────────────────────────────────────────────────────────
+   * ── SCORING RUBRIC (7 dimensions, sum to 1.00) ───────────────────────────
    *
-   * Dimension       Weight   What it measures
+   * Dimension          Weight   What it measures
    * ─────────────────────────────────────────────────────────────────────────
-   * skillsMatch      0.25    Coverage of required skills from the job description
-   * experienceDepth  0.20    Evidence of seniority-appropriate, hands-on depth
-   * communication    0.20    Clarity, professionalism, and stakeholder communication
-   * clientFit        0.20    Alignment with client culture, values, working style
-   * stability        0.10    Tenure patterns and long-term commitment signals
-   * autonomy         0.05    End-to-end ownership, self-direction, led initiatives
+   * skillsMatch         0.23    Coverage of required skills from the job description
+   * experienceDepth     0.20    Evidence of seniority-appropriate, hands-on depth
+   * softSkills          0.15    Communication, empathy, adaptability
+   * autonomy            0.13    End-to-end ownership, self-direction, led initiatives
+   * cultureFit          0.10    Alignment with stated team values and ways of working
+   * longTermPotential   0.10    Growth trajectory, learning agility
+   * productMindset      0.09    User/business impact awareness beyond pure execution
    *
    * Recommendation thresholds (also in the prompt):
    *   80–100 → Strong Yes
    *   60–79  → Yes
    *   40–59  → Maybe
    *   0–39   → No
-   *
-   * To customize:
-   *   - Change weights: update the prompt AND the recomputation block below
-   *   - Add/rename dimensions: add to the prompt + scoreBreakdown + recomputation
-   *   - Change thresholds: edit the recommendation line in the prompt
-   *   - See examples/custom-scoring-rubric.md for a full walkthrough
    */
   private async runCandidateMatching(payload: CandidateMatchingPayload): Promise<CandidateMatchResult[]> {
     const { job, insight, candidates } = payload;
     const results = await batchProcess(
       candidates,
       async (candidate) => {
-        const prompt = `You are a senior technical recruiter evaluating a candidate for a specific role. Be concrete and specific — never write generic statements. Every piece of reasoning must reference actual details from the candidate's profile or the job requirements.
+        const prompt = `You are an experienced HR partner evaluating a candidate for a role. Be concrete and specific — never write generic statements. Every piece of reasoning must reference actual details from the candidate's profile or the job requirements.
 
 JOB: ${job.title} (${job.seniority})
 Must-Have Skills: ${job.mustHaveSkills.join(", ")}
@@ -136,42 +131,45 @@ CANDIDATE: ${candidate.name}
 Skills: ${candidate.skills.length > 0 ? candidate.skills.join(", ") : "none listed"}
 Summary: ${candidate.summary ?? "No summary provided"}
 
-Score this candidate's FIT for the role across 6 weighted dimensions. Each dimension score is 0-100.
-The fitScore = round((skillsMatch * 0.25) + (experienceDepth * 0.20) + (communication * 0.20) + (clientFit * 0.20) + (stability * 0.10) + (autonomy * 0.05)).
+Score this candidate's FIT for the role across 7 weighted dimensions. Each dimension score is 0-100.
+The fitScore = round(
+  skillsMatch*0.23 + experienceDepth*0.20 + autonomy*0.13 + productMindset*0.09 +
+  softSkills*0.15 + cultureFit*0.10 + longTermPotential*0.10
+).
 
 IMPORTANT — Fit scoring rules:
 - Score ONLY based on evidence present in the profile. Do NOT assume or invent qualifications.
-- Do NOT penalize for missing data (e.g. an absent summary). Instead, score conservatively on that dimension and flag the gap in missingDataWarnings.
-- If a dimension has no evidence at all (no skills, no summary), score it at 20-30 (not 0) and flag it.
+- Do NOT penalize for missing data. Instead, score conservatively on that dimension and flag the gap in missingDataWarnings.
+- If a dimension has no evidence at all, score it at 20-30 (not 0) and flag it.
 - Never fabricate experience or skills that are not explicitly listed.
 
 Dimension definitions:
-- skillsMatch (weight 0.25): Coverage of must-have skills from the job. Cite specific skill matches or gaps.
-- experienceDepth (weight 0.20): Evidence of seniority-appropriate, hands-on depth. Be explicit about what is missing or present.
-- communication (weight 0.20): Signals of clear written communication, stakeholder engagement, and professional presence. Cite observable evidence or flag absence.
-- clientFit (weight 0.20): Alignment with the client's culture, working style, and values inferred from the job description. Cite specific signals.
-- stability (weight 0.10): Tenure patterns across roles — evidence of commitment vs. high churn. Flag job-hopping or gaps explicitly.
-- autonomy (weight 0.05): Evidence the candidate has owned projects end-to-end, led initiatives, or worked without heavy direction. If no evidence, say so explicitly.
+- skillsMatch (0.23): Coverage of must-have skills from the job. Cite specific skill matches or gaps.
+- experienceDepth (0.20): Evidence of seniority-appropriate, hands-on depth.
+- softSkills (0.15): Communication, empathy, adaptability — written tone, collaboration signals, customer/team contact in their summary.
+- autonomy (0.13): End-to-end ownership, led initiatives, worked without heavy direction.
+- cultureFit (0.10): Alignment with the team values and working style implied by the job description and ideal profile.
+- longTermPotential (0.10): Growth trajectory and learning agility — promotions, breadth of new skills picked up, scope expansion.
+- productMindset (0.09): Evidence the candidate thinks about users, product impact, or business outcomes.
 
 Additional rules:
 - reasoning must be 1-2 specific sentences referencing actual candidate details
-- Never write "The candidate has strong skills" — always name the specific skill and how it maps to the role
-- strengths and gaps must be specific, not generic
-- risks must be concrete with specific evidence
+- strengths, gaps and risks must be specific, not generic
 - confidenceReason: 1 sentence explaining data limitations that reduce scoring confidence (or "Profile provides sufficient data for reliable scoring" if data is complete)
 - missingDataWarnings: list 0-3 specific data gaps that affect scoring reliability (empty array if none)
 
 Return only valid JSON matching this exact structure:
 {
   "scoreBreakdown": {
-    "skillsMatch": { "score": <0-100>, "weight": 0.25, "reasoning": "<specific 1-2 sentences>" },
-    "experienceDepth": { "score": <0-100>, "weight": 0.20, "reasoning": "<specific 1-2 sentences>" },
-    "communication": { "score": <0-100>, "weight": 0.20, "reasoning": "<specific 1-2 sentences>" },
-    "clientFit": { "score": <0-100>, "weight": 0.20, "reasoning": "<specific 1-2 sentences>" },
-    "stability": { "score": <0-100>, "weight": 0.10, "reasoning": "<specific 1-2 sentences>" },
-    "autonomy": { "score": <0-100>, "weight": 0.05, "reasoning": "<specific 1-2 sentences>" }
+    "skillsMatch":       { "score": <0-100>, "weight": 0.23, "reasoning": "<specific 1-2 sentences>" },
+    "experienceDepth":   { "score": <0-100>, "weight": 0.20, "reasoning": "<specific 1-2 sentences>" },
+    "autonomy":          { "score": <0-100>, "weight": 0.13, "reasoning": "<specific 1-2 sentences>" },
+    "productMindset":    { "score": <0-100>, "weight": 0.09, "reasoning": "<specific 1-2 sentences>" },
+    "softSkills":        { "score": <0-100>, "weight": 0.15, "reasoning": "<specific 1-2 sentences>" },
+    "cultureFit":        { "score": <0-100>, "weight": 0.10, "reasoning": "<specific 1-2 sentences>" },
+    "longTermPotential": { "score": <0-100>, "weight": 0.10, "reasoning": "<specific 1-2 sentences>" }
   },
-  "fitScore": <integer 0-100, must equal round(skillsMatch*0.25 + experienceDepth*0.20 + communication*0.20 + clientFit*0.20 + stability*0.10 + autonomy*0.05)>,
+  "fitScore": <integer 0-100, must equal round(weighted sum above)>,
   "strengths": ["<specific strength citing candidate detail>", "<specific strength>"],
   "gaps": ["<specific gap naming missing skill or evidence>"],
   "risks": ["<concrete risk with specific evidence>"],
@@ -182,7 +180,7 @@ Return only valid JSON matching this exact structure:
 
         const response = await openai.chat.completions.create({
           model: "gpt-5.1",
-          max_completion_tokens: 1000,
+          max_completion_tokens: 1400,
           messages: [{ role: "user", content: prompt }],
         });
         const raw = json<{
@@ -202,12 +200,13 @@ Return only valid JSON matching this exact structure:
         const bd = raw.scoreBreakdown;
         const fitScore = bd
           ? Math.round(
-              bd.skillsMatch.score * 0.25 +
+              bd.skillsMatch.score * 0.23 +
               bd.experienceDepth.score * 0.20 +
-              (bd.communication?.score ?? 0) * 0.20 +
-              (bd.clientFit?.score ?? 0) * 0.20 +
-              (bd.stability?.score ?? 0) * 0.10 +
-              bd.autonomy.score * 0.05,
+              bd.autonomy.score * 0.13 +
+              bd.productMindset.score * 0.09 +
+              (bd.softSkills?.score ?? 0) * 0.15 +
+              (bd.cultureFit?.score ?? 0) * 0.10 +
+              (bd.longTermPotential?.score ?? 0) * 0.10,
             )
           : (raw.fitScore ?? raw.score ?? 0);
 
