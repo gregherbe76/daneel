@@ -135,6 +135,7 @@ async function runSourcing(
           githubUsername: c.username || null,
           sourcingConfidence: c.confidence ?? null,
           source: sourceTag,
+          emailSource: c.emailSource ?? null,
           emailValidationStatus: validation.status,
           emailValidationReason: validation.reason,
           emailValidatedAt: emailToValidate ? new Date() : null,

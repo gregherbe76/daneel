@@ -285,6 +285,7 @@ router.post("/candidates/import/batch", async (req, res) => {
           currentCompany: row.currentCompany || null,
           summary: row.summary || null,
           source: row.source || "Imported",
+          emailSource: "manual",
         })
         .onConflictDoNothing()
         .returning({ id: candidatesTable.id, name: candidatesTable.name, email: candidatesTable.email });
@@ -459,6 +460,7 @@ router.post("/candidates/source", async (req, res) => {
           githubUsername: c.username || null,
           sourcingConfidence: c.confidence ?? null,
           source: sourceTag,
+          emailSource: c.emailSource ?? null,
         })
         .returning({
           id: candidatesTable.id,
@@ -473,6 +475,7 @@ router.post("/candidates/source", async (req, res) => {
           githubUrl: candidatesTable.githubUrl,
           githubUsername: candidatesTable.githubUsername,
           sourcingConfidence: candidatesTable.sourcingConfidence,
+          emailSource: candidatesTable.emailSource,
         });
 
       if (inserted) {
@@ -544,6 +547,7 @@ router.post("/candidates/import/csv/confirm", async (req, res) => {
           currentCompany: row.currentCompany || null,
           summary: row.summary || null,
           source: "CSV Import",
+          emailSource: "manual",
         })
         .onConflictDoNothing()
         .returning({ id: candidatesTable.id });
@@ -595,7 +599,7 @@ router.post(
       try {
         const [created] = await db
           .insert(candidatesTable)
-          .values({ name, email, linkedIn: linkedIn || null, skills, summary: summary || null, source: "CV Upload" })
+          .values({ name, email, linkedIn: linkedIn || null, skills, summary: summary || null, source: "CV Upload", emailSource: "manual" })
           .onConflictDoNothing()
           .returning({ id: candidatesTable.id, name: candidatesTable.name, email: candidatesTable.email });
 

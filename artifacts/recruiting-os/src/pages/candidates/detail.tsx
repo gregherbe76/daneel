@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { CandidateNotesPanel } from "@/components/candidate-notes-panel";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
+import { EmailSourceBadge } from "@/components/email-source-badge";
 
 export default function CandidateDetailPage() {
   const [, params] = useRoute("/candidates/:id");
@@ -85,13 +86,21 @@ export default function CandidateDetailPage() {
               <p className="text-sm text-muted-foreground mt-0.5">{candidate.headline}</p>
             )}
             <div className="flex flex-wrap gap-3 mt-2 text-xs text-muted-foreground">
-              <a href={`mailto:${candidate.email}`} className="flex items-center gap-1 hover:text-foreground">
-                <Mail className="h-3.5 w-3.5" /> {candidate.email}
-              </a>
-              <EmailValidationBadge
-                status={candidate.emailValidationStatus}
-                reason={candidate.emailValidationReason}
-              />
+              {candidate.email && (
+                <span className="flex items-center gap-1.5">
+                  <a
+                    href={`mailto:${candidate.email}`}
+                    className="flex items-center gap-1 hover:text-foreground"
+                  >
+                    <Mail className="h-3.5 w-3.5" /> {candidate.email}
+                  </a>
+                  <EmailSourceBadge source={candidate.emailSource} />
+                  <EmailValidationBadge
+                    status={candidate.emailValidationStatus}
+                    reason={candidate.emailValidationReason}
+                  />
+                </span>
+              )}
               {candidate.location && (
                 <span className="flex items-center gap-1">
                   <MapPin className="h-3.5 w-3.5" /> {candidate.location}

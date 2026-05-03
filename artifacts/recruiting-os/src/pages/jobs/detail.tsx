@@ -42,6 +42,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CandidateNotesIndicator } from "@/components/candidate-notes-indicator";
+import { EmailSourceBadge } from "@/components/email-source-badge";
 
 // ── color helpers ────────────────────────────────────────────────────────────
 
@@ -991,9 +992,10 @@ export default function JobDetailPage() {
                               )}
                             </div>
                             
-                            <div className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
-                              <Mail className="h-3 w-3" />
+                            <div className="text-xs text-muted-foreground flex items-center gap-1.5 mb-2 min-w-0">
+                              <Mail className="h-3 w-3 shrink-0" />
                               <span className="truncate">{app.candidate.email}</span>
+                              <EmailSourceBadge source={app.candidate.emailSource} className="shrink-0" />
                             </div>
                             
                             {evalData && (

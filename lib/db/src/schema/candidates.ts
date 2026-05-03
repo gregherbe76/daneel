@@ -17,6 +17,11 @@ export const candidatesTable = pgTable("candidates", {
   githubUsername: text("github_username"),
   sourcingConfidence: real("sourcing_confidence"),
   source: text("source"),
+  // Where the candidate's email came from. Helps recruiters gauge trust before
+  // outreach. Values: "profile" (verified profile email), "commit" (inferred
+  // from public commit metadata), "noreply" (placeholder noreply, undeliverable),
+  // "generated" (AI-generated/mock placeholder), "manual" (entered by recruiter).
+  emailSource: text("email_source"),
   // Enrichment fields
   enrichedAt: timestamp("enriched_at"),
   enrichmentSource: text("enrichment_source"),

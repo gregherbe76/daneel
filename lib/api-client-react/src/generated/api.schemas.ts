@@ -77,6 +77,27 @@ export interface CreateJobBody {
   scoringWeights?: ScoringWeights;
 }
 
+/**
+ * Where the candidate's email came from, so recruiters can gauge
+trust before outreach. "profile" = verified profile email,
+"commit" = inferred from public commit metadata,
+"noreply" = placeholder noreply (not deliverable),
+"generated" = AI/mock placeholder (not deliverable),
+"manual" = entered by a recruiter.
+
+ */
+export type CandidateEmailSource =
+  | (typeof CandidateEmailSource)[keyof typeof CandidateEmailSource]
+  | null;
+
+export const CandidateEmailSource = {
+  profile: "profile",
+  commit: "commit",
+  noreply: "noreply",
+  generated: "generated",
+  manual: "manual",
+} as const;
+
 export type CandidateEnrichmentStatus =
   | (typeof CandidateEnrichmentStatus)[keyof typeof CandidateEnrichmentStatus]
   | null;
@@ -112,6 +133,14 @@ export interface Candidate {
   githubUsername?: string | null;
   sourcingConfidence?: number | null;
   source?: string | null;
+  /** Where the candidate's email came from, so recruiters can gauge
+trust before outreach. "profile" = verified profile email,
+"commit" = inferred from public commit metadata,
+"noreply" = placeholder noreply (not deliverable),
+"generated" = AI/mock placeholder (not deliverable),
+"manual" = entered by a recruiter.
+ */
+  emailSource?: CandidateEmailSource;
   enrichedAt?: string | null;
   enrichmentSource?: string | null;
   enrichmentConfidence?: number | null;

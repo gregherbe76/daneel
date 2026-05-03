@@ -19,6 +19,15 @@ export type SourcingCandidate = {
   username: string | null;
   /** Confidence 0..1 derived by the provider; null if not computed. */
   confidence: number | null;
+  /**
+   * Where the email came from, so recruiters can judge how confidently to reach out.
+   *  - "profile":  taken from a verified profile field (e.g. public GitHub email)
+   *  - "commit":   inferred from public commit metadata (best-effort, not verified)
+   *  - "noreply":  placeholder address (e.g. GitHub noreply) — not deliverable
+   *  - "generated":fabricated for mock/demo data — not deliverable
+   *  - null:       no email is associated with this candidate
+   */
+  emailSource: "profile" | "commit" | "noreply" | "generated" | null;
   skills: string[];
   summary: string;
   evidence: string;
@@ -100,7 +109,14 @@ IMPORTANT:
     const raw = json<Array<Omit<SourcingCandidate, "username" | "confidence"> & { username?: string | null; confidence?: number | null }>>(
       response.choices[0]?.message?.content ?? "[]",
     );
-    return raw.map((c) => ({ ...c, username: c.username ?? null, confidence: c.confidence ?? null }));
+    return raw.map((c) => ({
+      ...c,
+      username: c.username ?? null,
+      confidence: c.confidence ?? null,
+      // Mock candidates use placeholder *.mock@example.com addresses — flag them
+      // so the UI can warn recruiters not to send real outreach.
+      emailSource: c.email ? "generated" : null,
+    }));
   }
 
   async validateConnection(): Promise<{ ok: boolean; error?: string }> {

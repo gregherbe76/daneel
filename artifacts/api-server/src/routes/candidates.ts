@@ -32,6 +32,9 @@ router.post("/candidates", async (req, res) => {
       linkedIn: body.linkedIn ?? null,
       summary: body.summary ?? null,
       skills: body.skills,
+      // Recruiter-entered emails are first-party — flag as "manual" so the UI
+      // shows a trust label rather than leaving the field unlabeled.
+      emailSource: body.email ? "manual" : null,
     })
     .returning();
   res.status(201).json(candidate);
@@ -55,6 +58,9 @@ router.get("/candidates/:id", async (req, res) => {
 router.put("/candidates/:id", async (req, res) => {
   const { id } = UpdateCandidateParams.parse({ id: Number(req.params.id) });
   const body = UpdateCandidateBody.parse(req.body);
+  // Keep emailSource in sync when a recruiter edits the email so the trust
+  // label always reflects the current value (a recruiter typing in a fresh
+  // address overrides any prior provenance like "commit" or "noreply").
   const [candidate] = await db
     .update(candidatesTable)
     .set({
@@ -63,6 +69,7 @@ router.put("/candidates/:id", async (req, res) => {
       linkedIn: body.linkedIn ?? null,
       summary: body.summary ?? null,
       skills: body.skills,
+      emailSource: body.email ? "manual" : null,
       updatedAt: new Date(),
     })
     .where(eq(candidatesTable.id, id))

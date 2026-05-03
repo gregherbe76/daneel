@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Users, Loader2, Mail, Upload } from "lucide-react";
 import { ImportCandidatesModal } from "@/components/import-candidates-modal";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
+import { EmailSourceBadge } from "@/components/email-source-badge";
 
 const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
   "Imported CSV": {
@@ -95,9 +96,10 @@ export default function CandidatesPage() {
                   <h3 className="text-lg font-semibold group-hover:text-primary transition-colors">
                     {candidate.name}
                   </h3>
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1 mb-2">
-                    <Mail className="h-3 w-3" />
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1 mb-2 min-w-0">
+                    <Mail className="h-3 w-3 shrink-0" />
                     <span className="truncate">{candidate.email}</span>
+                    <EmailSourceBadge source={candidate.emailSource} className="shrink-0" />
                   </div>
                   <div className="mb-4">
                     <EmailValidationBadge

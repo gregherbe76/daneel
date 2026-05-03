@@ -1097,6 +1097,17 @@ components:
         source:
           type: string
           nullable: true
+        emailSource:
+          type: string
+          enum: [profile, commit, noreply, generated, manual]
+          nullable: true
+          description: |
+            Where the candidate's email came from, so recruiters can gauge
+            trust before outreach. "profile" = verified profile email,
+            "commit" = inferred from public commit metadata,
+            "noreply" = placeholder noreply (not deliverable),
+            "generated" = AI/mock placeholder (not deliverable),
+            "manual" = entered by a recruiter.
         enrichedAt:
           type: string
           format: date-time

@@ -398,6 +398,33 @@ export class GithubSourcingProvider implements AgentProvider {
         const evidenceParts = [user.html_url, ...topRepos.map((r) => r.html_url)];
         const evidence = evidenceParts.join(" \n");
 
+        // Email resolution order:
+        //   1. Public profile email (when GitHub exposes it).
+        //   2. Real address discovered from the user's public commit metadata.
+        //   3. Noreply fallback so the candidate row always carries a stable
+        //      identifier — recruiters can tell at a glance it isn't deliverable.
+        // Track the *source* alongside the value so the UI can label trust
+        // (verified profile vs. inferred from commits vs. undeliverable noreply).
+        // Reuses the pre-fetched `profileEmailUsable` and `events` from above
+        // so we avoid a second events round-trip per candidate.
+        let resolvedEmail: string;
+        let emailSource: "profile" | "commit" | "noreply";
+        if (profileEmailUsable) {
+          resolvedEmail = user.email!;
+          emailSource = "profile";
+        } else {
+          const fromCommits = events != null
+            ? this.discoverEmailFromCommits(user.login, user.name, events)
+            : null;
+          if (fromCommits) {
+            resolvedEmail = fromCommits;
+            emailSource = "commit";
+          } else {
+            resolvedEmail = this.noreplyEmail(user.login);
+            emailSource = "noreply";
+          }
+        }
+
         results.push({
           // Preserve source fidelity — never fall back to login. If GitHub
           // does not expose a display name, leave it empty so the UI shows
@@ -406,16 +433,8 @@ export class GithubSourcingProvider implements AgentProvider {
           headline: "",
           location: user.location ?? "",
           currentCompany: "",
-          // Email resolution order:
-          //   1. Public profile email (when GitHub exposes it).
-          //   2. Real address discovered from the user's public commit metadata.
-          //   3. Noreply fallback so the candidate row always carries a stable
-          //      identifier — recruiters can tell at a glance it isn't deliverable.
-          email: profileEmailUsable
-            ? user.email!
-            : (events != null
-                ? this.discoverEmailFromCommits(user.login, user.name, events)
-                : null) ?? this.noreplyEmail(user.login),
+          email: resolvedEmail,
+          emailSource,
           linkedinUrl: "",
           githubUrl: user.html_url,
           username: user.login,
