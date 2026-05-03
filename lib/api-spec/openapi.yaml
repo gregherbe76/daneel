@@ -3,20 +3,25 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Recruiting OS API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: jobs
+    description: Job operations
+  - name: candidates
+    description: Candidate operations
+  - name: applications
+    description: Application pipeline operations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +29,333 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── JOBS ──────────────────────────────────────────────────────────────────
+  /jobs:
+    get:
+      operationId: listJobs
+      tags: [jobs]
+      summary: List all jobs
+      responses:
+        "200":
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Job"
+    post:
+      operationId: createJob
+      tags: [jobs]
+      summary: Create a job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateJobBody"
+      responses:
+        "201":
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+
+  /jobs/{id}:
+    get:
+      operationId: getJob
+      tags: [jobs]
+      summary: Get a job by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Job found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+        "404":
+          description: Not found
+    put:
+      operationId: updateJob
+      tags: [jobs]
+      summary: Update a job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateJobBody"
+      responses:
+        "200":
+          description: Job updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Job"
+    delete:
+      operationId: deleteJob
+      tags: [jobs]
+      summary: Delete a job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /jobs/{id}/applications:
+    get:
+      operationId: getJobApplications
+      tags: [jobs]
+      summary: Get all applications for a job (with candidate info)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Applications for this job
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApplicationWithDetails"
+
+  # ── CANDIDATES ────────────────────────────────────────────────────────────
+  /candidates:
+    get:
+      operationId: listCandidates
+      tags: [candidates]
+      summary: List all candidates
+      responses:
+        "200":
+          description: List of candidates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Candidate"
+    post:
+      operationId: createCandidate
+      tags: [candidates]
+      summary: Create a candidate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCandidateBody"
+      responses:
+        "201":
+          description: Candidate created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Candidate"
+
+  /candidates/{id}:
+    get:
+      operationId: getCandidate
+      tags: [candidates]
+      summary: Get a candidate by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Candidate found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Candidate"
+        "404":
+          description: Not found
+    put:
+      operationId: updateCandidate
+      tags: [candidates]
+      summary: Update a candidate
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCandidateBody"
+      responses:
+        "200":
+          description: Candidate updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Candidate"
+    delete:
+      operationId: deleteCandidate
+      tags: [candidates]
+      summary: Delete a candidate
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /candidates/{id}/applications:
+    get:
+      operationId: getCandidateApplications
+      tags: [candidates]
+      summary: Get all applications for a candidate (with job info)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Applications for this candidate
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApplicationWithDetails"
+
+  # ── APPLICATIONS ──────────────────────────────────────────────────────────
+  /applications:
+    get:
+      operationId: listApplications
+      tags: [applications]
+      summary: List all applications with candidate and job info
+      responses:
+        "200":
+          description: List of applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApplicationWithDetails"
+    post:
+      operationId: createApplication
+      tags: [applications]
+      summary: Create an application (link candidate to job)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApplicationBody"
+      responses:
+        "201":
+          description: Application created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+
+  /applications/{id}:
+    get:
+      operationId: getApplication
+      tags: [applications]
+      summary: Get an application by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Application found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationWithDetails"
+        "404":
+          description: Not found
+    put:
+      operationId: updateApplication
+      tags: [applications]
+      summary: Update an application (e.g. change stage)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateApplicationBody"
+      responses:
+        "200":
+          description: Application updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+    delete:
+      operationId: deleteApplication
+      tags: [applications]
+      summary: Delete an application
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── SUMMARY / WOW ─────────────────────────────────────────────────────────
+  /pipeline/summary:
+    get:
+      operationId: getPipelineSummary
+      tags: [applications]
+      summary: Get pipeline summary - counts per stage across all jobs
+      responses:
+        "200":
+          description: Pipeline stage counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PipelineSummary"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +363,201 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    # ── ENUMS ──
+    Seniority:
+      type: string
+      enum: [Intern, Junior, Mid, Senior, Lead, Principal, Director, VP]
+
+    ApplicationStage:
+      type: string
+      enum: [Sourced, Contacted, Screened, Interview, Offer, Hired, Rejected]
+
+    # ── JOB ──
+    Job:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        seniority:
+          $ref: "#/components/schemas/Seniority"
+        mustHaveSkills:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, title, description, location, seniority, mustHaveSkills, createdAt, updatedAt]
+
+    CreateJobBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        seniority:
+          $ref: "#/components/schemas/Seniority"
+        mustHaveSkills:
+          type: array
+          items:
+            type: string
+      required: [title, description, location, seniority, mustHaveSkills]
+
+    # ── CANDIDATE ──
+    Candidate:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        linkedIn:
+          type: string
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+        skills:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, email, skills, createdAt, updatedAt]
+
+    CreateCandidateBody:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        linkedIn:
+          type: string
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+        skills:
+          type: array
+          items:
+            type: string
+      required: [name, email, skills]
+
+    # ── APPLICATION ──
+    Application:
+      type: object
+      properties:
+        id:
+          type: integer
+        jobId:
+          type: integer
+        candidateId:
+          type: integer
+        stage:
+          $ref: "#/components/schemas/ApplicationStage"
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, jobId, candidateId, stage, createdAt, updatedAt]
+
+    ApplicationWithDetails:
+      type: object
+      properties:
+        id:
+          type: integer
+        jobId:
+          type: integer
+        candidateId:
+          type: integer
+        stage:
+          $ref: "#/components/schemas/ApplicationStage"
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        job:
+          $ref: "#/components/schemas/Job"
+        candidate:
+          $ref: "#/components/schemas/Candidate"
+      required: [id, jobId, candidateId, stage, createdAt, updatedAt, job, candidate]
+
+    CreateApplicationBody:
+      type: object
+      properties:
+        jobId:
+          type: integer
+        candidateId:
+          type: integer
+        stage:
+          $ref: "#/components/schemas/ApplicationStage"
+        notes:
+          type: string
+          nullable: true
+      required: [jobId, candidateId, stage]
+
+    UpdateApplicationBody:
+      type: object
+      properties:
+        stage:
+          $ref: "#/components/schemas/ApplicationStage"
+        notes:
+          type: string
+          nullable: true
+      required: [stage]
+
+    # ── SUMMARY ──
+    StageCount:
+      type: object
+      properties:
+        stage:
+          $ref: "#/components/schemas/ApplicationStage"
+        count:
+          type: integer
+      required: [stage, count]
+
+    PipelineSummary:
+      type: object
+      properties:
+        totalJobs:
+          type: integer
+        totalCandidates:
+          type: integer
+        totalApplications:
+          type: integer
+        byStage:
+          type: array
+          items:
+            $ref: "#/components/schemas/StageCount"
+      required: [totalJobs, totalCandidates, totalApplications, byStage]
