@@ -62,6 +62,16 @@ One product, three templates:
 
 Switching is one env var (`APP_TEMPLATE` / `VITE_APP_TEMPLATE`). Each template ships its own brand colors, product name, primary user vocabulary, and full prompt pack with its own voice. The engine, schema, and JSON output contract stay identical across all three.
 
+## Demo flow (60 seconds)
+
+1. **Create or open a job** — set title, description, and the 3 scoring weights
+2. **Add candidates** — paste profiles, upload, or let the engine source mock candidates
+3. **Run AI workflow** — one click triggers all 4 Daneel steps end-to-end
+4. **Show decision summary** — top-5 shortlist with Fit / Confidence / Decision scores, why-relevant, key risks, recommendation
+5. **Export PDF** — branded report, ready to share
+
+> Powered by the **Daneel** engine. Re-skinnable via **customizable templates** (HiringAI, HireFlow, ShortlistPro) — one env var swaps brand, voice, and prompt pack while the engine and data contract stay identical.
+
 ## Known limitations
 
 - **Single-tenant** — no auth, no organizations, no per-user data isolation. The team roster is a hard-coded HR list. Run one instance per company.
