@@ -1357,7 +1357,7 @@ export default function JobReportPage() {
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
                           Score Breakdown
                         </p>
-                        <ScoreBreakdownDisplay breakdown={e.scoreBreakdown} defaultExpanded={false} showToggle />
+                        <ScoreBreakdownDisplay breakdown={e.scoreBreakdown} weights={job?.scoringWeights} defaultExpanded={false} showToggle />
                       </div>
                     )}
                     <div className="grid md:grid-cols-2 gap-3 text-sm">

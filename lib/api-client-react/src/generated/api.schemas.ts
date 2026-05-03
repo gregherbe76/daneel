@@ -35,6 +35,47 @@ export const ApplicationStage = {
   Rejected: "Rejected",
 } as const;
 
+/**
+ * Per-job scoring weights (integer percentages 0-100, must sum to 100).
+ */
+export interface ScoringWeights {
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  skillsMatch: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  experienceDepth: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  softSkills: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  autonomy: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  cultureFit: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  longTermPotential: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  productMindset: number;
+}
+
 export interface Job {
   id: number;
   title: string;
@@ -44,6 +85,7 @@ export interface Job {
   mustHaveSkills: string[];
   clientName?: string | null;
   clientLogoUrl?: string | null;
+  scoringWeights: ScoringWeights;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +98,7 @@ export interface CreateJobBody {
   mustHaveSkills: string[];
   clientName?: string | null;
   clientLogoUrl?: string | null;
+  scoringWeights?: ScoringWeights;
 }
 
 export type CandidateEnrichmentStatus =

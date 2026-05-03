@@ -17,6 +17,27 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary List all jobs
  */
+export const listJobsResponseScoringWeightsSkillsMatchMin = 0;
+export const listJobsResponseScoringWeightsSkillsMatchMax = 100;
+
+export const listJobsResponseScoringWeightsExperienceDepthMin = 0;
+export const listJobsResponseScoringWeightsExperienceDepthMax = 100;
+
+export const listJobsResponseScoringWeightsSoftSkillsMin = 0;
+export const listJobsResponseScoringWeightsSoftSkillsMax = 100;
+
+export const listJobsResponseScoringWeightsAutonomyMin = 0;
+export const listJobsResponseScoringWeightsAutonomyMax = 100;
+
+export const listJobsResponseScoringWeightsCultureFitMin = 0;
+export const listJobsResponseScoringWeightsCultureFitMax = 100;
+
+export const listJobsResponseScoringWeightsLongTermPotentialMin = 0;
+export const listJobsResponseScoringWeightsLongTermPotentialMax = 100;
+
+export const listJobsResponseScoringWeightsProductMindsetMin = 0;
+export const listJobsResponseScoringWeightsProductMindsetMax = 100;
+
 export const ListJobsResponseItem = zod.object({
   id: zod.number(),
   title: zod.string(),
@@ -35,6 +56,40 @@ export const ListJobsResponseItem = zod.object({
   mustHaveSkills: zod.array(zod.string()),
   clientName: zod.string().nullish(),
   clientLogoUrl: zod.string().nullish(),
+  scoringWeights: zod
+    .object({
+      skillsMatch: zod
+        .number()
+        .min(listJobsResponseScoringWeightsSkillsMatchMin)
+        .max(listJobsResponseScoringWeightsSkillsMatchMax),
+      experienceDepth: zod
+        .number()
+        .min(listJobsResponseScoringWeightsExperienceDepthMin)
+        .max(listJobsResponseScoringWeightsExperienceDepthMax),
+      softSkills: zod
+        .number()
+        .min(listJobsResponseScoringWeightsSoftSkillsMin)
+        .max(listJobsResponseScoringWeightsSoftSkillsMax),
+      autonomy: zod
+        .number()
+        .min(listJobsResponseScoringWeightsAutonomyMin)
+        .max(listJobsResponseScoringWeightsAutonomyMax),
+      cultureFit: zod
+        .number()
+        .min(listJobsResponseScoringWeightsCultureFitMin)
+        .max(listJobsResponseScoringWeightsCultureFitMax),
+      longTermPotential: zod
+        .number()
+        .min(listJobsResponseScoringWeightsLongTermPotentialMin)
+        .max(listJobsResponseScoringWeightsLongTermPotentialMax),
+      productMindset: zod
+        .number()
+        .min(listJobsResponseScoringWeightsProductMindsetMin)
+        .max(listJobsResponseScoringWeightsProductMindsetMax),
+    })
+    .describe(
+      "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+    ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -43,6 +98,27 @@ export const ListJobsResponse = zod.array(ListJobsResponseItem);
 /**
  * @summary Create a job
  */
+export const createJobBodyScoringWeightsSkillsMatchMin = 0;
+export const createJobBodyScoringWeightsSkillsMatchMax = 100;
+
+export const createJobBodyScoringWeightsExperienceDepthMin = 0;
+export const createJobBodyScoringWeightsExperienceDepthMax = 100;
+
+export const createJobBodyScoringWeightsSoftSkillsMin = 0;
+export const createJobBodyScoringWeightsSoftSkillsMax = 100;
+
+export const createJobBodyScoringWeightsAutonomyMin = 0;
+export const createJobBodyScoringWeightsAutonomyMax = 100;
+
+export const createJobBodyScoringWeightsCultureFitMin = 0;
+export const createJobBodyScoringWeightsCultureFitMax = 100;
+
+export const createJobBodyScoringWeightsLongTermPotentialMin = 0;
+export const createJobBodyScoringWeightsLongTermPotentialMax = 100;
+
+export const createJobBodyScoringWeightsProductMindsetMin = 0;
+export const createJobBodyScoringWeightsProductMindsetMax = 100;
+
 export const CreateJobBody = zod.object({
   title: zod.string(),
   description: zod.string(),
@@ -60,6 +136,41 @@ export const CreateJobBody = zod.object({
   mustHaveSkills: zod.array(zod.string()),
   clientName: zod.string().nullish(),
   clientLogoUrl: zod.string().nullish(),
+  scoringWeights: zod
+    .object({
+      skillsMatch: zod
+        .number()
+        .min(createJobBodyScoringWeightsSkillsMatchMin)
+        .max(createJobBodyScoringWeightsSkillsMatchMax),
+      experienceDepth: zod
+        .number()
+        .min(createJobBodyScoringWeightsExperienceDepthMin)
+        .max(createJobBodyScoringWeightsExperienceDepthMax),
+      softSkills: zod
+        .number()
+        .min(createJobBodyScoringWeightsSoftSkillsMin)
+        .max(createJobBodyScoringWeightsSoftSkillsMax),
+      autonomy: zod
+        .number()
+        .min(createJobBodyScoringWeightsAutonomyMin)
+        .max(createJobBodyScoringWeightsAutonomyMax),
+      cultureFit: zod
+        .number()
+        .min(createJobBodyScoringWeightsCultureFitMin)
+        .max(createJobBodyScoringWeightsCultureFitMax),
+      longTermPotential: zod
+        .number()
+        .min(createJobBodyScoringWeightsLongTermPotentialMin)
+        .max(createJobBodyScoringWeightsLongTermPotentialMax),
+      productMindset: zod
+        .number()
+        .min(createJobBodyScoringWeightsProductMindsetMin)
+        .max(createJobBodyScoringWeightsProductMindsetMax),
+    })
+    .optional()
+    .describe(
+      "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+    ),
 });
 
 /**
@@ -68,6 +179,27 @@ export const CreateJobBody = zod.object({
 export const GetJobParams = zod.object({
   id: zod.coerce.number(),
 });
+
+export const getJobResponseScoringWeightsSkillsMatchMin = 0;
+export const getJobResponseScoringWeightsSkillsMatchMax = 100;
+
+export const getJobResponseScoringWeightsExperienceDepthMin = 0;
+export const getJobResponseScoringWeightsExperienceDepthMax = 100;
+
+export const getJobResponseScoringWeightsSoftSkillsMin = 0;
+export const getJobResponseScoringWeightsSoftSkillsMax = 100;
+
+export const getJobResponseScoringWeightsAutonomyMin = 0;
+export const getJobResponseScoringWeightsAutonomyMax = 100;
+
+export const getJobResponseScoringWeightsCultureFitMin = 0;
+export const getJobResponseScoringWeightsCultureFitMax = 100;
+
+export const getJobResponseScoringWeightsLongTermPotentialMin = 0;
+export const getJobResponseScoringWeightsLongTermPotentialMax = 100;
+
+export const getJobResponseScoringWeightsProductMindsetMin = 0;
+export const getJobResponseScoringWeightsProductMindsetMax = 100;
 
 export const GetJobResponse = zod.object({
   id: zod.number(),
@@ -87,6 +219,40 @@ export const GetJobResponse = zod.object({
   mustHaveSkills: zod.array(zod.string()),
   clientName: zod.string().nullish(),
   clientLogoUrl: zod.string().nullish(),
+  scoringWeights: zod
+    .object({
+      skillsMatch: zod
+        .number()
+        .min(getJobResponseScoringWeightsSkillsMatchMin)
+        .max(getJobResponseScoringWeightsSkillsMatchMax),
+      experienceDepth: zod
+        .number()
+        .min(getJobResponseScoringWeightsExperienceDepthMin)
+        .max(getJobResponseScoringWeightsExperienceDepthMax),
+      softSkills: zod
+        .number()
+        .min(getJobResponseScoringWeightsSoftSkillsMin)
+        .max(getJobResponseScoringWeightsSoftSkillsMax),
+      autonomy: zod
+        .number()
+        .min(getJobResponseScoringWeightsAutonomyMin)
+        .max(getJobResponseScoringWeightsAutonomyMax),
+      cultureFit: zod
+        .number()
+        .min(getJobResponseScoringWeightsCultureFitMin)
+        .max(getJobResponseScoringWeightsCultureFitMax),
+      longTermPotential: zod
+        .number()
+        .min(getJobResponseScoringWeightsLongTermPotentialMin)
+        .max(getJobResponseScoringWeightsLongTermPotentialMax),
+      productMindset: zod
+        .number()
+        .min(getJobResponseScoringWeightsProductMindsetMin)
+        .max(getJobResponseScoringWeightsProductMindsetMax),
+    })
+    .describe(
+      "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+    ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -97,6 +263,27 @@ export const GetJobResponse = zod.object({
 export const UpdateJobParams = zod.object({
   id: zod.coerce.number(),
 });
+
+export const updateJobBodyScoringWeightsSkillsMatchMin = 0;
+export const updateJobBodyScoringWeightsSkillsMatchMax = 100;
+
+export const updateJobBodyScoringWeightsExperienceDepthMin = 0;
+export const updateJobBodyScoringWeightsExperienceDepthMax = 100;
+
+export const updateJobBodyScoringWeightsSoftSkillsMin = 0;
+export const updateJobBodyScoringWeightsSoftSkillsMax = 100;
+
+export const updateJobBodyScoringWeightsAutonomyMin = 0;
+export const updateJobBodyScoringWeightsAutonomyMax = 100;
+
+export const updateJobBodyScoringWeightsCultureFitMin = 0;
+export const updateJobBodyScoringWeightsCultureFitMax = 100;
+
+export const updateJobBodyScoringWeightsLongTermPotentialMin = 0;
+export const updateJobBodyScoringWeightsLongTermPotentialMax = 100;
+
+export const updateJobBodyScoringWeightsProductMindsetMin = 0;
+export const updateJobBodyScoringWeightsProductMindsetMax = 100;
 
 export const UpdateJobBody = zod.object({
   title: zod.string(),
@@ -115,7 +302,63 @@ export const UpdateJobBody = zod.object({
   mustHaveSkills: zod.array(zod.string()),
   clientName: zod.string().nullish(),
   clientLogoUrl: zod.string().nullish(),
+  scoringWeights: zod
+    .object({
+      skillsMatch: zod
+        .number()
+        .min(updateJobBodyScoringWeightsSkillsMatchMin)
+        .max(updateJobBodyScoringWeightsSkillsMatchMax),
+      experienceDepth: zod
+        .number()
+        .min(updateJobBodyScoringWeightsExperienceDepthMin)
+        .max(updateJobBodyScoringWeightsExperienceDepthMax),
+      softSkills: zod
+        .number()
+        .min(updateJobBodyScoringWeightsSoftSkillsMin)
+        .max(updateJobBodyScoringWeightsSoftSkillsMax),
+      autonomy: zod
+        .number()
+        .min(updateJobBodyScoringWeightsAutonomyMin)
+        .max(updateJobBodyScoringWeightsAutonomyMax),
+      cultureFit: zod
+        .number()
+        .min(updateJobBodyScoringWeightsCultureFitMin)
+        .max(updateJobBodyScoringWeightsCultureFitMax),
+      longTermPotential: zod
+        .number()
+        .min(updateJobBodyScoringWeightsLongTermPotentialMin)
+        .max(updateJobBodyScoringWeightsLongTermPotentialMax),
+      productMindset: zod
+        .number()
+        .min(updateJobBodyScoringWeightsProductMindsetMin)
+        .max(updateJobBodyScoringWeightsProductMindsetMax),
+    })
+    .optional()
+    .describe(
+      "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+    ),
 });
+
+export const updateJobResponseScoringWeightsSkillsMatchMin = 0;
+export const updateJobResponseScoringWeightsSkillsMatchMax = 100;
+
+export const updateJobResponseScoringWeightsExperienceDepthMin = 0;
+export const updateJobResponseScoringWeightsExperienceDepthMax = 100;
+
+export const updateJobResponseScoringWeightsSoftSkillsMin = 0;
+export const updateJobResponseScoringWeightsSoftSkillsMax = 100;
+
+export const updateJobResponseScoringWeightsAutonomyMin = 0;
+export const updateJobResponseScoringWeightsAutonomyMax = 100;
+
+export const updateJobResponseScoringWeightsCultureFitMin = 0;
+export const updateJobResponseScoringWeightsCultureFitMax = 100;
+
+export const updateJobResponseScoringWeightsLongTermPotentialMin = 0;
+export const updateJobResponseScoringWeightsLongTermPotentialMax = 100;
+
+export const updateJobResponseScoringWeightsProductMindsetMin = 0;
+export const updateJobResponseScoringWeightsProductMindsetMax = 100;
 
 export const UpdateJobResponse = zod.object({
   id: zod.number(),
@@ -135,6 +378,40 @@ export const UpdateJobResponse = zod.object({
   mustHaveSkills: zod.array(zod.string()),
   clientName: zod.string().nullish(),
   clientLogoUrl: zod.string().nullish(),
+  scoringWeights: zod
+    .object({
+      skillsMatch: zod
+        .number()
+        .min(updateJobResponseScoringWeightsSkillsMatchMin)
+        .max(updateJobResponseScoringWeightsSkillsMatchMax),
+      experienceDepth: zod
+        .number()
+        .min(updateJobResponseScoringWeightsExperienceDepthMin)
+        .max(updateJobResponseScoringWeightsExperienceDepthMax),
+      softSkills: zod
+        .number()
+        .min(updateJobResponseScoringWeightsSoftSkillsMin)
+        .max(updateJobResponseScoringWeightsSoftSkillsMax),
+      autonomy: zod
+        .number()
+        .min(updateJobResponseScoringWeightsAutonomyMin)
+        .max(updateJobResponseScoringWeightsAutonomyMax),
+      cultureFit: zod
+        .number()
+        .min(updateJobResponseScoringWeightsCultureFitMin)
+        .max(updateJobResponseScoringWeightsCultureFitMax),
+      longTermPotential: zod
+        .number()
+        .min(updateJobResponseScoringWeightsLongTermPotentialMin)
+        .max(updateJobResponseScoringWeightsLongTermPotentialMax),
+      productMindset: zod
+        .number()
+        .min(updateJobResponseScoringWeightsProductMindsetMin)
+        .max(updateJobResponseScoringWeightsProductMindsetMax),
+    })
+    .describe(
+      "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+    ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -152,6 +429,27 @@ export const DeleteJobParams = zod.object({
 export const GetJobApplicationsParams = zod.object({
   id: zod.coerce.number(),
 });
+
+export const getJobApplicationsResponseJobScoringWeightsSkillsMatchMin = 0;
+export const getJobApplicationsResponseJobScoringWeightsSkillsMatchMax = 100;
+
+export const getJobApplicationsResponseJobScoringWeightsExperienceDepthMin = 0;
+export const getJobApplicationsResponseJobScoringWeightsExperienceDepthMax = 100;
+
+export const getJobApplicationsResponseJobScoringWeightsSoftSkillsMin = 0;
+export const getJobApplicationsResponseJobScoringWeightsSoftSkillsMax = 100;
+
+export const getJobApplicationsResponseJobScoringWeightsAutonomyMin = 0;
+export const getJobApplicationsResponseJobScoringWeightsAutonomyMax = 100;
+
+export const getJobApplicationsResponseJobScoringWeightsCultureFitMin = 0;
+export const getJobApplicationsResponseJobScoringWeightsCultureFitMax = 100;
+
+export const getJobApplicationsResponseJobScoringWeightsLongTermPotentialMin = 0;
+export const getJobApplicationsResponseJobScoringWeightsLongTermPotentialMax = 100;
+
+export const getJobApplicationsResponseJobScoringWeightsProductMindsetMin = 0;
+export const getJobApplicationsResponseJobScoringWeightsProductMindsetMax = 100;
 
 export const GetJobApplicationsResponseItem = zod.object({
   id: zod.number(),
@@ -187,6 +485,40 @@ export const GetJobApplicationsResponseItem = zod.object({
     mustHaveSkills: zod.array(zod.string()),
     clientName: zod.string().nullish(),
     clientLogoUrl: zod.string().nullish(),
+    scoringWeights: zod
+      .object({
+        skillsMatch: zod
+          .number()
+          .min(getJobApplicationsResponseJobScoringWeightsSkillsMatchMin)
+          .max(getJobApplicationsResponseJobScoringWeightsSkillsMatchMax),
+        experienceDepth: zod
+          .number()
+          .min(getJobApplicationsResponseJobScoringWeightsExperienceDepthMin)
+          .max(getJobApplicationsResponseJobScoringWeightsExperienceDepthMax),
+        softSkills: zod
+          .number()
+          .min(getJobApplicationsResponseJobScoringWeightsSoftSkillsMin)
+          .max(getJobApplicationsResponseJobScoringWeightsSoftSkillsMax),
+        autonomy: zod
+          .number()
+          .min(getJobApplicationsResponseJobScoringWeightsAutonomyMin)
+          .max(getJobApplicationsResponseJobScoringWeightsAutonomyMax),
+        cultureFit: zod
+          .number()
+          .min(getJobApplicationsResponseJobScoringWeightsCultureFitMin)
+          .max(getJobApplicationsResponseJobScoringWeightsCultureFitMax),
+        longTermPotential: zod
+          .number()
+          .min(getJobApplicationsResponseJobScoringWeightsLongTermPotentialMin)
+          .max(getJobApplicationsResponseJobScoringWeightsLongTermPotentialMax),
+        productMindset: zod
+          .number()
+          .min(getJobApplicationsResponseJobScoringWeightsProductMindsetMin)
+          .max(getJobApplicationsResponseJobScoringWeightsProductMindsetMax),
+      })
+      .describe(
+        "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+      ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -325,6 +657,27 @@ export const GetCandidateApplicationsParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const getCandidateApplicationsResponseJobScoringWeightsSkillsMatchMin = 0;
+export const getCandidateApplicationsResponseJobScoringWeightsSkillsMatchMax = 100;
+
+export const getCandidateApplicationsResponseJobScoringWeightsExperienceDepthMin = 0;
+export const getCandidateApplicationsResponseJobScoringWeightsExperienceDepthMax = 100;
+
+export const getCandidateApplicationsResponseJobScoringWeightsSoftSkillsMin = 0;
+export const getCandidateApplicationsResponseJobScoringWeightsSoftSkillsMax = 100;
+
+export const getCandidateApplicationsResponseJobScoringWeightsAutonomyMin = 0;
+export const getCandidateApplicationsResponseJobScoringWeightsAutonomyMax = 100;
+
+export const getCandidateApplicationsResponseJobScoringWeightsCultureFitMin = 0;
+export const getCandidateApplicationsResponseJobScoringWeightsCultureFitMax = 100;
+
+export const getCandidateApplicationsResponseJobScoringWeightsLongTermPotentialMin = 0;
+export const getCandidateApplicationsResponseJobScoringWeightsLongTermPotentialMax = 100;
+
+export const getCandidateApplicationsResponseJobScoringWeightsProductMindsetMin = 0;
+export const getCandidateApplicationsResponseJobScoringWeightsProductMindsetMax = 100;
+
 export const GetCandidateApplicationsResponseItem = zod.object({
   id: zod.number(),
   jobId: zod.number(),
@@ -359,6 +712,52 @@ export const GetCandidateApplicationsResponseItem = zod.object({
     mustHaveSkills: zod.array(zod.string()),
     clientName: zod.string().nullish(),
     clientLogoUrl: zod.string().nullish(),
+    scoringWeights: zod
+      .object({
+        skillsMatch: zod
+          .number()
+          .min(getCandidateApplicationsResponseJobScoringWeightsSkillsMatchMin)
+          .max(getCandidateApplicationsResponseJobScoringWeightsSkillsMatchMax),
+        experienceDepth: zod
+          .number()
+          .min(
+            getCandidateApplicationsResponseJobScoringWeightsExperienceDepthMin,
+          )
+          .max(
+            getCandidateApplicationsResponseJobScoringWeightsExperienceDepthMax,
+          ),
+        softSkills: zod
+          .number()
+          .min(getCandidateApplicationsResponseJobScoringWeightsSoftSkillsMin)
+          .max(getCandidateApplicationsResponseJobScoringWeightsSoftSkillsMax),
+        autonomy: zod
+          .number()
+          .min(getCandidateApplicationsResponseJobScoringWeightsAutonomyMin)
+          .max(getCandidateApplicationsResponseJobScoringWeightsAutonomyMax),
+        cultureFit: zod
+          .number()
+          .min(getCandidateApplicationsResponseJobScoringWeightsCultureFitMin)
+          .max(getCandidateApplicationsResponseJobScoringWeightsCultureFitMax),
+        longTermPotential: zod
+          .number()
+          .min(
+            getCandidateApplicationsResponseJobScoringWeightsLongTermPotentialMin,
+          )
+          .max(
+            getCandidateApplicationsResponseJobScoringWeightsLongTermPotentialMax,
+          ),
+        productMindset: zod
+          .number()
+          .min(
+            getCandidateApplicationsResponseJobScoringWeightsProductMindsetMin,
+          )
+          .max(
+            getCandidateApplicationsResponseJobScoringWeightsProductMindsetMax,
+          ),
+      })
+      .describe(
+        "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+      ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -389,6 +788,27 @@ export const GetCandidateApplicationsResponse = zod.array(
 /**
  * @summary List all applications with candidate and job info
  */
+export const listApplicationsResponseJobScoringWeightsSkillsMatchMin = 0;
+export const listApplicationsResponseJobScoringWeightsSkillsMatchMax = 100;
+
+export const listApplicationsResponseJobScoringWeightsExperienceDepthMin = 0;
+export const listApplicationsResponseJobScoringWeightsExperienceDepthMax = 100;
+
+export const listApplicationsResponseJobScoringWeightsSoftSkillsMin = 0;
+export const listApplicationsResponseJobScoringWeightsSoftSkillsMax = 100;
+
+export const listApplicationsResponseJobScoringWeightsAutonomyMin = 0;
+export const listApplicationsResponseJobScoringWeightsAutonomyMax = 100;
+
+export const listApplicationsResponseJobScoringWeightsCultureFitMin = 0;
+export const listApplicationsResponseJobScoringWeightsCultureFitMax = 100;
+
+export const listApplicationsResponseJobScoringWeightsLongTermPotentialMin = 0;
+export const listApplicationsResponseJobScoringWeightsLongTermPotentialMax = 100;
+
+export const listApplicationsResponseJobScoringWeightsProductMindsetMin = 0;
+export const listApplicationsResponseJobScoringWeightsProductMindsetMax = 100;
+
 export const ListApplicationsResponseItem = zod.object({
   id: zod.number(),
   jobId: zod.number(),
@@ -423,6 +843,40 @@ export const ListApplicationsResponseItem = zod.object({
     mustHaveSkills: zod.array(zod.string()),
     clientName: zod.string().nullish(),
     clientLogoUrl: zod.string().nullish(),
+    scoringWeights: zod
+      .object({
+        skillsMatch: zod
+          .number()
+          .min(listApplicationsResponseJobScoringWeightsSkillsMatchMin)
+          .max(listApplicationsResponseJobScoringWeightsSkillsMatchMax),
+        experienceDepth: zod
+          .number()
+          .min(listApplicationsResponseJobScoringWeightsExperienceDepthMin)
+          .max(listApplicationsResponseJobScoringWeightsExperienceDepthMax),
+        softSkills: zod
+          .number()
+          .min(listApplicationsResponseJobScoringWeightsSoftSkillsMin)
+          .max(listApplicationsResponseJobScoringWeightsSoftSkillsMax),
+        autonomy: zod
+          .number()
+          .min(listApplicationsResponseJobScoringWeightsAutonomyMin)
+          .max(listApplicationsResponseJobScoringWeightsAutonomyMax),
+        cultureFit: zod
+          .number()
+          .min(listApplicationsResponseJobScoringWeightsCultureFitMin)
+          .max(listApplicationsResponseJobScoringWeightsCultureFitMax),
+        longTermPotential: zod
+          .number()
+          .min(listApplicationsResponseJobScoringWeightsLongTermPotentialMin)
+          .max(listApplicationsResponseJobScoringWeightsLongTermPotentialMax),
+        productMindset: zod
+          .number()
+          .min(listApplicationsResponseJobScoringWeightsProductMindsetMin)
+          .max(listApplicationsResponseJobScoringWeightsProductMindsetMax),
+      })
+      .describe(
+        "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+      ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -473,6 +927,27 @@ export const GetApplicationParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const getApplicationResponseJobScoringWeightsSkillsMatchMin = 0;
+export const getApplicationResponseJobScoringWeightsSkillsMatchMax = 100;
+
+export const getApplicationResponseJobScoringWeightsExperienceDepthMin = 0;
+export const getApplicationResponseJobScoringWeightsExperienceDepthMax = 100;
+
+export const getApplicationResponseJobScoringWeightsSoftSkillsMin = 0;
+export const getApplicationResponseJobScoringWeightsSoftSkillsMax = 100;
+
+export const getApplicationResponseJobScoringWeightsAutonomyMin = 0;
+export const getApplicationResponseJobScoringWeightsAutonomyMax = 100;
+
+export const getApplicationResponseJobScoringWeightsCultureFitMin = 0;
+export const getApplicationResponseJobScoringWeightsCultureFitMax = 100;
+
+export const getApplicationResponseJobScoringWeightsLongTermPotentialMin = 0;
+export const getApplicationResponseJobScoringWeightsLongTermPotentialMax = 100;
+
+export const getApplicationResponseJobScoringWeightsProductMindsetMin = 0;
+export const getApplicationResponseJobScoringWeightsProductMindsetMax = 100;
+
 export const GetApplicationResponse = zod.object({
   id: zod.number(),
   jobId: zod.number(),
@@ -507,6 +982,40 @@ export const GetApplicationResponse = zod.object({
     mustHaveSkills: zod.array(zod.string()),
     clientName: zod.string().nullish(),
     clientLogoUrl: zod.string().nullish(),
+    scoringWeights: zod
+      .object({
+        skillsMatch: zod
+          .number()
+          .min(getApplicationResponseJobScoringWeightsSkillsMatchMin)
+          .max(getApplicationResponseJobScoringWeightsSkillsMatchMax),
+        experienceDepth: zod
+          .number()
+          .min(getApplicationResponseJobScoringWeightsExperienceDepthMin)
+          .max(getApplicationResponseJobScoringWeightsExperienceDepthMax),
+        softSkills: zod
+          .number()
+          .min(getApplicationResponseJobScoringWeightsSoftSkillsMin)
+          .max(getApplicationResponseJobScoringWeightsSoftSkillsMax),
+        autonomy: zod
+          .number()
+          .min(getApplicationResponseJobScoringWeightsAutonomyMin)
+          .max(getApplicationResponseJobScoringWeightsAutonomyMax),
+        cultureFit: zod
+          .number()
+          .min(getApplicationResponseJobScoringWeightsCultureFitMin)
+          .max(getApplicationResponseJobScoringWeightsCultureFitMax),
+        longTermPotential: zod
+          .number()
+          .min(getApplicationResponseJobScoringWeightsLongTermPotentialMin)
+          .max(getApplicationResponseJobScoringWeightsLongTermPotentialMax),
+        productMindset: zod
+          .number()
+          .min(getApplicationResponseJobScoringWeightsProductMindsetMin)
+          .max(getApplicationResponseJobScoringWeightsProductMindsetMax),
+      })
+      .describe(
+        "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+      ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -1051,6 +1560,27 @@ export const GetJobReportForRunParams = zod.object({
   runId: zod.coerce.number(),
 });
 
+export const getJobReportForRunResponseJobScoringWeightsSkillsMatchMin = 0;
+export const getJobReportForRunResponseJobScoringWeightsSkillsMatchMax = 100;
+
+export const getJobReportForRunResponseJobScoringWeightsExperienceDepthMin = 0;
+export const getJobReportForRunResponseJobScoringWeightsExperienceDepthMax = 100;
+
+export const getJobReportForRunResponseJobScoringWeightsSoftSkillsMin = 0;
+export const getJobReportForRunResponseJobScoringWeightsSoftSkillsMax = 100;
+
+export const getJobReportForRunResponseJobScoringWeightsAutonomyMin = 0;
+export const getJobReportForRunResponseJobScoringWeightsAutonomyMax = 100;
+
+export const getJobReportForRunResponseJobScoringWeightsCultureFitMin = 0;
+export const getJobReportForRunResponseJobScoringWeightsCultureFitMax = 100;
+
+export const getJobReportForRunResponseJobScoringWeightsLongTermPotentialMin = 0;
+export const getJobReportForRunResponseJobScoringWeightsLongTermPotentialMax = 100;
+
+export const getJobReportForRunResponseJobScoringWeightsProductMindsetMin = 0;
+export const getJobReportForRunResponseJobScoringWeightsProductMindsetMax = 100;
+
 export const GetJobReportForRunResponse = zod.object({
   generatedAt: zod.coerce.date(),
   run: zod.object({
@@ -1091,6 +1621,40 @@ export const GetJobReportForRunResponse = zod.object({
     mustHaveSkills: zod.array(zod.string()),
     clientName: zod.string().nullish(),
     clientLogoUrl: zod.string().nullish(),
+    scoringWeights: zod
+      .object({
+        skillsMatch: zod
+          .number()
+          .min(getJobReportForRunResponseJobScoringWeightsSkillsMatchMin)
+          .max(getJobReportForRunResponseJobScoringWeightsSkillsMatchMax),
+        experienceDepth: zod
+          .number()
+          .min(getJobReportForRunResponseJobScoringWeightsExperienceDepthMin)
+          .max(getJobReportForRunResponseJobScoringWeightsExperienceDepthMax),
+        softSkills: zod
+          .number()
+          .min(getJobReportForRunResponseJobScoringWeightsSoftSkillsMin)
+          .max(getJobReportForRunResponseJobScoringWeightsSoftSkillsMax),
+        autonomy: zod
+          .number()
+          .min(getJobReportForRunResponseJobScoringWeightsAutonomyMin)
+          .max(getJobReportForRunResponseJobScoringWeightsAutonomyMax),
+        cultureFit: zod
+          .number()
+          .min(getJobReportForRunResponseJobScoringWeightsCultureFitMin)
+          .max(getJobReportForRunResponseJobScoringWeightsCultureFitMax),
+        longTermPotential: zod
+          .number()
+          .min(getJobReportForRunResponseJobScoringWeightsLongTermPotentialMin)
+          .max(getJobReportForRunResponseJobScoringWeightsLongTermPotentialMax),
+        productMindset: zod
+          .number()
+          .min(getJobReportForRunResponseJobScoringWeightsProductMindsetMin)
+          .max(getJobReportForRunResponseJobScoringWeightsProductMindsetMax),
+      })
+      .describe(
+        "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+      ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -1207,6 +1771,27 @@ export const GetJobReportParams = zod.object({
   jobId: zod.coerce.number(),
 });
 
+export const getJobReportResponseJobScoringWeightsSkillsMatchMin = 0;
+export const getJobReportResponseJobScoringWeightsSkillsMatchMax = 100;
+
+export const getJobReportResponseJobScoringWeightsExperienceDepthMin = 0;
+export const getJobReportResponseJobScoringWeightsExperienceDepthMax = 100;
+
+export const getJobReportResponseJobScoringWeightsSoftSkillsMin = 0;
+export const getJobReportResponseJobScoringWeightsSoftSkillsMax = 100;
+
+export const getJobReportResponseJobScoringWeightsAutonomyMin = 0;
+export const getJobReportResponseJobScoringWeightsAutonomyMax = 100;
+
+export const getJobReportResponseJobScoringWeightsCultureFitMin = 0;
+export const getJobReportResponseJobScoringWeightsCultureFitMax = 100;
+
+export const getJobReportResponseJobScoringWeightsLongTermPotentialMin = 0;
+export const getJobReportResponseJobScoringWeightsLongTermPotentialMax = 100;
+
+export const getJobReportResponseJobScoringWeightsProductMindsetMin = 0;
+export const getJobReportResponseJobScoringWeightsProductMindsetMax = 100;
+
 export const GetJobReportResponse = zod.object({
   generatedAt: zod.coerce.date(),
   run: zod.object({
@@ -1247,6 +1832,40 @@ export const GetJobReportResponse = zod.object({
     mustHaveSkills: zod.array(zod.string()),
     clientName: zod.string().nullish(),
     clientLogoUrl: zod.string().nullish(),
+    scoringWeights: zod
+      .object({
+        skillsMatch: zod
+          .number()
+          .min(getJobReportResponseJobScoringWeightsSkillsMatchMin)
+          .max(getJobReportResponseJobScoringWeightsSkillsMatchMax),
+        experienceDepth: zod
+          .number()
+          .min(getJobReportResponseJobScoringWeightsExperienceDepthMin)
+          .max(getJobReportResponseJobScoringWeightsExperienceDepthMax),
+        softSkills: zod
+          .number()
+          .min(getJobReportResponseJobScoringWeightsSoftSkillsMin)
+          .max(getJobReportResponseJobScoringWeightsSoftSkillsMax),
+        autonomy: zod
+          .number()
+          .min(getJobReportResponseJobScoringWeightsAutonomyMin)
+          .max(getJobReportResponseJobScoringWeightsAutonomyMax),
+        cultureFit: zod
+          .number()
+          .min(getJobReportResponseJobScoringWeightsCultureFitMin)
+          .max(getJobReportResponseJobScoringWeightsCultureFitMax),
+        longTermPotential: zod
+          .number()
+          .min(getJobReportResponseJobScoringWeightsLongTermPotentialMin)
+          .max(getJobReportResponseJobScoringWeightsLongTermPotentialMax),
+        productMindset: zod
+          .number()
+          .min(getJobReportResponseJobScoringWeightsProductMindsetMin)
+          .max(getJobReportResponseJobScoringWeightsProductMindsetMax),
+      })
+      .describe(
+        "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+      ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),

@@ -16,8 +16,22 @@
 
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { batchProcess } from "@workspace/integrations-openai-ai-server/batch";
+import { DEFAULT_SCORING_WEIGHTS, type ScoringWeights } from "@workspace/db";
 import type { AgentProvider, AgentProviderRunInput, WorkflowStep } from "./interface";
 import type { JobInsightResult, CandidateMatchResult, ShortlistResult, ScoreBreakdown } from "../engine-types";
+
+/** Convert integer percent weights (0-100) into 0-1 fractions used by the scoring math. */
+function toFractions(w: ScoringWeights): Record<keyof ScoringWeights, number> {
+  return {
+    skillsMatch: w.skillsMatch / 100,
+    experienceDepth: w.experienceDepth / 100,
+    softSkills: w.softSkills / 100,
+    autonomy: w.autonomy / 100,
+    cultureFit: w.cultureFit / 100,
+    longTermPotential: w.longTermPotential / 100,
+    productMindset: w.productMindset / 100,
+  };
+}
 
 /** Parse JSON from model output, stripping markdown code fences if present. */
 function json<T>(content: string): T {
@@ -116,6 +130,8 @@ Keep it concise and accurate. Return only valid JSON, no other text.`;
    */
   private async runCandidateMatching(payload: CandidateMatchingPayload): Promise<CandidateMatchResult[]> {
     const { job, insight, candidates } = payload;
+    const weights = toFractions(job.scoringWeights ?? DEFAULT_SCORING_WEIGHTS);
+    const fmt = (v: number) => v.toFixed(2);
     const results = await batchProcess(
       candidates,
       async (candidate) => {
@@ -133,8 +149,8 @@ Summary: ${candidate.summary ?? "No summary provided"}
 
 Score this candidate's FIT for the role across 7 weighted dimensions. Each dimension score is 0-100.
 The fitScore = round(
-  skillsMatch*0.23 + experienceDepth*0.20 + autonomy*0.13 + productMindset*0.09 +
-  softSkills*0.15 + cultureFit*0.10 + longTermPotential*0.10
+  skillsMatch*${fmt(weights.skillsMatch)} + experienceDepth*${fmt(weights.experienceDepth)} + autonomy*${fmt(weights.autonomy)} + productMindset*${fmt(weights.productMindset)} +
+  softSkills*${fmt(weights.softSkills)} + cultureFit*${fmt(weights.cultureFit)} + longTermPotential*${fmt(weights.longTermPotential)}
 ).
 
 IMPORTANT — Fit scoring rules:
@@ -143,14 +159,14 @@ IMPORTANT — Fit scoring rules:
 - If a dimension has no evidence at all, score it at 20-30 (not 0) and flag it.
 - Never fabricate experience or skills that are not explicitly listed.
 
-Dimension definitions:
-- skillsMatch (0.23): Coverage of must-have skills from the job. Cite specific skill matches or gaps.
-- experienceDepth (0.20): Evidence of seniority-appropriate, hands-on depth.
-- softSkills (0.15): Communication, empathy, adaptability — written tone, collaboration signals, customer/team contact in their summary.
-- autonomy (0.13): End-to-end ownership, led initiatives, worked without heavy direction.
-- cultureFit (0.10): Alignment with the team values and working style implied by the job description and ideal profile.
-- longTermPotential (0.10): Growth trajectory and learning agility — promotions, breadth of new skills picked up, scope expansion.
-- productMindset (0.09): Evidence the candidate thinks about users, product impact, or business outcomes.
+Dimension definitions (the weights below are tuned per-job by the hiring manager):
+- skillsMatch (${fmt(weights.skillsMatch)}): Coverage of must-have skills from the job. Cite specific skill matches or gaps.
+- experienceDepth (${fmt(weights.experienceDepth)}): Evidence of seniority-appropriate, hands-on depth.
+- softSkills (${fmt(weights.softSkills)}): Communication, empathy, adaptability — written tone, collaboration signals, customer/team contact in their summary.
+- autonomy (${fmt(weights.autonomy)}): End-to-end ownership, led initiatives, worked without heavy direction.
+- cultureFit (${fmt(weights.cultureFit)}): Alignment with the team values and working style implied by the job description and ideal profile.
+- longTermPotential (${fmt(weights.longTermPotential)}): Growth trajectory and learning agility — promotions, breadth of new skills picked up, scope expansion.
+- productMindset (${fmt(weights.productMindset)}): Evidence the candidate thinks about users, product impact, or business outcomes.
 
 Additional rules:
 - reasoning must be 1-2 specific sentences referencing actual candidate details
@@ -161,13 +177,13 @@ Additional rules:
 Return only valid JSON matching this exact structure:
 {
   "scoreBreakdown": {
-    "skillsMatch":       { "score": <0-100>, "weight": 0.23, "reasoning": "<specific 1-2 sentences>" },
-    "experienceDepth":   { "score": <0-100>, "weight": 0.20, "reasoning": "<specific 1-2 sentences>" },
-    "autonomy":          { "score": <0-100>, "weight": 0.13, "reasoning": "<specific 1-2 sentences>" },
-    "productMindset":    { "score": <0-100>, "weight": 0.09, "reasoning": "<specific 1-2 sentences>" },
-    "softSkills":        { "score": <0-100>, "weight": 0.15, "reasoning": "<specific 1-2 sentences>" },
-    "cultureFit":        { "score": <0-100>, "weight": 0.10, "reasoning": "<specific 1-2 sentences>" },
-    "longTermPotential": { "score": <0-100>, "weight": 0.10, "reasoning": "<specific 1-2 sentences>" }
+    "skillsMatch":       { "score": <0-100>, "weight": ${fmt(weights.skillsMatch)}, "reasoning": "<specific 1-2 sentences>" },
+    "experienceDepth":   { "score": <0-100>, "weight": ${fmt(weights.experienceDepth)}, "reasoning": "<specific 1-2 sentences>" },
+    "autonomy":          { "score": <0-100>, "weight": ${fmt(weights.autonomy)}, "reasoning": "<specific 1-2 sentences>" },
+    "productMindset":    { "score": <0-100>, "weight": ${fmt(weights.productMindset)}, "reasoning": "<specific 1-2 sentences>" },
+    "softSkills":        { "score": <0-100>, "weight": ${fmt(weights.softSkills)}, "reasoning": "<specific 1-2 sentences>" },
+    "cultureFit":        { "score": <0-100>, "weight": ${fmt(weights.cultureFit)}, "reasoning": "<specific 1-2 sentences>" },
+    "longTermPotential": { "score": <0-100>, "weight": ${fmt(weights.longTermPotential)}, "reasoning": "<specific 1-2 sentences>" }
   },
   "fitScore": <integer 0-100, must equal round(weighted sum above)>,
   "strengths": ["<specific strength citing candidate detail>", "<specific strength>"],
@@ -200,13 +216,13 @@ Return only valid JSON matching this exact structure:
         const bd = raw.scoreBreakdown;
         const fitScore = bd
           ? Math.round(
-              bd.skillsMatch.score * 0.23 +
-              bd.experienceDepth.score * 0.20 +
-              bd.autonomy.score * 0.13 +
-              bd.productMindset.score * 0.09 +
-              (bd.softSkills?.score ?? 0) * 0.15 +
-              (bd.cultureFit?.score ?? 0) * 0.10 +
-              (bd.longTermPotential?.score ?? 0) * 0.10,
+              (bd.skillsMatch?.score ?? 0) * weights.skillsMatch +
+              (bd.experienceDepth?.score ?? 0) * weights.experienceDepth +
+              (bd.autonomy?.score ?? 0) * weights.autonomy +
+              (bd.productMindset?.score ?? 0) * weights.productMindset +
+              (bd.softSkills?.score ?? 0) * weights.softSkills +
+              (bd.cultureFit?.score ?? 0) * weights.cultureFit +
+              (bd.longTermPotential?.score ?? 0) * weights.longTermPotential,
             )
           : (raw.fitScore ?? raw.score ?? 0);
 
@@ -301,7 +317,7 @@ export type JobUnderstandingPayload = {
 };
 
 export type CandidateMatchingPayload = {
-  job: { title: string; description: string; mustHaveSkills: string[]; seniority: string };
+  job: { title: string; description: string; mustHaveSkills: string[]; seniority: string; scoringWeights?: ScoringWeights };
   insight: JobInsightResult;
   candidates: Array<{ id: number; name: string; email: string; skills: string[]; summary: string | null }>;
 };

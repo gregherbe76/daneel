@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, jobsTable } from "@workspace/db";
+import { db, jobsTable, DEFAULT_SCORING_WEIGHTS } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import {
   CreateJobBody,
@@ -32,6 +32,7 @@ router.post("/jobs", async (req, res) => {
       mustHaveSkills: body.mustHaveSkills,
       clientName: body.clientName ?? null,
       clientLogoUrl: body.clientLogoUrl ?? null,
+      scoringWeights: body.scoringWeights ?? DEFAULT_SCORING_WEIGHTS,
     })
     .returning();
   res.status(201).json(job);
@@ -65,6 +66,9 @@ router.put("/jobs/:id", async (req, res) => {
       mustHaveSkills: body.mustHaveSkills,
       clientName: body.clientName ?? null,
       clientLogoUrl: body.clientLogoUrl ?? null,
+      // Only overwrite weights when the client explicitly sends them.
+      // Omitting the field preserves the job's existing customized weights.
+      ...(body.scoringWeights ? { scoringWeights: body.scoringWeights } : {}),
       updatedAt: new Date(),
     })
     .where(eq(jobsTable.id, id))

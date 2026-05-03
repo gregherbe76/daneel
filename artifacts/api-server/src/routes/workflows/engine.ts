@@ -9,7 +9,7 @@ import {
   candidatesTable,
   applicationsTable,
 } from "@workspace/db";
-import type { VariantCriteria, DataMode } from "@workspace/db";
+import type { VariantCriteria, DataMode, ScoringWeights } from "@workspace/db";
 import { eq, ne, and, inArray } from "drizzle-orm";
 import { logger } from "../../lib/logger";
 import { resolveProvider, resolveSourcingProvider, resolveEnrichmentProvider } from "./providers";
@@ -428,7 +428,7 @@ async function runInlineEnrichmentForCandidates(
 async function runCandidateMatching(
   runId: number,
   jobId: number,
-  job: { title: string; description: string; mustHaveSkills: string[]; seniority: string },
+  job: { title: string; description: string; mustHaveSkills: string[]; seniority: string; scoringWeights: ScoringWeights },
   insight: JobInsightResult,
   candidates: Array<{
     id: number;

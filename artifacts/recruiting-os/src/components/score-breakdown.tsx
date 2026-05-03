@@ -20,61 +20,76 @@ export type ScoreBreakdown = {
   longTermPotential: ScoreDimension;
 };
 
-const DIMENSIONS: {
-  key: keyof ScoreBreakdown;
+/** Per-job scoring weights as integer percentages (0-100). Must sum to 100. */
+export type ScoringWeights = {
+  skillsMatch: number;
+  experienceDepth: number;
+  softSkills: number;
+  autonomy: number;
+  cultureFit: number;
+  longTermPotential: number;
+  productMindset: number;
+};
+
+export const DEFAULT_SCORING_WEIGHTS: ScoringWeights = {
+  skillsMatch: 23,
+  experienceDepth: 20,
+  softSkills: 15,
+  autonomy: 13,
+  cultureFit: 10,
+  longTermPotential: 10,
+  productMindset: 9,
+};
+
+type DimensionMeta = {
+  key: keyof ScoringWeights;
   label: string;
   abbr: string;
   description: string;
-  weight: number;
-}[] = [
+};
+
+const DIMENSION_META: DimensionMeta[] = [
   {
     key: "skillsMatch",
     label: "Skills Match",
     abbr: "Skills",
     description: "How well the candidate's skills line up with the must-haves you listed for this role.",
-    weight: 0.23,
   },
   {
     key: "experienceDepth",
     label: "Experience Depth",
     abbr: "Experience",
     description: "Whether their past hands-on experience matches the seniority you need.",
-    weight: 0.20,
   },
   {
     key: "softSkills",
     label: "Soft Skills",
     abbr: "Soft",
     description: "Communication, empathy and adaptability shown in their profile.",
-    weight: 0.15,
   },
   {
     key: "autonomy",
     label: "Autonomy & Ownership",
     abbr: "Autonomy",
     description: "Evidence they can run with projects and make decisions on their own.",
-    weight: 0.13,
   },
   {
     key: "cultureFit",
     label: "Culture Fit",
     abbr: "Culture",
     description: "How aligned they look with your team's stated values and ways of working.",
-    weight: 0.10,
   },
   {
     key: "longTermPotential",
     label: "Long-Term Potential",
     abbr: "Growth",
     description: "Their growth trajectory and learning agility — how far they could go on your team.",
-    weight: 0.10,
   },
   {
     key: "productMindset",
     label: "Product Mindset",
     abbr: "Product",
     description: "Whether they think about users and business impact, not just execution.",
-    weight: 0.09,
   },
 ];
 
@@ -94,6 +109,8 @@ function scoreTextColor(score: number) {
 
 interface Props {
   breakdown: ScoreBreakdown;
+  /** Per-job weights (integer percentages). Falls back to defaults when omitted. */
+  weights?: ScoringWeights;
   /** compact = inline bars only; expanded = bars + reasoning */
   defaultExpanded?: boolean;
   showToggle?: boolean;
@@ -102,6 +119,7 @@ interface Props {
 
 export function ScoreBreakdownDisplay({
   breakdown,
+  weights = DEFAULT_SCORING_WEIGHTS,
   defaultExpanded = false,
   showToggle = true,
   className = "",
@@ -112,11 +130,12 @@ export function ScoreBreakdownDisplay({
     <div className={className}>
       {/* dimension bars row */}
       <div className="space-y-2">
-        {DIMENSIONS.map((dim) => {
+        {DIMENSION_META.map((dim) => {
           const d = breakdown[dim.key];
           if (!d) return null;
           const score = d.score ?? 0;
-          const weightedContrib = Math.round(score * dim.weight);
+          const weightPct = weights[dim.key] ?? 0;
+          const weightedContrib = Math.round((score * weightPct) / 100);
 
           return (
             <div key={dim.key}>
@@ -130,7 +149,7 @@ export function ScoreBreakdownDisplay({
                     <Info className="h-3 w-3 text-muted-foreground shrink-0" />
                   </span>
                   <span className="text-[10px] text-muted-foreground shrink-0">
-                    {Math.round(dim.weight * 100)}% weight
+                    {weightPct}% weight
                   </span>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -187,7 +206,7 @@ export function ScoreBreakdownPills({
 }) {
   return (
     <div className="flex gap-1.5 flex-wrap">
-      {DIMENSIONS.map((dim) => {
+      {DIMENSION_META.map((dim) => {
         const d = breakdown[dim.key];
         if (!d) return null;
         const score = d.score ?? 0;

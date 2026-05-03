@@ -919,6 +919,40 @@ components:
       enum: [Sourced, Contacted, Screened, Interview, Offer, Hired, Rejected]
 
     # ── JOB ──
+    ScoringWeights:
+      type: object
+      description: Per-job scoring weights (integer percentages 0-100, must sum to 100).
+      properties:
+        skillsMatch:
+          type: integer
+          minimum: 0
+          maximum: 100
+        experienceDepth:
+          type: integer
+          minimum: 0
+          maximum: 100
+        softSkills:
+          type: integer
+          minimum: 0
+          maximum: 100
+        autonomy:
+          type: integer
+          minimum: 0
+          maximum: 100
+        cultureFit:
+          type: integer
+          minimum: 0
+          maximum: 100
+        longTermPotential:
+          type: integer
+          minimum: 0
+          maximum: 100
+        productMindset:
+          type: integer
+          minimum: 0
+          maximum: 100
+      required: [skillsMatch, experienceDepth, softSkills, autonomy, cultureFit, longTermPotential, productMindset]
+
     Job:
       type: object
       properties:
@@ -942,13 +976,15 @@ components:
         clientLogoUrl:
           type: string
           nullable: true
+        scoringWeights:
+          $ref: "#/components/schemas/ScoringWeights"
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
-      required: [id, title, description, location, seniority, mustHaveSkills, createdAt, updatedAt]
+      required: [id, title, description, location, seniority, mustHaveSkills, scoringWeights, createdAt, updatedAt]
 
     CreateJobBody:
       type: object
@@ -971,6 +1007,8 @@ components:
         clientLogoUrl:
           type: string
           nullable: true
+        scoringWeights:
+          $ref: "#/components/schemas/ScoringWeights"
       required: [title, description, location, seniority, mustHaveSkills]
 
     # ── CANDIDATE ──
