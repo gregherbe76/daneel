@@ -32,6 +32,27 @@ const EMAIL_SOURCE_OPTIONS: { value: string; label: string }[] = [
 ];
 const EMAIL_SOURCE_VALUES = new Set(EMAIL_SOURCE_OPTIONS.map((o) => o.value));
 const UNKNOWN_SOURCE = "__unknown__";
+const UNKNOWN_URL_VALUE = "unknown";
+
+function parseEmailSourceParam(search: string): Set<string> {
+  const parsed = new URLSearchParams(search);
+  const raw = parsed.get("emailSource");
+  if (!raw) return new Set();
+  const next = new Set<string>();
+  for (const part of raw.split(",")) {
+    const v = part.trim();
+    if (!v) continue;
+    if (v === UNKNOWN_URL_VALUE) next.add(UNKNOWN_SOURCE);
+    else if (EMAIL_SOURCE_VALUES.has(v)) next.add(v);
+  }
+  return next;
+}
+
+function serializeEmailSourceParam(selected: Set<string>): string {
+  return Array.from(selected)
+    .map((v) => (v === UNKNOWN_SOURCE ? UNKNOWN_URL_VALUE : v))
+    .join(",");
+}
 
 const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
   "Imported CSV": {
@@ -52,10 +73,10 @@ const EMAIL_FILTER_PARAM = "email";
 
 export default function CandidatesPage() {
   const { data: candidates, isLoading, refetch } = useListCandidates();
-  const [importOpen, setImportOpen] = useState(false);
-  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
   const search = useSearch();
   const [, navigate] = useLocation();
+
+  const selectedSources: Set<string> = useMemo(() => parseEmailSourceParam(search), [search]);
 
   const emailFilter: EmailStatusFilterValue = useMemo(() => {
     const parsed = new URLSearchParams(search);
@@ -63,15 +84,26 @@ export default function CandidatesPage() {
     return isEmailStatusFilterValue(v) ? v : "all";
   }, [search]);
 
-  const setEmailFilter = (value: EmailStatusFilterValue) => {
+  const updateUrl = (mutate: (params: URLSearchParams) => void) => {
     const parsed = new URLSearchParams(search);
-    if (value === "all") {
-      parsed.delete(EMAIL_FILTER_PARAM);
-    } else {
-      parsed.set(EMAIL_FILTER_PARAM, value);
-    }
+    mutate(parsed);
     const qs = parsed.toString();
     navigate(`/candidates${qs ? `?${qs}` : ""}`, { replace: true });
+  };
+
+  const setEmailFilter = (value: EmailStatusFilterValue) => {
+    updateUrl((p) => {
+      if (value === "all") p.delete(EMAIL_FILTER_PARAM);
+      else p.set(EMAIL_FILTER_PARAM, value);
+    });
+  };
+
+  const setSelectedSources = (next: Set<string>) => {
+    const serialized = serializeEmailSourceParam(next);
+    updateUrl((p) => {
+      if (serialized) p.set("emailSource", serialized);
+      else p.delete("emailSource");
+    });
   };
 
   const availableSources = useMemo(() => {
@@ -128,12 +160,10 @@ export default function CandidatesPage() {
   }, [candidates, selectedSources, emailFilter]);
 
   const toggleSource = (value: string) => {
-    setSelectedSources((prev) => {
-      const next = new Set(prev);
-      if (next.has(value)) next.delete(value);
-      else next.add(value);
-      return next;
-    });
+    const next = new Set(selectedSources);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    setSelectedSources(next);
   };
 
   const totalCount = candidates?.length ?? 0;
