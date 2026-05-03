@@ -1,13 +1,31 @@
 import { useListCandidates } from "@workspace/api-client-react";
 import { Link } from "wouter";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Users, Loader2, Mail, Upload } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, Users, Loader2, Mail, Upload, Filter } from "lucide-react";
 import { ImportCandidatesModal } from "@/components/import-candidates-modal";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
 import { EmailSourceBadge } from "@/components/email-source-badge";
+
+const EMAIL_SOURCE_OPTIONS: { value: string; label: string }[] = [
+  { value: "profile", label: "Profile" },
+  { value: "commit", label: "From commits" },
+  { value: "manual", label: "Manual" },
+  { value: "noreply", label: "Noreply" },
+  { value: "generated", label: "Mock" },
+];
+const EMAIL_SOURCE_VALUES = new Set(EMAIL_SOURCE_OPTIONS.map((o) => o.value));
+const UNKNOWN_SOURCE = "__unknown__";
 
 const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
   "Imported CSV": {
@@ -27,6 +45,44 @@ const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
 export default function CandidatesPage() {
   const { data: candidates, isLoading, refetch } = useListCandidates();
   const [importOpen, setImportOpen] = useState(false);
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+
+  const availableSources = useMemo(() => {
+    const set = new Set<string>();
+    let hasUnknown = false;
+    for (const c of candidates ?? []) {
+      const s = c.emailSource;
+      if (s && EMAIL_SOURCE_VALUES.has(s)) {
+        set.add(s);
+      } else {
+        hasUnknown = true;
+      }
+    }
+    return { set, hasUnknown };
+  }, [candidates]);
+
+  const filteredCandidates = useMemo(() => {
+    if (!candidates) return candidates;
+    if (selectedSources.size === 0) return candidates;
+    return candidates.filter((c) => {
+      const s = c.emailSource;
+      if (s && EMAIL_SOURCE_VALUES.has(s)) return selectedSources.has(s);
+      return selectedSources.has(UNKNOWN_SOURCE);
+    });
+  }, [candidates, selectedSources]);
+
+  const toggleSource = (value: string) => {
+    setSelectedSources((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  };
+
+  const totalCount = candidates?.length ?? 0;
+  const filteredCount = filteredCandidates?.length ?? 0;
+  const isFiltered = selectedSources.size > 0;
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -36,6 +92,55 @@ export default function CandidatesPage() {
           <p className="text-muted-foreground mt-1">Everyone in your talent pool, in one place.</p>
         </div>
         <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Filter className="mr-2 h-4 w-4" />
+                Email source
+                {isFiltered && (
+                  <Badge variant="secondary" className="ml-2 h-5 px-1.5">
+                    {selectedSources.size}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Filter by email source</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {EMAIL_SOURCE_OPTIONS.map((opt) => (
+                <DropdownMenuCheckboxItem
+                  key={opt.value}
+                  checked={selectedSources.has(opt.value)}
+                  onCheckedChange={() => toggleSource(opt.value)}
+                  onSelect={(e) => e.preventDefault()}
+                  disabled={!availableSources.set.has(opt.value) && !selectedSources.has(opt.value)}
+                >
+                  {opt.label}
+                </DropdownMenuCheckboxItem>
+              ))}
+              {(availableSources.hasUnknown || selectedSources.has(UNKNOWN_SOURCE)) && (
+                <DropdownMenuCheckboxItem
+                  checked={selectedSources.has(UNKNOWN_SOURCE)}
+                  onCheckedChange={() => toggleSource(UNKNOWN_SOURCE)}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  Unknown
+                </DropdownMenuCheckboxItem>
+              )}
+              {isFiltered && (
+                <>
+                  <DropdownMenuSeparator />
+                  <button
+                    type="button"
+                    className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent"
+                    onClick={() => setSelectedSources(new Set())}
+                  >
+                    Clear filter
+                  </button>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
             Import Candidates
@@ -48,6 +153,22 @@ export default function CandidatesPage() {
           </Link>
         </div>
       </div>
+
+      {isFiltered && !isLoading && (
+        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+          <span>
+            Showing {filteredCount} of {totalCount} candidates filtered by email source.
+          </span>
+          <Button
+            variant="link"
+            size="sm"
+            className="h-auto p-0"
+            onClick={() => setSelectedSources(new Set())}
+          >
+            Clear
+          </Button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center py-12">
@@ -72,9 +193,23 @@ export default function CandidatesPage() {
             </Link>
           </div>
         </Card>
+      ) : isFiltered && filteredCount === 0 ? (
+        <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed">
+          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+            <Filter className="h-6 w-6 text-primary" />
+          </div>
+          <h3 className="text-lg font-semibold mb-1">No matching candidates</h3>
+          <p className="text-muted-foreground mb-4">
+            None of your {totalCount} candidates have an email from the selected
+            sources. Try adjusting the filter.
+          </p>
+          <Button variant="outline" onClick={() => setSelectedSources(new Set())}>
+            Clear filter
+          </Button>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {candidates?.map((candidate) => {
+          {filteredCandidates?.map((candidate) => {
             const sourceTag = candidate.source
               ? SOURCE_LABELS[candidate.source]
               : null;

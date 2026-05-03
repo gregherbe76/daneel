@@ -1627,6 +1627,18 @@ export const PreviewGithubQueryBody = zod
           .describe(
             "Minimum public repo count (adds `repos:>=N` to the query).",
           ),
+        requireBio: zod
+          .boolean()
+          .nullish()
+          .describe(
+            "Drop candidates with empty profile bios (post-fetch filter).",
+          ),
+        activeWithinMonths: zod
+          .number()
+          .nullish()
+          .describe(
+            "Drop candidates whose latest public event is older than N months (post-fetch filter).",
+          ),
       })
       .describe(
         "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
