@@ -229,6 +229,27 @@ export const WorkflowStepName = {
   enrichment: "enrichment",
 } as const;
 
+/**
+ * Recruiter-tunable knobs for the GitHub Agent's user-search query.
+ */
+export interface GithubProviderConfig {
+  /** Free-text keywords appended verbatim to the search query (e.g. "open source", "fintech"). */
+  extraKeywords?: string | null;
+  /** Comma- or space-separated GitHub org/user logins to exclude from results (e.g. "google, microsoft"). */
+  excludeOrgs?: string | null;
+  /** Minimum follower count (adds `followers:>=N` to the query). */
+  minFollowers?: number | null;
+  /** Minimum public repo count (adds `repos:>=N` to the query). */
+  minRepos?: number | null;
+}
+
+/**
+ * Per-provider tuning knobs. Only the section matching the provider type is read.
+ */
+export interface AgentProviderConfig {
+  github?: GithubProviderConfig;
+}
+
 export interface AgentProviderRecord {
   id: number;
   name: string;
@@ -236,6 +257,7 @@ export interface AgentProviderRecord {
   baseUrl?: string | null;
   webhookUrl?: string | null;
   apiKeyEncryptedPlaceholder?: string | null;
+  config?: AgentProviderConfig | null;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -247,6 +269,7 @@ export interface CreateProviderBody {
   baseUrl?: string | null;
   webhookUrl?: string | null;
   apiKeyPlaceholder?: string | null;
+  config?: AgentProviderConfig | null;
   enabled?: boolean;
 }
 

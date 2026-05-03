@@ -1051,6 +1051,44 @@ export const ListProvidersResponseItem = zod.object({
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
   apiKeyEncryptedPlaceholder: zod.string().nullish(),
+  config: zod
+    .object({
+      github: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the search query (e.g. \"open source\", \"fintech\").',
+            ),
+          excludeOrgs: zod
+            .string()
+            .nullish()
+            .describe(
+              'Comma- or space-separated GitHub org\/user logins to exclude from results (e.g. \"google, microsoft\").',
+            ),
+          minFollowers: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum follower count (adds `followers:>=N` to the query).",
+            ),
+          minRepos: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum public repo count (adds `repos:>=N` to the query).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+        ),
+    })
+    .describe(
+      "Per-provider tuning knobs. Only the section matching the provider type is read.",
+    )
+    .nullish(),
   enabled: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -1066,6 +1104,44 @@ export const CreateProviderBody = zod.object({
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
   apiKeyPlaceholder: zod.string().nullish(),
+  config: zod
+    .object({
+      github: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the search query (e.g. \"open source\", \"fintech\").',
+            ),
+          excludeOrgs: zod
+            .string()
+            .nullish()
+            .describe(
+              'Comma- or space-separated GitHub org\/user logins to exclude from results (e.g. \"google, microsoft\").',
+            ),
+          minFollowers: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum follower count (adds `followers:>=N` to the query).",
+            ),
+          minRepos: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum public repo count (adds `repos:>=N` to the query).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+        ),
+    })
+    .describe(
+      "Per-provider tuning knobs. Only the section matching the provider type is read.",
+    )
+    .nullish(),
   enabled: zod.boolean().optional(),
 });
 
@@ -1083,6 +1159,44 @@ export const GetProviderResponse = zod.object({
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
   apiKeyEncryptedPlaceholder: zod.string().nullish(),
+  config: zod
+    .object({
+      github: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the search query (e.g. \"open source\", \"fintech\").',
+            ),
+          excludeOrgs: zod
+            .string()
+            .nullish()
+            .describe(
+              'Comma- or space-separated GitHub org\/user logins to exclude from results (e.g. \"google, microsoft\").',
+            ),
+          minFollowers: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum follower count (adds `followers:>=N` to the query).",
+            ),
+          minRepos: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum public repo count (adds `repos:>=N` to the query).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+        ),
+    })
+    .describe(
+      "Per-provider tuning knobs. Only the section matching the provider type is read.",
+    )
+    .nullish(),
   enabled: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -1101,6 +1215,44 @@ export const UpdateProviderBody = zod.object({
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
   apiKeyPlaceholder: zod.string().nullish(),
+  config: zod
+    .object({
+      github: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the search query (e.g. \"open source\", \"fintech\").',
+            ),
+          excludeOrgs: zod
+            .string()
+            .nullish()
+            .describe(
+              'Comma- or space-separated GitHub org\/user logins to exclude from results (e.g. \"google, microsoft\").',
+            ),
+          minFollowers: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum follower count (adds `followers:>=N` to the query).",
+            ),
+          minRepos: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum public repo count (adds `repos:>=N` to the query).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+        ),
+    })
+    .describe(
+      "Per-provider tuning knobs. Only the section matching the provider type is read.",
+    )
+    .nullish(),
   enabled: zod.boolean().optional(),
 });
 
@@ -1111,6 +1263,44 @@ export const UpdateProviderResponse = zod.object({
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
   apiKeyEncryptedPlaceholder: zod.string().nullish(),
+  config: zod
+    .object({
+      github: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the search query (e.g. \"open source\", \"fintech\").',
+            ),
+          excludeOrgs: zod
+            .string()
+            .nullish()
+            .describe(
+              'Comma- or space-separated GitHub org\/user logins to exclude from results (e.g. \"google, microsoft\").',
+            ),
+          minFollowers: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum follower count (adds `followers:>=N` to the query).",
+            ),
+          minRepos: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum public repo count (adds `repos:>=N` to the query).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+        ),
+    })
+    .describe(
+      "Per-provider tuning knobs. Only the section matching the provider type is read.",
+    )
+    .nullish(),
   enabled: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -1141,6 +1331,44 @@ export const ToggleProviderResponse = zod.object({
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
   apiKeyEncryptedPlaceholder: zod.string().nullish(),
+  config: zod
+    .object({
+      github: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the search query (e.g. \"open source\", \"fintech\").',
+            ),
+          excludeOrgs: zod
+            .string()
+            .nullish()
+            .describe(
+              'Comma- or space-separated GitHub org\/user logins to exclude from results (e.g. \"google, microsoft\").',
+            ),
+          minFollowers: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum follower count (adds `followers:>=N` to the query).",
+            ),
+          minRepos: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum public repo count (adds `repos:>=N` to the query).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+        ),
+    })
+    .describe(
+      "Per-provider tuning knobs. Only the section matching the provider type is read.",
+    )
+    .nullish(),
   enabled: zod.boolean(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -1186,6 +1414,44 @@ export const ListProviderStepSettingsResponseItem = zod.object({
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
     apiKeyEncryptedPlaceholder: zod.string().nullish(),
+    config: zod
+      .object({
+        github: zod
+          .object({
+            extraKeywords: zod
+              .string()
+              .nullish()
+              .describe(
+                'Free-text keywords appended verbatim to the search query (e.g. \"open source\", \"fintech\").',
+              ),
+            excludeOrgs: zod
+              .string()
+              .nullish()
+              .describe(
+                'Comma- or space-separated GitHub org\/user logins to exclude from results (e.g. \"google, microsoft\").',
+              ),
+            minFollowers: zod
+              .number()
+              .nullish()
+              .describe(
+                "Minimum follower count (adds `followers:>=N` to the query).",
+              ),
+            minRepos: zod
+              .number()
+              .nullish()
+              .describe(
+                "Minimum public repo count (adds `repos:>=N` to the query).",
+              ),
+          })
+          .optional()
+          .describe(
+            "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+          ),
+      })
+      .describe(
+        "Per-provider tuning knobs. Only the section matching the provider type is read.",
+      )
+      .nullish(),
     enabled: zod.boolean(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
@@ -1235,6 +1501,44 @@ export const UpsertProviderStepSettingResponse = zod.object({
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
     apiKeyEncryptedPlaceholder: zod.string().nullish(),
+    config: zod
+      .object({
+        github: zod
+          .object({
+            extraKeywords: zod
+              .string()
+              .nullish()
+              .describe(
+                'Free-text keywords appended verbatim to the search query (e.g. \"open source\", \"fintech\").',
+              ),
+            excludeOrgs: zod
+              .string()
+              .nullish()
+              .describe(
+                'Comma- or space-separated GitHub org\/user logins to exclude from results (e.g. \"google, microsoft\").',
+              ),
+            minFollowers: zod
+              .number()
+              .nullish()
+              .describe(
+                "Minimum follower count (adds `followers:>=N` to the query).",
+              ),
+            minRepos: zod
+              .number()
+              .nullish()
+              .describe(
+                "Minimum public repo count (adds `repos:>=N` to the query).",
+              ),
+          })
+          .optional()
+          .describe(
+            "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+          ),
+      })
+      .describe(
+        "Per-provider tuning knobs. Only the section matching the provider type is read.",
+      )
+      .nullish(),
     enabled: zod.boolean(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),

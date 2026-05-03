@@ -31,6 +31,7 @@ router.post("/providers", async (req, res) => {
       baseUrl: body.baseUrl ?? null,
       webhookUrl: body.webhookUrl ?? null,
       apiKeyEncryptedPlaceholder: body.apiKeyPlaceholder ?? null,
+      config: body.config ?? null,
       enabled: body.enabled ?? true,
     })
     .returning();
@@ -115,6 +116,7 @@ router.put("/providers/:id", async (req, res) => {
       baseUrl: body.baseUrl ?? null,
       webhookUrl: body.webhookUrl ?? null,
       apiKeyEncryptedPlaceholder: body.apiKeyPlaceholder ?? null,
+      config: body.config ?? null,
       enabled: body.enabled ?? true,
       updatedAt: new Date(),
     })

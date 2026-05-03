@@ -6,7 +6,19 @@ import {
   timestamp,
   pgEnum,
   integer,
+  jsonb,
 } from "drizzle-orm/pg-core";
+
+export type GithubProviderConfig = {
+  extraKeywords?: string | null;
+  excludeOrgs?: string | null;
+  minFollowers?: number | null;
+  minRepos?: number | null;
+};
+
+export type AgentProviderConfig = {
+  github?: GithubProviderConfig;
+};
 
 export const providerTypeEnum = pgEnum("provider_type", [
   "native_openai",
@@ -31,6 +43,7 @@ export const agentProvidersTable = pgTable("agent_providers", {
   baseUrl: text("base_url"),
   webhookUrl: text("webhook_url"),
   apiKeyEncryptedPlaceholder: text("api_key_encrypted_placeholder"),
+  config: jsonb("config").$type<AgentProviderConfig>(),
   enabled: boolean("enabled").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

@@ -1,5 +1,6 @@
 import type { AgentProvider, AgentProviderRunInput } from "./interface";
 import type { SourcingCandidate } from "./native-openai-sourcing";
+import type { GithubProviderConfig } from "@workspace/db";
 import { logger } from "../../../lib/logger";
 
 const GITHUB_API = "https://api.github.com";
@@ -60,10 +61,12 @@ export class GithubSourcingProvider implements AgentProvider {
   readonly name: string;
   readonly type = "github";
   private readonly token?: string;
+  private readonly config: GithubProviderConfig;
 
-  constructor(id: number, name: string) {
+  constructor(id: number, name: string, config?: GithubProviderConfig | null) {
     this.id = id;
     this.name = name;
+    this.config = config ?? {};
     const t = process.env.GITHUB_TOKEN;
     this.token = t && t.trim() ? t.trim() : undefined;
   }
@@ -139,8 +142,33 @@ export class GithubSourcingProvider implements AgentProvider {
       .filter((s) => s.length > 0);
     if (free.length > 0) parts.push(free.join(" "));
 
+    // Recruiter-tunable extra keywords are appended to the free-text portion verbatim
+    // (sanitised the same way as title/seniority so GitHub's parser doesn't choke).
+    const extraKeywords = sanitize(this.config.extraKeywords ?? "");
+    if (extraKeywords) parts.push(extraKeywords);
+
     parts.push(...langs);
     if (filterLoc) parts.push(`location:${quoteIfNeeded(filterLoc)}`);
+
+    // Per-provider numeric filters
+    const minFollowers = this.config.minFollowers;
+    if (typeof minFollowers === "number" && minFollowers > 0) {
+      parts.push(`followers:>=${Math.floor(minFollowers)}`);
+    }
+    const minRepos = this.config.minRepos;
+    if (typeof minRepos === "number" && minRepos > 0) {
+      parts.push(`repos:>=${Math.floor(minRepos)}`);
+    }
+
+    // Exclude orgs/users — split on commas, whitespace, or semicolons.
+    const excludeOrgs = (this.config.excludeOrgs ?? "")
+      .split(/[\s,;]+/)
+      .map((o) => o.trim().replace(/^@/, ""))
+      .filter(Boolean);
+    for (const org of excludeOrgs) {
+      parts.push(`-user:${quoteIfNeeded(org)}`);
+    }
+
     parts.push("type:user");
     return parts.join(" ");
   }

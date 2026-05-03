@@ -1305,6 +1305,34 @@ components:
       type: string
       enum: [job_understanding, candidate_matching, shortlist_generation, sourcing_later, sourcing, enrichment]
 
+    GithubProviderConfig:
+      type: object
+      description: Recruiter-tunable knobs for the GitHub Agent's user-search query.
+      properties:
+        extraKeywords:
+          type: string
+          nullable: true
+          description: Free-text keywords appended verbatim to the search query (e.g. "open source", "fintech").
+        excludeOrgs:
+          type: string
+          nullable: true
+          description: Comma- or space-separated GitHub org/user logins to exclude from results (e.g. "google, microsoft").
+        minFollowers:
+          type: integer
+          nullable: true
+          description: Minimum follower count (adds `followers:>=N` to the query).
+        minRepos:
+          type: integer
+          nullable: true
+          description: Minimum public repo count (adds `repos:>=N` to the query).
+
+    AgentProviderConfig:
+      type: object
+      description: Per-provider tuning knobs. Only the section matching the provider type is read.
+      properties:
+        github:
+          $ref: "#/components/schemas/GithubProviderConfig"
+
     AgentProviderRecord:
       type: object
       properties:
@@ -1322,6 +1350,10 @@ components:
           nullable: true
         apiKeyEncryptedPlaceholder:
           type: string
+          nullable: true
+        config:
+          allOf:
+            - $ref: "#/components/schemas/AgentProviderConfig"
           nullable: true
         enabled:
           type: boolean
@@ -1348,6 +1380,10 @@ components:
           nullable: true
         apiKeyPlaceholder:
           type: string
+          nullable: true
+        config:
+          allOf:
+            - $ref: "#/components/schemas/AgentProviderConfig"
           nullable: true
         enabled:
           type: boolean

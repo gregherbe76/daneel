@@ -79,6 +79,7 @@ interface Provider {
   baseUrl?: string | null;
   webhookUrl?: string | null;
   apiKeyEncryptedPlaceholder?: string | null;
+  config?: { github?: GithubProviderConfig | null } | null;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -116,8 +117,19 @@ const providerSchema = z.object({
   webhookUrl: z.string().optional(),
   apiKeyPlaceholder: z.string().optional(),
   enabled: z.boolean().default(true),
+  githubExtraKeywords: z.string().optional(),
+  githubExcludeOrgs: z.string().optional(),
+  githubMinFollowers: z.string().optional(),
+  githubMinRepos: z.string().optional(),
 });
 type ProviderFormValues = z.infer<typeof providerSchema>;
+
+interface GithubProviderConfig {
+  extraKeywords?: string | null;
+  excludeOrgs?: string | null;
+  minFollowers?: number | null;
+  minRepos?: number | null;
+}
 
 // ── test connection badge ────────────────────────────────────────────────────
 
@@ -365,6 +377,16 @@ function ProviderDialog({
           webhookUrl: editProvider.webhookUrl ?? "",
           apiKeyPlaceholder: editProvider.apiKeyEncryptedPlaceholder ?? "",
           enabled: editProvider.enabled,
+          githubExtraKeywords: editProvider.config?.github?.extraKeywords ?? "",
+          githubExcludeOrgs: editProvider.config?.github?.excludeOrgs ?? "",
+          githubMinFollowers:
+            editProvider.config?.github?.minFollowers != null
+              ? String(editProvider.config.github.minFollowers)
+              : "",
+          githubMinRepos:
+            editProvider.config?.github?.minRepos != null
+              ? String(editProvider.config.github.minRepos)
+              : "",
         }
       : { name: "", type: "native_openai", enabled: true },
   });
@@ -372,12 +394,29 @@ function ProviderDialog({
   const providerType = watch("type");
 
   async function onSubmit(values: ProviderFormValues) {
+    let config: { github?: GithubProviderConfig } | null = null;
+    if (values.type === "github") {
+      const parseInt0 = (v?: string) => {
+        const n = parseInt((v ?? "").trim(), 10);
+        return Number.isFinite(n) && n > 0 ? n : null;
+      };
+      const gh: GithubProviderConfig = {
+        extraKeywords: values.githubExtraKeywords?.trim() || null,
+        excludeOrgs: values.githubExcludeOrgs?.trim() || null,
+        minFollowers: parseInt0(values.githubMinFollowers),
+        minRepos: parseInt0(values.githubMinRepos),
+      };
+      const hasAny = gh.extraKeywords || gh.excludeOrgs || gh.minFollowers != null || gh.minRepos != null;
+      if (hasAny) config = { github: gh };
+    }
+
     const payload = {
       name: values.name,
       type: values.type,
       baseUrl: values.baseUrl || null,
       webhookUrl: values.webhookUrl || null,
       apiKeyPlaceholder: values.apiKeyPlaceholder || null,
+      config,
       enabled: values.enabled,
     };
 
@@ -484,9 +523,65 @@ function ProviderDialog({
           )}
 
           {providerType === "github" && (
-            <div className="rounded-md bg-muted/50 border border-border p-3 text-sm text-muted-foreground">
-              Sources candidates from the public GitHub REST API. Set the <code className="text-xs">GITHUB_TOKEN</code> secret to raise rate limits — the agent works without it but is limited to ~60 requests/hour.
-            </div>
+            <>
+              <div className="rounded-md bg-muted/50 border border-border p-3 text-sm text-muted-foreground">
+                Sources candidates from the public GitHub REST API. Set the <code className="text-xs">GITHUB_TOKEN</code> secret to raise rate limits — the agent works without it but is limited to ~60 requests/hour.
+              </div>
+
+              <div className="space-y-3 rounded-md border border-border p-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Search tuning</p>
+                  <p className="text-xs text-muted-foreground">
+                    Optional knobs added to the GitHub user-search query for every run. Leave blank to use the defaults derived from the job.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Extra keywords</Label>
+                  <Input
+                    {...register("githubExtraKeywords")}
+                    placeholder="e.g. open source fintech"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Appended to the free-text portion of the query (matches bios &amp; profile text).
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Exclude orgs / users</Label>
+                  <Input
+                    {...register("githubExcludeOrgs")}
+                    placeholder="e.g. google, microsoft, meta"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma- or space-separated GitHub logins. Each becomes a <code className="text-xs">-user:&lt;name&gt;</code> filter.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Min followers</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      placeholder="e.g. 50"
+                      {...register("githubMinFollowers")}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Min public repos</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      placeholder="e.g. 5"
+                      {...register("githubMinRepos")}
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
           )}
 
           <div className="flex items-center justify-between pt-1">

@@ -62,7 +62,7 @@ function buildProvider(row: typeof agentProvidersTable.$inferSelect): AgentProvi
       if (!row.baseUrl) throw new Error(`Provider "${row.name}" is missing baseUrl`);
       return new TwinWebhookProvider(row.id, row.name, row.baseUrl, row.apiKeyEncryptedPlaceholder ?? undefined);
     case "github":
-      return new GithubSourcingProvider(row.id, row.name);
+      return new GithubSourcingProvider(row.id, row.name, row.config?.github ?? null);
     default:
       throw new Error(`Unknown provider type: ${row.type}`);
   }
