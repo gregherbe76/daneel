@@ -530,6 +530,14 @@ export interface EmailRevalidationSettings {
   retentionDays: number;
   /** When false, the scheduler is paused. */
   enabled: boolean;
+  /**
+   * Consecutive failed sweeps that trigger an admin alert. 0 disables alerting.
+   * @minimum 0
+   * @maximum 50
+   */
+  alertThreshold: number;
+  /** Optional admin address to notify when the alert fires. */
+  alertEmail?: string | null;
   updatedAt: string;
 }
 
@@ -552,6 +560,12 @@ export interface UpdateEmailRevalidationSettingsBody {
    */
   retentionDays: number;
   enabled: boolean;
+  /**
+   * @minimum 0
+   * @maximum 50
+   */
+  alertThreshold: number;
+  alertEmail?: string | null;
 }
 
 /**
@@ -577,6 +591,8 @@ export interface EmailRevalidationRun {
   trigger: EmailRevalidationRunTrigger;
   /** Populated only when the sweep itself crashed before completing. */
   errorMessage?: string | null;
+  /** When this run participated in firing an admin alert. */
+  alertedAt?: string | null;
 }
 
 /**
@@ -598,6 +614,22 @@ export interface UpdateNotificationSettingsBody {
   emailRecipients: string[];
   slackEnabled: boolean;
   slackWebhookUrl?: string | null;
+}
+
+/**
+ * Current state of the consecutive-failure alert for the sweeper.
+ */
+export interface EmailRevalidationAlertStatus {
+  /** True when alerting is enabled and the latest N runs all failed. */
+  active: boolean;
+  /** Configured number of consecutive failed sweeps required to fire. */
+  threshold: number;
+  /** How many of the most recent runs were failures (capped at threshold). */
+  consecutiveFailures: number;
+  /** Configured admin address that receives notifications, when set. */
+  alertEmail?: string | null;
+  /** Timestamp of the most recent fired alert, if any. */
+  lastAlertedAt?: string | null;
 }
 
 /**

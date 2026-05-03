@@ -36,6 +36,7 @@ import type {
   CreateCandidateNoteBody,
   CreateJobBody,
   CreateProviderBody,
+  EmailRevalidationAlertStatus,
   EmailRevalidationRun,
   EmailRevalidationSettings,
   EmailStatusChange,
@@ -3425,6 +3426,86 @@ export function useListEmailRevalidationRuns<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getListEmailRevalidationRunsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Current admin-alert state for the email re-check sweeper
+ */
+export const getGetEmailRevalidationAlertStatusUrl = () => {
+  return `/api/settings/email-revalidation/alert`;
+};
+
+export const getEmailRevalidationAlertStatus = async (
+  options?: RequestInit,
+): Promise<EmailRevalidationAlertStatus> => {
+  return customFetch<EmailRevalidationAlertStatus>(
+    getGetEmailRevalidationAlertStatusUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetEmailRevalidationAlertStatusQueryKey = () => {
+  return [`/api/settings/email-revalidation/alert`] as const;
+};
+
+export const getGetEmailRevalidationAlertStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmailRevalidationAlertStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEmailRevalidationAlertStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEmailRevalidationAlertStatusQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmailRevalidationAlertStatus>>
+  > = ({ signal }) =>
+    getEmailRevalidationAlertStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmailRevalidationAlertStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmailRevalidationAlertStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmailRevalidationAlertStatus>>
+>;
+export type GetEmailRevalidationAlertStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Current admin-alert state for the email re-check sweeper
+ */
+
+export function useGetEmailRevalidationAlertStatus<
+  TData = Awaited<ReturnType<typeof getEmailRevalidationAlertStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEmailRevalidationAlertStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmailRevalidationAlertStatusQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

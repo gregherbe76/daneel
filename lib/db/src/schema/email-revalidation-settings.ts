@@ -1,4 +1,4 @@
-import { pgTable, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, integer, timestamp, boolean, text } from "drizzle-orm/pg-core";
 
 /**
  * Singleton settings row (id is fixed to 1) controlling the background email
@@ -24,6 +24,17 @@ export const emailRevalidationSettingsTable = pgTable(
     retentionDays: integer("retention_days").notNull().default(30),
     /** When false, the scheduler is paused (no sweeps will run). */
     enabled: boolean("enabled").notNull().default(true),
+    /**
+     * Number of consecutive failed sweeps that triggers an admin alert. A
+     * sweep is "failed" when it crashed (errorMessage is set) or recorded any
+     * per-candidate errors. Set to 0 to disable alerting.
+     */
+    alertThreshold: integer("alert_threshold").notNull().default(3),
+    /**
+     * Optional admin address to notify when the alert fires. When null, the
+     * in-app banner is the only notification surface.
+     */
+    alertEmail: text("alert_email"),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
 );

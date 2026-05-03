@@ -790,6 +790,19 @@ paths:
                 items:
                   $ref: "#/components/schemas/EmailRevalidationRun"
 
+  /settings/email-revalidation/alert:
+    get:
+      operationId: getEmailRevalidationAlertStatus
+      tags: [settings]
+      summary: Current admin-alert state for the email re-check sweeper
+      responses:
+        "200":
+          description: Alert status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailRevalidationAlertStatus"
+
   /settings/email-revalidation/sweep:
     post:
       operationId: runEmailRevalidationSweepNow
@@ -2119,10 +2132,19 @@ components:
         enabled:
           type: boolean
           description: When false, the scheduler is paused.
+        alertThreshold:
+          type: integer
+          minimum: 0
+          maximum: 50
+          description: Consecutive failed sweeps that trigger an admin alert. 0 disables alerting.
+        alertEmail:
+          type: string
+          nullable: true
+          description: Optional admin address to notify when the alert fires.
         updatedAt:
           type: string
           format: date-time
-      required: [thresholdDays, intervalMs, batchSize, retentionDays, enabled, updatedAt]
+      required: [thresholdDays, intervalMs, batchSize, retentionDays, enabled, alertThreshold, updatedAt]
 
     UpdateEmailRevalidationSettingsBody:
       type: object
@@ -2144,7 +2166,14 @@ components:
           maximum: 365
         enabled:
           type: boolean
-      required: [thresholdDays, intervalMs, batchSize, retentionDays, enabled]
+        alertThreshold:
+          type: integer
+          minimum: 0
+          maximum: 50
+        alertEmail:
+          type: string
+          nullable: true
+      required: [thresholdDays, intervalMs, batchSize, retentionDays, enabled, alertThreshold]
 
     EmailRevalidationRun:
       type: object
@@ -2172,6 +2201,11 @@ components:
           type: string
           nullable: true
           description: Populated only when the sweep itself crashed before completing.
+        alertedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When this run participated in firing an admin alert.
       required: [id, startedAt, rechecked, errors, trigger]
 
     NotificationSettings:
@@ -2213,6 +2247,30 @@ components:
           type: string
           nullable: true
       required: [emailEnabled, emailRecipients, slackEnabled]
+
+    EmailRevalidationAlertStatus:
+      type: object
+      description: Current state of the consecutive-failure alert for the sweeper.
+      properties:
+        active:
+          type: boolean
+          description: True when alerting is enabled and the latest N runs all failed.
+        threshold:
+          type: integer
+          description: Configured number of consecutive failed sweeps required to fire.
+        consecutiveFailures:
+          type: integer
+          description: How many of the most recent runs were failures (capped at threshold).
+        alertEmail:
+          type: string
+          nullable: true
+          description: Configured admin address that receives notifications, when set.
+        lastAlertedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp of the most recent fired alert, if any.
+      required: [active, threshold, consecutiveFailures]
 
     # ── WORKFLOWS ──
     RunWorkflowBody:

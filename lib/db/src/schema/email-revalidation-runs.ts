@@ -20,6 +20,12 @@ export const emailRevalidationRunsTable = pgTable("email_revalidation_runs", {
   trigger: text("trigger").notNull().default("scheduled"),
   /** Populated only when the sweep itself crashed before completing. */
   errorMessage: text("error_message"),
+  /**
+   * Set the first time this run participated in a fired admin alert. Used to
+   * dedupe so we only alert once per qualifying streak rather than after every
+   * subsequent failed sweep.
+   */
+  alertedAt: timestamp("alerted_at"),
 });
 
 export type EmailRevalidationRun =

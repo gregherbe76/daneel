@@ -4,8 +4,10 @@ import {
   useUpdateEmailRevalidationSettings,
   useListEmailRevalidationRuns,
   useRunEmailRevalidationSweepNow,
+  useGetEmailRevalidationAlertStatus,
   getGetEmailRevalidationSettingsQueryKey,
   getListEmailRevalidationRunsQueryKey,
+  getGetEmailRevalidationAlertStatusQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -13,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Mail, RotateCcw, Play, Activity } from "lucide-react";
+import { Loader2, Mail, RotateCcw, Play, Activity, AlertTriangle } from "lucide-react";
 import { SettingsTabs } from "@/components/settings-tabs";
 
 const PRESET_INTERVALS: { label: string; ms: number }[] = [
@@ -47,12 +49,20 @@ export default function EmailRevalidationSettingsPage() {
     },
   });
   const sweepMutation = useRunEmailRevalidationSweepNow();
+  const alertQuery = useGetEmailRevalidationAlertStatus({
+    query: {
+      queryKey: getGetEmailRevalidationAlertStatusQueryKey(),
+      refetchInterval: 15000,
+    },
+  });
 
   const [thresholdDays, setThresholdDays] = useState("30");
   const [intervalHours, setIntervalHours] = useState("6");
   const [batchSize, setBatchSize] = useState("50");
   const [retentionDays, setRetentionDays] = useState("30");
   const [enabled, setEnabled] = useState(true);
+  const [alertThreshold, setAlertThreshold] = useState("3");
+  const [alertEmail, setAlertEmail] = useState("");
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
@@ -62,6 +72,8 @@ export default function EmailRevalidationSettingsPage() {
       setBatchSize(String(settingsQuery.data.batchSize));
       setRetentionDays(String(settingsQuery.data.retentionDays));
       setEnabled(settingsQuery.data.enabled);
+      setAlertThreshold(String(settingsQuery.data.alertThreshold));
+      setAlertEmail(settingsQuery.data.alertEmail ?? "");
     }
   }, [settingsQuery.data, dirty]);
 
@@ -72,6 +84,8 @@ export default function EmailRevalidationSettingsPage() {
     const intervalMs = hoursToMs(intervalHours);
     const batch = Number(batchSize);
     const retention = Number(retentionDays);
+    const alertN = Number(alertThreshold);
+    const trimmedEmail = alertEmail.trim();
 
     if (!Number.isFinite(days) || days < 1 || days > 365) {
       toast({ title: "Invalid threshold", description: "Threshold must be between 1 and 365 days.", variant: "destructive" });
@@ -89,6 +103,14 @@ export default function EmailRevalidationSettingsPage() {
       toast({ title: "Invalid retention", description: "History retention must be between 1 and 365 days.", variant: "destructive" });
       return;
     }
+    if (!Number.isFinite(alertN) || alertN < 0 || alertN > 50) {
+      toast({ title: "Invalid alert threshold", description: "Alert threshold must be between 0 and 50.", variant: "destructive" });
+      return;
+    }
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      toast({ title: "Invalid alert email", description: "Enter a valid email address or leave blank.", variant: "destructive" });
+      return;
+    }
 
     try {
       await updateMutation.mutateAsync({
@@ -98,10 +120,15 @@ export default function EmailRevalidationSettingsPage() {
           batchSize: batch,
           retentionDays: retention,
           enabled,
+          alertThreshold: alertN,
+          alertEmail: trimmedEmail || null,
         },
       });
       await queryClient.invalidateQueries({
         queryKey: getGetEmailRevalidationSettingsQueryKey(),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: getGetEmailRevalidationAlertStatusQueryKey(),
       });
       setDirty(false);
       toast({ title: "Settings saved", description: "The scheduler will pick up the new values on its next tick." });
@@ -121,6 +148,8 @@ export default function EmailRevalidationSettingsPage() {
     setBatchSize(String(settingsQuery.data.batchSize));
     setRetentionDays(String(settingsQuery.data.retentionDays));
     setEnabled(settingsQuery.data.enabled);
+    setAlertThreshold(String(settingsQuery.data.alertThreshold));
+    setAlertEmail(settingsQuery.data.alertEmail ?? "");
     setDirty(false);
   };
 
@@ -157,6 +186,9 @@ export default function EmailRevalidationSettingsPage() {
       await queryClient.invalidateQueries({
         queryKey: getListEmailRevalidationRunsQueryKey(),
       });
+      await queryClient.invalidateQueries({
+        queryKey: getGetEmailRevalidationAlertStatusQueryKey(),
+      });
       const errorSuffix = run.errors > 0 ? `, ${run.errors} error${run.errors === 1 ? "" : "s"}` : "";
       toast({
         title: "Sweep finished",
@@ -172,11 +204,37 @@ export default function EmailRevalidationSettingsPage() {
   };
 
   const runs = runsQuery.data ?? [];
+  const alert = alertQuery.data;
 
   return (
     <>
       <SettingsTabs />
       <div className="p-8 max-w-3xl">
+      {alert?.active ? (
+        <div
+          role="alert"
+          data-testid="banner-sweep-alert"
+          className="mb-6 flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm"
+        >
+          <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <div className="font-semibold text-destructive">
+              Email re-check sweeps are repeatedly failing
+            </div>
+            <div className="text-foreground/80 mt-1">
+              The last {alert.threshold} sweep{alert.threshold === 1 ? "" : "s"} all
+              completed with errors or crashed. Candidate email statuses may be
+              going stale — check the recent activity table below for details.
+              {alert.alertEmail ? (
+                <> A notification was logged for <span className="font-medium">{alert.alertEmail}</span>.</>
+              ) : (
+                <> Set an admin alert email below to also get notified by email.</>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mb-8 flex items-start gap-3">
         <div className="h-10 w-10 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
           <Mail className="h-5 w-5" />
@@ -298,6 +356,64 @@ export default function EmailRevalidationSettingsPage() {
           <p className="text-xs text-muted-foreground">
             Sweep history older than this is pruned automatically at the end of each sweep, so the "Recent activity" table stays fast on long-lived deployments.
           </p>
+        </div>
+
+        <div className="border-t border-border pt-6 space-y-4">
+          <div>
+            <Label className="text-base font-semibold">Failure alerts</Label>
+            <p className="text-sm text-muted-foreground">
+              Show a banner here (and log a notification) when this many consecutive sweeps fail. Set to 0 to disable.
+            </p>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="alert-threshold">Consecutive failures before alerting</Label>
+            <Input
+              id="alert-threshold"
+              type="number"
+              min={0}
+              max={50}
+              value={alertThreshold}
+              onChange={(e) => {
+                setAlertThreshold(e.target.value);
+                markDirty();
+              }}
+              className="max-w-xs"
+              data-testid="input-alert-threshold"
+            />
+            <p className="text-xs text-muted-foreground">
+              A sweep counts as a failure if it crashed or recorded any per-candidate errors.
+            </p>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="alert-email">Admin alert email (optional)</Label>
+            <Input
+              id="alert-email"
+              type="email"
+              placeholder="ops@example.com"
+              value={alertEmail}
+              onChange={(e) => {
+                setAlertEmail(e.target.value);
+                markDirty();
+              }}
+              className="max-w-xs"
+              data-testid="input-alert-email"
+            />
+            <p className="text-xs text-muted-foreground">
+              When set, a notification entry is dispatched to this address each time the threshold is crossed.
+            </p>
+          </div>
+
+          {alert ? (
+            <p className="text-xs text-muted-foreground" data-testid="text-alert-status">
+              {alert.threshold === 0
+                ? "Alerting is disabled."
+                : alert.active
+                  ? `Alert is active — ${alert.consecutiveFailures} of the last ${alert.threshold} sweeps failed.`
+                  : `Healthy — ${alert.consecutiveFailures} consecutive failure${alert.consecutiveFailures === 1 ? "" : "s"} (threshold ${alert.threshold}).`}
+            </p>
+          ) : null}
         </div>
 
         <div className="pt-2 flex items-center gap-3 border-t border-border">

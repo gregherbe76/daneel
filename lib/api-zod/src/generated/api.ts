@@ -2300,6 +2300,9 @@ export const getEmailRevalidationSettingsResponseBatchSizeMax = 10000;
 
 export const getEmailRevalidationSettingsResponseRetentionDaysMax = 365;
 
+export const getEmailRevalidationSettingsResponseAlertThresholdMin = 0;
+export const getEmailRevalidationSettingsResponseAlertThresholdMax = 50;
+
 export const GetEmailRevalidationSettingsResponse = zod.object({
   thresholdDays: zod
     .number()
@@ -2327,6 +2330,17 @@ export const GetEmailRevalidationSettingsResponse = zod.object({
       "How many days of sweep history to keep. Older rows are pruned at the end of each sweep.",
     ),
   enabled: zod.boolean().describe("When false, the scheduler is paused."),
+  alertThreshold: zod
+    .number()
+    .min(getEmailRevalidationSettingsResponseAlertThresholdMin)
+    .max(getEmailRevalidationSettingsResponseAlertThresholdMax)
+    .describe(
+      "Consecutive failed sweeps that trigger an admin alert. 0 disables alerting.",
+    ),
+  alertEmail: zod
+    .string()
+    .nullish()
+    .describe("Optional admin address to notify when the alert fires."),
   updatedAt: zod.coerce.date(),
 });
 
@@ -2340,6 +2354,9 @@ export const updateEmailRevalidationSettingsBodyIntervalMsMin = 0;
 export const updateEmailRevalidationSettingsBodyBatchSizeMax = 10000;
 
 export const updateEmailRevalidationSettingsBodyRetentionDaysMax = 365;
+
+export const updateEmailRevalidationSettingsBodyAlertThresholdMin = 0;
+export const updateEmailRevalidationSettingsBodyAlertThresholdMax = 50;
 
 export const UpdateEmailRevalidationSettingsBody = zod.object({
   thresholdDays: zod
@@ -2358,6 +2375,11 @@ export const UpdateEmailRevalidationSettingsBody = zod.object({
     .min(1)
     .max(updateEmailRevalidationSettingsBodyRetentionDaysMax),
   enabled: zod.boolean(),
+  alertThreshold: zod
+    .number()
+    .min(updateEmailRevalidationSettingsBodyAlertThresholdMin)
+    .max(updateEmailRevalidationSettingsBodyAlertThresholdMax),
+  alertEmail: zod.string().nullish(),
 });
 
 export const updateEmailRevalidationSettingsResponseThresholdDaysMax = 365;
@@ -2367,6 +2389,9 @@ export const updateEmailRevalidationSettingsResponseIntervalMsMin = 0;
 export const updateEmailRevalidationSettingsResponseBatchSizeMax = 10000;
 
 export const updateEmailRevalidationSettingsResponseRetentionDaysMax = 365;
+
+export const updateEmailRevalidationSettingsResponseAlertThresholdMin = 0;
+export const updateEmailRevalidationSettingsResponseAlertThresholdMax = 50;
 
 export const UpdateEmailRevalidationSettingsResponse = zod.object({
   thresholdDays: zod
@@ -2395,6 +2420,17 @@ export const UpdateEmailRevalidationSettingsResponse = zod.object({
       "How many days of sweep history to keep. Older rows are pruned at the end of each sweep.",
     ),
   enabled: zod.boolean().describe("When false, the scheduler is paused."),
+  alertThreshold: zod
+    .number()
+    .min(updateEmailRevalidationSettingsResponseAlertThresholdMin)
+    .max(updateEmailRevalidationSettingsResponseAlertThresholdMax)
+    .describe(
+      "Consecutive failed sweeps that trigger an admin alert. 0 disables alerting.",
+    ),
+  alertEmail: zod
+    .string()
+    .nullish()
+    .describe("Optional admin address to notify when the alert fires."),
   updatedAt: zod.coerce.date(),
 });
 
@@ -2422,10 +2458,47 @@ export const ListEmailRevalidationRunsResponseItem = zod.object({
     .describe(
       "Populated only when the sweep itself crashed before completing.",
     ),
+  alertedAt: zod.coerce
+    .date()
+    .nullish()
+    .describe("When this run participated in firing an admin alert."),
 });
 export const ListEmailRevalidationRunsResponse = zod.array(
   ListEmailRevalidationRunsResponseItem,
 );
+
+/**
+ * @summary Current admin-alert state for the email re-check sweeper
+ */
+export const GetEmailRevalidationAlertStatusResponse = zod
+  .object({
+    active: zod
+      .boolean()
+      .describe(
+        "True when alerting is enabled and the latest N runs all failed.",
+      ),
+    threshold: zod
+      .number()
+      .describe(
+        "Configured number of consecutive failed sweeps required to fire.",
+      ),
+    consecutiveFailures: zod
+      .number()
+      .describe(
+        "How many of the most recent runs were failures (capped at threshold).",
+      ),
+    alertEmail: zod
+      .string()
+      .nullish()
+      .describe(
+        "Configured admin address that receives notifications, when set.",
+      ),
+    lastAlertedAt: zod.coerce
+      .date()
+      .nullish()
+      .describe("Timestamp of the most recent fired alert, if any."),
+  })
+  .describe("Current state of the consecutive-failure alert for the sweeper.");
 
 /**
  * @summary Trigger a one-off email re-validation sweep immediately
@@ -2451,6 +2524,10 @@ export const RunEmailRevalidationSweepNowResponse = zod.object({
     .describe(
       "Populated only when the sweep itself crashed before completing.",
     ),
+  alertedAt: zod.coerce
+    .date()
+    .nullish()
+    .describe("When this run participated in firing an admin alert."),
 });
 
 /**

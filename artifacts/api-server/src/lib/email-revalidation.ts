@@ -100,6 +100,8 @@ export async function updateEmailRevalidationSettings(input: {
   batchSize: number;
   retentionDays: number;
   enabled: boolean;
+  alertThreshold: number;
+  alertEmail: string | null;
 }): Promise<EmailRevalidationSettings> {
   // Make sure the row exists.
   await getEmailRevalidationSettings();
@@ -111,11 +113,154 @@ export async function updateEmailRevalidationSettings(input: {
       batchSize: input.batchSize,
       retentionDays: input.retentionDays,
       enabled: input.enabled,
+      alertThreshold: input.alertThreshold,
+      alertEmail: input.alertEmail,
       updatedAt: new Date(),
     })
     .where(eq(emailRevalidationSettingsTable.id, SINGLETON_ID))
     .returning();
   return updated;
+}
+
+/**
+ * A sweep counts as "failed" for alerting purposes when it crashed before
+ * completing or recorded any per-candidate errors. We alert on either signal
+ * because a steady drip of per-candidate errors is just as worrying as an
+ * outright crash — both mean candidate emails are silently going stale.
+ */
+function isFailedRun(run: EmailRevalidationRun): boolean {
+  return !!run.errorMessage || run.errors > 0;
+}
+
+export interface EmailRevalidationAlertStatus {
+  active: boolean;
+  threshold: number;
+  consecutiveFailures: number;
+  alertEmail: string | null;
+  lastAlertedAt: Date | null;
+}
+
+/**
+ * Compute whether the consecutive-failure alert should be firing right now,
+ * based on the configured threshold and the most recent N (= threshold) runs.
+ * When `threshold` is 0 alerting is treated as disabled.
+ */
+export async function getEmailRevalidationAlertStatus(): Promise<EmailRevalidationAlertStatus> {
+  const settings = await getEmailRevalidationSettings();
+  const threshold = settings.alertThreshold;
+
+  if (threshold <= 0) {
+    return {
+      active: false,
+      threshold: 0,
+      consecutiveFailures: 0,
+      alertEmail: settings.alertEmail,
+      lastAlertedAt: null,
+    };
+  }
+
+  // Only consider completed runs (finishedAt set) so an in-flight sweep
+  // doesn't masquerade as a fresh failure. Pull a generous window so we can
+  // accurately count an ongoing failure streak that's longer than threshold.
+  const recent = await db
+    .select()
+    .from(emailRevalidationRunsTable)
+    .where(isNotNull(emailRevalidationRunsTable.finishedAt))
+    .orderBy(desc(emailRevalidationRunsTable.startedAt))
+    .limit(Math.max(threshold * 5, 20));
+
+  let consecutiveFailures = 0;
+  let lastAlerted: Date | null = null;
+  for (const run of recent) {
+    if (!isFailedRun(run)) break;
+    consecutiveFailures += 1;
+    if (run.alertedAt && (!lastAlerted || run.alertedAt > lastAlerted)) {
+      lastAlerted = run.alertedAt;
+    }
+  }
+
+  return {
+    active: consecutiveFailures >= threshold,
+    threshold,
+    consecutiveFailures,
+    alertEmail: settings.alertEmail,
+    lastAlertedAt: lastAlerted,
+  };
+}
+
+/**
+ * Fire the admin alert if the latest run completed a streak of failures that
+ * meets the configured threshold AND we haven't already alerted on that
+ * streak. Dedupe is anchored on the most recent successful run rather than
+ * "within the last N runs" — otherwise a long uninterrupted outage would
+ * re-fire repeatedly as the originally-stamped run scrolled out of the window.
+ * One alert per failure streak; the next alert can only fire after at least
+ * one healthy sweep breaks the streak.
+ */
+async function maybeFireAlert(latestRun: EmailRevalidationRun): Promise<void> {
+  const settings = await getEmailRevalidationSettings();
+  const threshold = settings.alertThreshold;
+  if (threshold <= 0) return;
+  if (!isFailedRun(latestRun)) return;
+
+  // Walk back through completed runs newest-first to find the current
+  // failure streak (everything since the most recent successful run). We do
+  // NOT cap the scan at `threshold` because we need to detect an `alertedAt`
+  // anywhere in the streak — capping would let a long incident re-fire as
+  // the originally-stamped run scrolled out of the window.
+  const streak: EmailRevalidationRun[] = [];
+  let cursor: Date | null = null;
+  let alreadyAlerted = false;
+  while (true) {
+    const conditions = [isNotNull(emailRevalidationRunsTable.finishedAt)];
+    if (cursor) conditions.push(lt(emailRevalidationRunsTable.startedAt, cursor));
+    const [next] = await db
+      .select()
+      .from(emailRevalidationRunsTable)
+      .where(and(...conditions))
+      .orderBy(desc(emailRevalidationRunsTable.startedAt))
+      .limit(1);
+    if (!next) break;
+    if (!isFailedRun(next)) break;
+    streak.push(next);
+    if (next.alertedAt !== null) {
+      alreadyAlerted = true;
+      break;
+    }
+    cursor = next.startedAt;
+  }
+
+  // Same uninterrupted incident — already notified, don't re-fire.
+  if (alreadyAlerted) return;
+  if (streak.length < threshold) return;
+
+  const stampedAt = new Date();
+  await db
+    .update(emailRevalidationRunsTable)
+    .set({ alertedAt: stampedAt })
+    .where(eq(emailRevalidationRunsTable.id, latestRun.id));
+
+  logger.error(
+    {
+      threshold,
+      alertEmail: settings.alertEmail,
+      latestRunId: latestRun.id,
+      latestErrorMessage: latestRun.errorMessage,
+      latestErrors: latestRun.errors,
+      streakRunIds: streak.map((r) => r.id),
+    },
+    "Email re-validation sweep alert: consecutive failures threshold reached",
+  );
+
+  if (settings.alertEmail) {
+    // Actual SMTP delivery is intentionally pluggable — wire whatever transport
+    // the deployment uses here. We log explicitly so the notification is at
+    // least visible in production logs even without a transport configured.
+    logger.warn(
+      { alertEmail: settings.alertEmail, latestRunId: latestRun.id },
+      "Email re-validation alert dispatched (configure SMTP transport to deliver)",
+    );
+  }
 }
 
 /**
@@ -342,6 +487,8 @@ export async function sweepStaleEmailValidations(
     .where(eq(emailRevalidationRunsTable.id, runRow.id))
     .returning();
 
+  const finalRun = finished ?? runRow;
+
   // Prune old history rows so the table doesn't grow forever. Best-effort:
   // a failure here must not fail the sweep, since the sweep itself already
   // succeeded and the cleanup will get another chance on the next tick.
@@ -361,7 +508,18 @@ export async function sweepStaleEmailValidations(
     );
   }
 
-  return finished ?? runRow;
+  // Best-effort alert dispatch; never let a notification failure mask the
+  // sweep result itself.
+  try {
+    await maybeFireAlert(finalRun);
+  } catch (err) {
+    logger.error(
+      { err: err instanceof Error ? err.message : String(err) },
+      "Failed to evaluate email re-validation alert",
+    );
+  }
+
+  return finalRun;
 }
 
 /**

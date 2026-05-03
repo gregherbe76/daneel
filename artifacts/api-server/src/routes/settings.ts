@@ -8,6 +8,7 @@ import {
   updateEmailRevalidationSettings,
   listRecentEmailRevalidationRuns,
   sweepStaleEmailValidations,
+  getEmailRevalidationAlertStatus,
 } from "../lib/email-revalidation";
 import {
   getNotificationSettings,
@@ -27,7 +28,15 @@ router.put("/settings/email-revalidation", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const updated = await updateEmailRevalidationSettings(parsed.data);
+  const updated = await updateEmailRevalidationSettings({
+    thresholdDays: parsed.data.thresholdDays,
+    intervalMs: parsed.data.intervalMs,
+    batchSize: parsed.data.batchSize,
+    retentionDays: parsed.data.retentionDays,
+    enabled: parsed.data.enabled,
+    alertThreshold: parsed.data.alertThreshold,
+    alertEmail: parsed.data.alertEmail ?? null,
+  });
   req.log.info(
     {
       thresholdDays: updated.thresholdDays,
@@ -45,6 +54,14 @@ router.get(
   async (_req, res): Promise<void> => {
     const runs = await listRecentEmailRevalidationRuns(10);
     res.json(runs);
+  },
+);
+
+router.get(
+  "/settings/email-revalidation/alert",
+  async (_req, res): Promise<void> => {
+    const status = await getEmailRevalidationAlertStatus();
+    res.json(status);
   },
 );
 
