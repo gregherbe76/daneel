@@ -556,6 +556,12 @@ export const DeleteApplicationParams = zod.object({
  */
 export const RunWorkflowBody = zod.object({
   jobId: zod.number(),
+  dataMode: zod
+    .enum(["real", "mock", "fallback"])
+    .optional()
+    .describe(
+      'Enforces strict data separation. \"real\" uses only Twin-sourced or imported candidates. \"mock\" uses only AI-generated mock candidates. \"fallback\" means a real run where the Twin provider failed and native was used instead.\n',
+    ),
   runSourcing: zod.boolean().optional(),
   runEnrichment: zod.boolean().optional(),
 });
@@ -567,6 +573,11 @@ export const ListWorkflowRunsResponseItem = zod.object({
   id: zod.number(),
   jobId: zod.number(),
   status: zod.enum(["pending", "running", "completed", "failed"]),
+  dataMode: zod
+    .enum(["real", "mock", "fallback"])
+    .describe(
+      'Enforces strict data separation. \"real\" uses only Twin-sourced or imported candidates. \"mock\" uses only AI-generated mock candidates. \"fallback\" means a real run where the Twin provider failed and native was used instead.\n',
+    ),
   runSourcing: zod.boolean(),
   variantOf: zod.number().nullish(),
   variantLabel: zod.string().nullish(),
@@ -620,6 +631,11 @@ export const GetLatestJobWorkflowResponse = zod.object({
     id: zod.number(),
     jobId: zod.number(),
     status: zod.enum(["pending", "running", "completed", "failed"]),
+    dataMode: zod
+      .enum(["real", "mock", "fallback"])
+      .describe(
+        'Enforces strict data separation. \"real\" uses only Twin-sourced or imported candidates. \"mock\" uses only AI-generated mock candidates. \"fallback\" means a real run where the Twin provider failed and native was used instead.\n',
+      ),
     runSourcing: zod.boolean(),
     variantOf: zod.number().nullish(),
     variantLabel: zod.string().nullish(),
@@ -925,6 +941,12 @@ export const RunVariantWorkflowBody = zod.object({
     mustHaveSkills: zod.array(zod.string()).nullish(),
     focusNote: zod.string().nullish(),
   }),
+  dataMode: zod
+    .enum(["real", "mock", "fallback"])
+    .optional()
+    .describe(
+      'Enforces strict data separation. \"real\" uses only Twin-sourced or imported candidates. \"mock\" uses only AI-generated mock candidates. \"fallback\" means a real run where the Twin provider failed and native was used instead.\n',
+    ),
   runSourcing: zod.boolean().optional(),
   runEnrichment: zod.boolean().optional(),
 });
@@ -940,6 +962,11 @@ export const ListJobRunsResponseItem = zod.object({
   id: zod.number(),
   jobId: zod.number(),
   status: zod.enum(["pending", "running", "completed", "failed"]),
+  dataMode: zod
+    .enum(["real", "mock", "fallback"])
+    .describe(
+      'Enforces strict data separation. \"real\" uses only Twin-sourced or imported candidates. \"mock\" uses only AI-generated mock candidates. \"fallback\" means a real run where the Twin provider failed and native was used instead.\n',
+    ),
   runSourcing: zod.boolean(),
   variantOf: zod.number().nullish(),
   variantLabel: zod.string().nullish(),
@@ -968,6 +995,11 @@ export const GetJobReportForRunResponse = zod.object({
     id: zod.number(),
     runDate: zod.coerce.date(),
     status: zod.enum(["pending", "running", "completed", "failed"]),
+    dataMode: zod
+      .enum(["real", "mock", "fallback"])
+      .describe(
+        'Enforces strict data separation. \"real\" uses only Twin-sourced or imported candidates. \"mock\" uses only AI-generated mock candidates. \"fallback\" means a real run where the Twin provider failed and native was used instead.\n',
+      ),
     runSourcing: zod.boolean(),
     variantOf: zod.number().nullish(),
     variantLabel: zod.string().nullish(),
@@ -1111,6 +1143,11 @@ export const GetJobReportResponse = zod.object({
     id: zod.number(),
     runDate: zod.coerce.date(),
     status: zod.enum(["pending", "running", "completed", "failed"]),
+    dataMode: zod
+      .enum(["real", "mock", "fallback"])
+      .describe(
+        'Enforces strict data separation. \"real\" uses only Twin-sourced or imported candidates. \"mock\" uses only AI-generated mock candidates. \"fallback\" means a real run where the Twin provider failed and native was used instead.\n',
+      ),
     runSourcing: zod.boolean(),
     variantOf: zod.number().nullish(),
     variantLabel: zod.string().nullish(),

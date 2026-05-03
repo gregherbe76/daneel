@@ -107,6 +107,7 @@ async function buildReport(jobId: number, runId?: number) {
       id: run.id,
       runDate: run.createdAt,
       status: run.status,
+      dataMode: run.dataMode,
       runSourcing: run.runSourcing,
       variantOf: run.variantOf ?? null,
       variantLabel: run.variantLabel ?? null,

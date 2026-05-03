@@ -18,7 +18,7 @@ import {
   ArrowLeft, Download, FileText, FileDown, Loader2, MapPin,
   Star, AlertTriangle, MessageSquare, Users, Zap, TrendingUp,
   CheckCircle2, XCircle, MinusCircle, ChevronRight, GitBranch,
-  ArrowUp, ArrowDown, Minus, Info,
+  ArrowUp, ArrowDown, Minus, Info, FlaskConical, Database, ShieldAlert,
 } from "lucide-react";
 import { HumanAIComparison } from "@/components/human-ai-comparison";
 import { ScoreBreakdownDisplay, ScoreBreakdownPills } from "@/components/score-breakdown";
@@ -32,10 +32,13 @@ type VariantCriteria = {
   focusNote?: string | null;
 };
 
+type DataMode = "real" | "mock" | "fallback";
+
 type ReportRunMeta = {
   id: number;
   runDate: string;
   status: string;
+  dataMode: DataMode;
   runSourcing: boolean;
   variantOf?: number | null;
   variantLabel?: string | null;
@@ -265,6 +268,21 @@ export default function JobReportPage() {
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium truncate">{report.job.title}</span>
           <Badge variant="outline" className="text-xs shrink-0">Hiring Manager Report</Badge>
+          {run.dataMode === "real" && (
+            <Badge variant="outline" className="border-green-300 text-green-700 bg-green-500/8 text-xs shrink-0">
+              <Database className="h-3 w-3 mr-1" />Real Data Run
+            </Badge>
+          )}
+          {run.dataMode === "mock" && (
+            <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-500/8 text-xs shrink-0">
+              <FlaskConical className="h-3 w-3 mr-1" />Demo Run
+            </Badge>
+          )}
+          {run.dataMode === "fallback" && (
+            <Badge variant="outline" className="border-orange-300 text-orange-700 bg-orange-500/8 text-xs shrink-0">
+              <ShieldAlert className="h-3 w-3 mr-1" />Fallback Mode
+            </Badge>
+          )}
           {run.runSourcing && (
             <Badge variant="outline" className="border-purple-200 text-purple-700 bg-purple-500/5 text-xs shrink-0">
               <Zap className="h-3 w-3 mr-1" />Sourcing
@@ -326,6 +344,41 @@ export default function JobReportPage() {
       </div>
 
       <div className="max-w-5xl mx-auto px-8 py-8 space-y-8">
+
+        {/* ── Data Mode Banners ── */}
+        {run.dataMode === "mock" && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-5 py-4 flex items-start gap-3">
+            <FlaskConical className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Demo Run — Simulated Data</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                This report is based on AI-generated mock candidates. Results are for demonstration purposes only and do not reflect real hiring data.
+              </p>
+            </div>
+          </div>
+        )}
+        {run.dataMode === "fallback" && (
+          <div className="rounded-xl border border-orange-200 bg-orange-50/70 px-5 py-4 flex items-start gap-3">
+            <ShieldAlert className="h-4 w-4 text-orange-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-orange-800">Fallback Mode — Partial Simulation</p>
+              <p className="text-xs text-orange-700 mt-0.5">
+                This run started as a Real Data Run but the Twin provider failed during sourcing. Results may include simulated data. Review provider settings before relying on this report.
+              </p>
+            </div>
+          </div>
+        )}
+        {run.dataMode === "real" && (
+          <div className="rounded-xl border border-green-200 bg-green-50/60 px-5 py-4 flex items-start gap-3">
+            <Database className="h-4 w-4 text-green-700 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-green-800">Real Data Run</p>
+              <p className="text-xs text-green-700 mt-0.5">
+                This report scored only imported and Twin-sourced candidates. No mock data was generated or mixed in.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* ── Variant Criteria Banner ── */}
         {isVariant && vc && (

@@ -1064,6 +1064,8 @@ components:
       properties:
         jobId:
           type: integer
+        dataMode:
+          $ref: "#/components/schemas/DataMode"
         runSourcing:
           type: boolean
         runEnrichment:
@@ -1097,6 +1099,8 @@ components:
           nullable: true
         variantCriteria:
           $ref: "#/components/schemas/VariantCriteria"
+        dataMode:
+          $ref: "#/components/schemas/DataMode"
         runSourcing:
           type: boolean
         runEnrichment:
@@ -1112,6 +1116,8 @@ components:
           type: integer
         status:
           $ref: "#/components/schemas/RunStatus"
+        dataMode:
+          $ref: "#/components/schemas/DataMode"
         runSourcing:
           type: boolean
         variantOf:
@@ -1127,7 +1133,16 @@ components:
         createdAt:
           type: string
           format: date-time
-      required: [id, jobId, status, runSourcing, createdAt]
+      required: [id, jobId, status, dataMode, runSourcing, createdAt]
+
+    DataMode:
+      type: string
+      enum: [real, mock, fallback]
+      description: >
+        Enforces strict data separation. "real" uses only Twin-sourced or
+        imported candidates. "mock" uses only AI-generated mock candidates.
+        "fallback" means a real run where the Twin provider failed and native
+        was used instead.
 
     RunStatus:
       type: string
@@ -1146,6 +1161,8 @@ components:
           type: integer
         status:
           $ref: "#/components/schemas/RunStatus"
+        dataMode:
+          $ref: "#/components/schemas/DataMode"
         runSourcing:
           type: boolean
         variantOf:
@@ -1164,7 +1181,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required: [id, jobId, status, runSourcing, createdAt, updatedAt]
+      required: [id, jobId, status, dataMode, runSourcing, createdAt, updatedAt]
 
     AgentLog:
       type: object
@@ -1382,6 +1399,8 @@ components:
           format: date-time
         status:
           $ref: "#/components/schemas/RunStatus"
+        dataMode:
+          $ref: "#/components/schemas/DataMode"
         runSourcing:
           type: boolean
         variantOf:
@@ -1394,7 +1413,7 @@ components:
           nullable: true
           allOf:
             - $ref: "#/components/schemas/VariantCriteria"
-      required: [id, runDate, status, runSourcing]
+      required: [id, runDate, status, dataMode, runSourcing]
 
     ReportEvaluation:
       type: object

@@ -32,10 +32,13 @@ function buildProvider(row: typeof agentProvidersTable.$inferSelect): AgentProvi
 
 /**
  * Resolve the provider for the sourcing step specifically.
- * Returns NativeOpenAISourcingProvider as fallback (not NativeOpenAIProvider).
+ * Returns the provider AND whether it is a real (Twin/custom) provider.
+ * isTwin=true means the provider is NOT the native mock generator.
  */
-export async function resolveSourcingProvider(): Promise<AgentProvider> {
+export async function resolveSourcingProvider(): Promise<{ provider: AgentProvider; isTwin: boolean }> {
   const { NativeOpenAISourcingProvider } = await import("./native-openai-sourcing");
+  const nativeFallback = { provider: new NativeOpenAISourcingProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME), isTwin: false };
+
   try {
     const [setting] = await db
       .select()
@@ -44,7 +47,7 @@ export async function resolveSourcingProvider(): Promise<AgentProvider> {
       .limit(1);
 
     if (!setting || !setting.enabled) {
-      return new NativeOpenAISourcingProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME);
+      return nativeFallback;
     }
 
     const [providerRow] = await db
@@ -55,14 +58,14 @@ export async function resolveSourcingProvider(): Promise<AgentProvider> {
 
     if (!providerRow || !providerRow.enabled) {
       logger.warn({ step: "sourcing", providerId: setting.providerId }, "Sourcing provider not found or disabled — falling back to native");
-      return new NativeOpenAISourcingProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME);
+      return nativeFallback;
     }
 
-    // If a custom/twin webhook is assigned, use the generic provider
-    return buildProvider(providerRow);
+    const isTwin = providerRow.type === "twin_webhook" || providerRow.type === "custom_webhook";
+    return { provider: buildProvider(providerRow), isTwin };
   } catch (err) {
     logger.error({ step: "sourcing", err }, "Failed to resolve sourcing provider — falling back to native");
-    return new NativeOpenAISourcingProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME);
+    return nativeFallback;
   }
 }
 

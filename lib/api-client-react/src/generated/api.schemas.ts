@@ -187,8 +187,21 @@ export interface UpsertStepSettingBody {
   enabled: boolean;
 }
 
+/**
+ * Enforces strict data separation. "real" uses only Twin-sourced or imported candidates. "mock" uses only AI-generated mock candidates. "fallback" means a real run where the Twin provider failed and native was used instead.
+
+ */
+export type DataMode = (typeof DataMode)[keyof typeof DataMode];
+
+export const DataMode = {
+  real: "real",
+  mock: "mock",
+  fallback: "fallback",
+} as const;
+
 export interface RunWorkflowBody {
   jobId: number;
+  dataMode?: DataMode;
   runSourcing?: boolean;
   runEnrichment?: boolean;
 }
@@ -204,6 +217,7 @@ export interface RunVariantBody {
   baseRunId: number;
   variantLabel?: string | null;
   variantCriteria: VariantCriteria;
+  dataMode?: DataMode;
   runSourcing?: boolean;
   runEnrichment?: boolean;
 }
@@ -221,6 +235,7 @@ export interface JobRunSummary {
   id: number;
   jobId: number;
   status: RunStatus;
+  dataMode: DataMode;
   runSourcing: boolean;
   variantOf?: number | null;
   variantLabel?: string | null;
@@ -241,6 +256,7 @@ export interface AgentRun {
   id: number;
   jobId: number;
   status: RunStatus;
+  dataMode: DataMode;
   runSourcing: boolean;
   variantOf?: number | null;
   variantLabel?: string | null;
@@ -347,6 +363,7 @@ export interface ReportRunMeta {
   id: number;
   runDate: string;
   status: RunStatus;
+  dataMode: DataMode;
   runSourcing: boolean;
   variantOf?: number | null;
   variantLabel?: string | null;

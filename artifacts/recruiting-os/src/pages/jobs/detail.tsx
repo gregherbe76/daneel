@@ -19,7 +19,8 @@ import { Label } from "@/components/ui/label";
 import {
   Loader2, MapPin, Edit, User, Mail, ArrowRight, Play,
   Sparkles, ChevronDown, ChevronUp, BrainCircuit, Zap,
-  Building2, Github, Linkedin, AlertTriangle, FileText, GitBranch
+  Building2, Github, Linkedin, AlertTriangle, FileText, GitBranch,
+  FlaskConical, Database,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -165,6 +166,7 @@ export default function JobDetailPage() {
   const [isInsightsOpen, setIsInsightsOpen] = useState(true);
   const [isAllEvalsOpen, setIsAllEvalsOpen] = useState(false);
   const [isSourcedOpen, setIsSourcedOpen] = useState(true);
+  const [dataMode, setDataMode] = useState<"real" | "mock">("mock");
   const [runSourcing, setRunSourcing] = useState(false);
   const [runEnrichment, setRunEnrichment] = useState(false);
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
@@ -184,18 +186,21 @@ export default function JobDetailPage() {
   };
 
   const handleRunWorkflow = () => {
-    runWorkflow.mutate({ data: { jobId, runSourcing, runEnrichment } }, {
+    runWorkflow.mutate({ data: { jobId, dataMode, runSourcing, runEnrichment } }, {
       onSuccess: () => {
-        const parts: string[] = [];
+        const modeLabel = dataMode === "real" ? "Real Data Run" : "Demo Run (Mock Data)";
+        const parts: string[] = [modeLabel];
         if (runSourcing) parts.push("sourcing");
         if (runEnrichment) parts.push("enrichment");
         toast({
-          title: parts.length > 0 ? `Workflow started with ${parts.join(" + ")}` : "Workflow started",
-          description: runSourcing
-            ? "Generating new candidates before matching..."
+          title: `Workflow started — ${modeLabel}`,
+          description: dataMode === "real"
+            ? "Matching against imported and Twin-sourced candidates only…"
+            : runSourcing
+            ? "Generating mock candidates before matching…"
             : runEnrichment
-            ? "Enriching candidate profiles before matching..."
-            : "Analysing candidates against the job...",
+            ? "Enriching candidate profiles before matching…"
+            : "Analysing mock candidates against the job…",
         });
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: getGetLatestJobWorkflowQueryKey(jobId) });
@@ -309,10 +314,54 @@ export default function JobDetailPage() {
                 </Button>
               </Link>
             </div>
+            {/* ── Data mode selector ── */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-0.5">Data Mode</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={workflowRunning}
+                  onClick={() => setDataMode("mock")}
+                  className={`flex items-start gap-2 px-3 py-2.5 rounded-md border text-left transition-all ${
+                    dataMode === "mock"
+                      ? "border-amber-300 bg-amber-500/8 ring-1 ring-amber-300"
+                      : "border-border bg-muted/20 hover:bg-muted/40"
+                  }`}
+                >
+                  <FlaskConical className={`h-4 w-4 mt-0.5 shrink-0 ${dataMode === "mock" ? "text-amber-600" : "text-muted-foreground"}`} />
+                  <div>
+                    <p className={`text-sm font-medium leading-tight ${dataMode === "mock" ? "text-amber-800" : ""}`}>Demo Run</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">Simulated candidates</p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  disabled={workflowRunning}
+                  onClick={() => setDataMode("real")}
+                  className={`flex items-start gap-2 px-3 py-2.5 rounded-md border text-left transition-all ${
+                    dataMode === "real"
+                      ? "border-green-300 bg-green-500/8 ring-1 ring-green-300"
+                      : "border-border bg-muted/20 hover:bg-muted/40"
+                  }`}
+                >
+                  <Database className={`h-4 w-4 mt-0.5 shrink-0 ${dataMode === "real" ? "text-green-700" : "text-muted-foreground"}`} />
+                  <div>
+                    <p className={`text-sm font-medium leading-tight ${dataMode === "real" ? "text-green-800" : ""}`}>Real Data Run</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">Imported + Twin only</p>
+                  </div>
+                </button>
+              </div>
+              {dataMode === "real" && (
+                <p className="text-[11px] text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1.5 flex items-start gap-1.5">
+                  <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                  Only imported and Twin-sourced candidates will be scored. Mock data will never be used or mixed in.
+                </p>
+              )}
+            </div>
             {/* Sourcing option */}
             <div className={`flex items-start gap-2 px-3 py-2 rounded-md border transition-colors ${
               runSourcing
-                ? "border-purple-200 bg-purple-500/5"
+                ? dataMode === "real" ? "border-green-200 bg-green-500/5" : "border-purple-200 bg-purple-500/5"
                 : "border-border bg-muted/30"
             }`}>
               <Checkbox
@@ -324,11 +373,13 @@ export default function JobDetailPage() {
               />
               <div>
                 <Label htmlFor="run-sourcing" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
-                  <Zap className="h-3.5 w-3.5 text-purple-600" />
-                  Generate new candidates before matching
+                  <Zap className={`h-3.5 w-3.5 ${dataMode === "real" ? "text-green-700" : "text-purple-600"}`} />
+                  {dataMode === "real" ? "Source new candidates via Twin provider" : "Generate new candidates before matching"}
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  AI will source 7 mock candidates tailored to this role
+                  {dataMode === "real"
+                    ? "Requires a Twin webhook provider assigned in Settings → Providers"
+                    : "AI will source 7 mock candidates tailored to this role"}
                 </p>
               </div>
             </div>

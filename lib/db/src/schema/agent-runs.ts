@@ -24,6 +24,15 @@ export const stepStatusEnum = pgEnum("step_status", [
   "failed",
 ]);
 
+/**
+ * data_mode enforces strict separation between real and simulated data.
+ *
+ * "real"     — only Twin-sourced or manually imported candidates; never mock
+ * "mock"     — AI-generated mock candidates only; never mixed with real
+ * "fallback" — started as "real" but Twin provider failed; fell back to native
+ */
+export const dataModeEnum = pgEnum("data_mode", ["real", "mock", "fallback"]);
+
 export type VariantCriteria = {
   seniority?: string;
   mustHaveSkills?: string[];
@@ -36,6 +45,7 @@ export const agentRunsTable = pgTable("agent_runs", {
     .notNull()
     .references(() => jobsTable.id, { onDelete: "cascade" }),
   status: runStatusEnum("status").notNull().default("pending"),
+  dataMode: dataModeEnum("data_mode").notNull().default("mock"),
   runSourcing: boolean("run_sourcing").notNull().default(false),
   variantOf: integer("variant_of"),
   variantCriteria: jsonb("variant_criteria").$type<VariantCriteria>(),
@@ -58,3 +68,4 @@ export const agentLogsTable = pgTable("agent_logs", {
 
 export type AgentRun = typeof agentRunsTable.$inferSelect;
 export type AgentLog = typeof agentLogsTable.$inferSelect;
+export type DataMode = "real" | "mock" | "fallback";

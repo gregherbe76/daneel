@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { eq, desc, inArray } from "drizzle-orm";
 import { RunWorkflowBody } from "@workspace/api-zod";
+import type { DataMode } from "@workspace/db";
 import { z } from "zod";
 import { runWorkflowEngine } from "./engine";
 
@@ -20,18 +21,21 @@ router.post("/workflows/run", async (req, res) => {
   const body = RunWorkflowBody.parse(req.body);
   const runSourcing = body.runSourcing ?? false;
   const runEnrichment = (body as { runEnrichment?: boolean }).runEnrichment ?? false;
+  const dataMode: DataMode = (body as { dataMode?: DataMode }).dataMode ?? "mock";
 
   const [run] = await db
     .insert(agentRunsTable)
-    .values({ jobId: body.jobId, status: "pending", runSourcing })
+    .values({ jobId: body.jobId, status: "pending", runSourcing, dataMode })
     .returning();
 
-  setImmediate(() => runWorkflowEngine(run.id, body.jobId, { runSourcing, runEnrichment }));
+  setImmediate(() => runWorkflowEngine(run.id, body.jobId, { runSourcing, runEnrichment, dataMode }));
 
   res.status(201).json(run);
 });
 
 // POST /workflows/run-variant — create variant run with modified criteria
+const DATA_MODE_VALUES = ["real", "mock", "fallback"] as const;
+
 const RunVariantBodySchema = z.object({
   jobId: z.number().int(),
   baseRunId: z.number().int(),
@@ -41,12 +45,14 @@ const RunVariantBodySchema = z.object({
     mustHaveSkills: z.array(z.string()).optional().nullable(),
     focusNote: z.string().optional().nullable(),
   }),
+  dataMode: z.enum(DATA_MODE_VALUES).optional(),
   runSourcing: z.boolean().optional(),
   runEnrichment: z.boolean().optional(),
 });
 
 router.post("/workflows/run-variant", async (req, res) => {
-  const { jobId, baseRunId, variantLabel, variantCriteria, runSourcing, runEnrichment } = RunVariantBodySchema.parse(req.body);
+  const { jobId, baseRunId, variantLabel, variantCriteria, dataMode, runSourcing, runEnrichment } = RunVariantBodySchema.parse(req.body);
+  const effectiveDataMode: DataMode = dataMode ?? "mock";
 
   const [run] = await db
     .insert(agentRunsTable)
@@ -54,6 +60,7 @@ router.post("/workflows/run-variant", async (req, res) => {
       jobId,
       status: "pending",
       runSourcing: runSourcing ?? false,
+      dataMode: effectiveDataMode,
       variantOf: baseRunId,
       variantLabel: variantLabel ?? null,
       variantCriteria: {
@@ -66,6 +73,7 @@ router.post("/workflows/run-variant", async (req, res) => {
 
   setImmediate(() =>
     runWorkflowEngine(run.id, jobId, {
+      dataMode: effectiveDataMode,
       runSourcing: runSourcing ?? false,
       runEnrichment: runEnrichment ?? false,
       variantCriteria: {
