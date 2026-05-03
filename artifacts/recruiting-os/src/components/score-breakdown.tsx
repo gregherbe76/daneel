@@ -103,7 +103,8 @@ export function ScoreBreakdownDisplay({
       <div className="space-y-2">
         {DIMENSIONS.map((dim) => {
           const d = breakdown[dim.key];
-          const score = d?.score ?? 0;
+          if (!d) return null;
+          const score = d.score ?? 0;
           const weightedContrib = Math.round(score * dim.weight);
 
           return (
@@ -173,11 +174,12 @@ export function ScoreBreakdownPills({
     <div className="flex gap-1.5 flex-wrap">
       {DIMENSIONS.map((dim) => {
         const d = breakdown[dim.key];
-        const score = d?.score ?? 0;
+        if (!d) return null;
+        const score = d.score ?? 0;
         return (
           <div
             key={dim.key}
-            title={`${dim.label}: ${score}/100\n${d?.reasoning ?? ""}`}
+            title={`${dim.label}: ${score}/100\n${d.reasoning ?? ""}`}
             className={`flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border ${
               score >= 80
                 ? "bg-green-50 border-green-200 text-green-700"
