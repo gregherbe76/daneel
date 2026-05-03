@@ -496,6 +496,133 @@ export const DeleteApplicationParams = zod.object({
 });
 
 /**
+ * @summary Start an agentic workflow run for a job
+ */
+export const RunWorkflowBody = zod.object({
+  jobId: zod.number(),
+});
+
+/**
+ * @summary List all workflow runs
+ */
+export const ListWorkflowRunsResponseItem = zod.object({
+  id: zod.number(),
+  jobId: zod.number(),
+  status: zod.enum(["pending", "running", "completed", "failed"]),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListWorkflowRunsResponse = zod.array(ListWorkflowRunsResponseItem);
+
+/**
+ * @summary Get a specific workflow run with logs
+ */
+export const GetWorkflowRunParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetWorkflowRunResponse = zod.object({
+  id: zod.number(),
+  jobId: zod.number(),
+  status: zod.enum(["pending", "running", "completed", "failed"]),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+  logs: zod.array(
+    zod.object({
+      id: zod.number(),
+      runId: zod.number(),
+      step: zod.string(),
+      input: zod.unknown().nullish(),
+      output: zod.unknown().nullish(),
+      status: zod.enum(["pending", "running", "completed", "failed"]),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
+ * @summary Get the latest workflow run for a job (with results)
+ */
+export const GetLatestJobWorkflowParams = zod.object({
+  jobId: zod.coerce.number(),
+});
+
+export const GetLatestJobWorkflowResponse = zod.object({
+  run: zod.object({
+    id: zod.number(),
+    jobId: zod.number(),
+    status: zod.enum(["pending", "running", "completed", "failed"]),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  insight: zod
+    .object({
+      id: zod.number(),
+      runId: zod.number(),
+      jobId: zod.number(),
+      mustHaveSkills: zod.array(zod.string()),
+      seniority: zod.string(),
+      evaluationCriteria: zod.array(zod.string()),
+      idealCandidateProfile: zod.string(),
+      createdAt: zod.coerce.date(),
+    })
+    .nullish(),
+  evaluations: zod.array(
+    zod.object({
+      id: zod.number(),
+      runId: zod.number(),
+      jobId: zod.number(),
+      candidateId: zod.number(),
+      score: zod.number(),
+      strengths: zod.array(zod.string()),
+      gaps: zod.array(zod.string()),
+      risks: zod.array(zod.string()),
+      recommendation: zod.enum(["Strong Yes", "Yes", "Maybe", "No"]),
+      candidate: zod.object({
+        id: zod.number(),
+        name: zod.string(),
+        email: zod.string(),
+        linkedIn: zod.string().nullish(),
+        summary: zod.string().nullish(),
+        skills: zod.array(zod.string()),
+        createdAt: zod.coerce.date(),
+        updatedAt: zod.coerce.date(),
+      }),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+  shortlist: zod
+    .object({
+      id: zod.number(),
+      runId: zod.number(),
+      jobId: zod.number(),
+      rankedCandidateIds: zod.array(zod.number()),
+      summaries: zod.array(
+        zod.object({
+          candidateId: zod.number(),
+          candidateName: zod.string(),
+          whyRelevant: zod.string(),
+          keyRisks: zod.string(),
+          finalRecommendation: zod.string(),
+        }),
+      ),
+      createdAt: zod.coerce.date(),
+    })
+    .nullish(),
+  logs: zod.array(
+    zod.object({
+      id: zod.number(),
+      runId: zod.number(),
+      step: zod.string(),
+      input: zod.unknown().nullish(),
+      output: zod.unknown().nullish(),
+      status: zod.enum(["pending", "running", "completed", "failed"]),
+      createdAt: zod.coerce.date(),
+    }),
+  ),
+});
+
+/**
  * @summary Get pipeline summary - counts per stage across all jobs
  */
 export const GetPipelineSummaryResponse = zod.object({

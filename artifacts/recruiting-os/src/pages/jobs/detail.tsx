@@ -1,8 +1,18 @@
-import { useGetJob, useGetJobApplications, ApplicationStage, useUpdateApplication, getGetJobApplicationsQueryKey } from "@workspace/api-client-react";
+import { useState } from "react";
+import { 
+  useGetJob, 
+  useGetJobApplications, 
+  ApplicationStage, 
+  useUpdateApplication, 
+  getGetJobApplicationsQueryKey,
+  useRunWorkflow,
+  useGetLatestJobWorkflow,
+  getGetLatestJobWorkflowQueryKey
+} from "@workspace/api-client-react";
 import { useRoute, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, MapPin, Edit, User, Mail, ArrowRight } from "lucide-react";
+import { Loader2, MapPin, Edit, User, Mail, ArrowRight, Play, Sparkles, ChevronDown, ChevronUp, BrainCircuit } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -11,6 +21,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// helper for recommendation color
+const getRecommendationColor = (rec?: string) => {
+  if (rec === "Strong Yes") return "bg-green-500/10 text-green-700 hover:bg-green-500/20 border-green-200";
+  if (rec === "Yes") return "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border-emerald-200";
+  if (rec === "Maybe") return "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border-amber-200";
+  if (rec === "No") return "bg-red-500/10 text-red-700 hover:bg-red-500/20 border-red-200";
+  return "bg-secondary text-secondary-foreground";
+};
+
+const getScoreColor = (score?: number) => {
+  if (!score) return "bg-secondary";
+  if (score >= 80) return "bg-green-500/10 text-green-700 border-green-200";
+  if (score >= 60) return "bg-amber-500/10 text-amber-700 border-amber-200";
+  return "bg-red-500/10 text-red-700 border-red-200";
+};
 
 export default function JobDetailPage() {
   const [, params] = useRoute("/jobs/:id");
@@ -24,9 +54,24 @@ export default function JobDetailPage() {
     query: { enabled: !!jobId, queryKey: getGetJobApplicationsQueryKey(jobId) },
   });
 
+  const { data: workflowData, isLoading: isLoadingWorkflow } = useGetLatestJobWorkflow(jobId, {
+    query: {
+      enabled: !!jobId,
+      queryKey: getGetLatestJobWorkflowQueryKey(jobId),
+      refetchInterval: (query) => {
+        const status = query.state.data?.run?.status;
+        return (status === 'running' || status === 'pending') ? 3000 : false;
+      }
+    }
+  });
+
+  const runWorkflow = useRunWorkflow();
   const updateApp = useUpdateApplication();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const [isInsightsOpen, setIsInsightsOpen] = useState(true);
+  const [isAllEvalsOpen, setIsAllEvalsOpen] = useState(false);
 
   const stages = Object.values(ApplicationStage);
 
@@ -42,6 +87,17 @@ export default function JobDetailPage() {
     );
   };
 
+  const handleRunWorkflow = () => {
+    runWorkflow.mutate({ data: { jobId } }, {
+      onSuccess: () => {
+        toast({ title: "Workflow started" });
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: getGetLatestJobWorkflowQueryKey(jobId) });
+        }, 2000);
+      }
+    });
+  };
+
   if (isLoadingJob || isLoadingApps) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-200px)]">
@@ -53,6 +109,8 @@ export default function JobDetailPage() {
   if (!job) {
     return <div className="p-8">Job not found</div>;
   }
+
+  const workflowRunning = workflowData?.run?.status === 'pending' || workflowData?.run?.status === 'running';
 
   return (
     <div className="h-full flex flex-col">
@@ -75,72 +133,290 @@ export default function JobDetailPage() {
               ))}
             </div>
           </div>
-          <Link href={`/jobs/${job.id}/edit`}>
-            <Button variant="outline">
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Job
+          <div className="flex items-center gap-3">
+            <Button 
+              onClick={handleRunWorkflow} 
+              disabled={runWorkflow.isPending || workflowRunning}
+              variant="default"
+              className="bg-primary/90 hover:bg-primary"
+            >
+              {workflowRunning ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              {workflowRunning ? 'Running Workflow...' : 'Run AI Workflow'}
             </Button>
-          </Link>
+            <Link href={`/jobs/${job.id}/edit`}>
+              <Button variant="outline">
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Job
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-x-auto p-8">
-        <div className="max-w-7xl mx-auto h-full min-w-max flex gap-4">
-          {stages.map((stage) => {
-            const appsInStage = applications?.filter((app) => app.stage === stage) || [];
-            return (
-              <div key={stage} className="flex-shrink-0 w-80 flex flex-col bg-muted/30 rounded-lg border border-border overflow-hidden">
-                <div className="p-3 border-b border-border bg-muted/50 font-medium flex justify-between items-center">
-                  <span>{stage}</span>
-                  <Badge variant="secondary">{appsInStage.length}</Badge>
-                </div>
-                <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                  {appsInStage.map((app) => (
-                    <div key={app.id} className="bg-card border border-border rounded-md p-4 shadow-sm hover:border-primary/50 transition-colors">
-                      <Link href={`/candidates/${app.candidate.id}`}>
-                        <div className="font-medium hover:text-primary transition-colors cursor-pointer mb-1">
-                          {app.candidate.name}
-                        </div>
-                      </Link>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1 mb-4">
-                        <Mail className="h-3 w-3" />
-                        <span className="truncate">{app.candidate.email}</span>
-                      </div>
-                      
-                      <div className="flex justify-between items-center mt-2 border-t border-border pt-3">
-                        <Link href={`/candidates/${app.candidate.id}`}>
-                          <Button variant="ghost" size="sm" className="h-7 text-xs px-2">
-                            <User className="mr-1 h-3 w-3" />
-                            Profile
-                          </Button>
-                        </Link>
-                        
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-7 text-xs px-2">
-                              Move <ArrowRight className="ml-1 h-3 w-3" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {stages.filter(s => s !== stage).map((s) => (
-                              <DropdownMenuItem key={s} onClick={() => handleStageChange(app.id, s)}>
-                                Move to {s}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  ))}
-                  {appsInStage.length === 0 && (
-                    <div className="text-center py-8 text-sm text-muted-foreground italic border-2 border-dashed border-border rounded-md bg-card/50">
-                      Empty
-                    </div>
-                  )}
-                </div>
+      <div className="flex-1 overflow-auto bg-background">
+        <div className="p-8 max-w-7xl mx-auto space-y-8">
+          
+          {/* AI WORKFLOW INSIGHTS */}
+          <Collapsible open={isInsightsOpen} onOpenChange={setIsInsightsOpen} className="border border-border rounded-lg bg-card shadow-sm">
+            <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20">
+              <div className="flex items-center gap-2">
+                <BrainCircuit className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold">AI Workflow Insights</h2>
+                {workflowData?.run && (
+                  <Badge variant="outline" className={`ml-2 capitalize ${
+                    workflowData.run.status === 'completed' ? 'border-green-500 text-green-600' :
+                    workflowData.run.status === 'failed' ? 'border-red-500 text-red-600' :
+                    workflowData.run.status === 'running' ? 'border-blue-500 text-blue-600' :
+                    'border-amber-500 text-amber-600'
+                  }`}>
+                    {workflowData.run.status}
+                  </Badge>
+                )}
               </div>
-            );
-          })}
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
+                  {isInsightsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+            
+            <CollapsibleContent>
+              <div className="p-6">
+                {!workflowData?.run ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-4">No AI workflow run yet. Click 'Run AI Workflow' to start.</p>
+                    <Button variant="outline" onClick={handleRunWorkflow} disabled={runWorkflow.isPending}>
+                      <Play className="mr-2 h-4 w-4" /> Start Workflow
+                    </Button>
+                  </div>
+                ) : workflowRunning ? (
+                  <div className="space-y-4">
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-32 w-full" />
+                    <div className="flex gap-4">
+                      <Skeleton className="h-48 w-1/3" />
+                      <Skeleton className="h-48 w-1/3" />
+                      <Skeleton className="h-48 w-1/3" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {/* Job Understanding */}
+                    {workflowData.insight && (
+                      <div>
+                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Job Understanding</h3>
+                        <div className="grid md:grid-cols-2 gap-6">
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-base">Ideal Candidate Profile</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <p className="text-sm">{workflowData.insight.idealCandidateProfile}</p>
+                            </CardContent>
+                          </Card>
+                          <div className="space-y-4">
+                            <Card>
+                              <CardHeader className="pb-2">
+                                <CardTitle className="text-base">Evaluation Criteria</CardTitle>
+                              </CardHeader>
+                              <CardContent>
+                                <ul className="list-disc pl-4 text-sm space-y-1">
+                                  {workflowData.insight.evaluationCriteria.map((crit, i) => (
+                                    <li key={i}>{crit}</li>
+                                  ))}
+                                </ul>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Top Candidates */}
+                    {workflowData.shortlist?.summaries && workflowData.shortlist.summaries.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Top Candidates</h3>
+                        <div className="grid md:grid-cols-3 gap-4">
+                          {workflowData.shortlist.summaries.map((summary) => {
+                            const evalData = workflowData.evaluations.find(e => e.candidateId === summary.candidateId);
+                            return (
+                              <Card key={summary.candidateId} className="flex flex-col">
+                                <CardHeader className="pb-2">
+                                  <div className="flex justify-between items-start">
+                                    <CardTitle className="text-base">{summary.candidateName}</CardTitle>
+                                    {evalData && (
+                                      <Badge variant="outline" className={getScoreColor(evalData.score)}>
+                                        {evalData.score}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {evalData && (
+                                    <CardDescription>
+                                      <Badge variant="outline" className={`mt-1 ${getRecommendationColor(evalData.recommendation)}`}>
+                                        {evalData.recommendation}
+                                      </Badge>
+                                    </CardDescription>
+                                  )}
+                                </CardHeader>
+                                <CardContent className="flex-1 flex flex-col text-sm space-y-3">
+                                  <div>
+                                    <span className="font-semibold block mb-1">Why Relevant</span>
+                                    <p className="text-muted-foreground">{summary.whyRelevant}</p>
+                                  </div>
+                                  {summary.keyRisks && (
+                                    <div>
+                                      <span className="font-semibold block mb-1">Key Risks</span>
+                                      <p className="text-muted-foreground">{summary.keyRisks}</p>
+                                    </div>
+                                  )}
+                                  <div className="mt-auto pt-4 border-t border-border">
+                                    <Link href={`/candidates/${summary.candidateId}`}>
+                                      <Button variant="ghost" size="sm" className="w-full">View Profile</Button>
+                                    </Link>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* All Evaluations Collapsible */}
+                    {workflowData.evaluations && workflowData.evaluations.length > 0 && (
+                      <Collapsible open={isAllEvalsOpen} onOpenChange={setIsAllEvalsOpen} className="border border-border rounded-md">
+                        <CollapsibleTrigger asChild>
+                          <Button variant="ghost" className="w-full justify-between p-4 h-auto font-medium hover:bg-muted/50">
+                            All Evaluations ({workflowData.evaluations.length})
+                            {isAllEvalsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="p-0 border-t border-border">
+                          <div className="divide-y divide-border">
+                            {workflowData.evaluations.map((ev) => (
+                              <div key={ev.id} className="p-4 flex flex-col md:flex-row gap-4 md:items-center justify-between hover:bg-muted/10">
+                                <div className="min-w-[200px]">
+                                  <Link href={`/candidates/${ev.candidateId}`}>
+                                    <span className="font-semibold hover:text-primary cursor-pointer">{ev.candidate.name}</span>
+                                  </Link>
+                                  <div className="mt-1">
+                                    <Badge variant="outline" className={getRecommendationColor(ev.recommendation)}>
+                                      {ev.recommendation}
+                                    </Badge>
+                                  </div>
+                                </div>
+                                <div className="flex-1 w-full max-w-md">
+                                  <div className="flex justify-between text-xs mb-1">
+                                    <span className="text-muted-foreground">Match Score</span>
+                                    <span className="font-medium">{ev.score}/100</span>
+                                  </div>
+                                  <Progress value={ev.score} className="h-2" />
+                                </div>
+                                <div className="flex-1 flex gap-2 flex-wrap text-xs">
+                                  {ev.strengths.slice(0, 2).map((s, i) => (
+                                    <span key={i} className="px-2 py-1 bg-green-500/10 text-green-700 rounded-full border border-green-200/50 truncate max-w-[150px]">+ {s}</span>
+                                  ))}
+                                  {ev.gaps.slice(0, 1).map((g, i) => (
+                                    <span key={i} className="px-2 py-1 bg-red-500/10 text-red-700 rounded-full border border-red-200/50 truncate max-w-[150px]">- {g}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
+
+                  </div>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* PIPELINE BOARD */}
+          <div className="flex-1 overflow-x-auto pb-4">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">Pipeline</h2>
+            <div className="h-full min-w-max flex gap-4">
+              {stages.map((stage) => {
+                const appsInStage = applications?.filter((app) => app.stage === stage) || [];
+                return (
+                  <div key={stage} className="flex-shrink-0 w-80 flex flex-col bg-muted/30 rounded-lg border border-border overflow-hidden">
+                    <div className="p-3 border-b border-border bg-muted/50 font-medium flex justify-between items-center">
+                      <span>{stage}</span>
+                      <Badge variant="secondary">{appsInStage.length}</Badge>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                      {appsInStage.map((app) => {
+                        const evalData = workflowData?.evaluations?.find(e => e.candidateId === app.candidate.id);
+                        return (
+                          <div key={app.id} className="bg-card border border-border rounded-md p-4 shadow-sm hover:border-primary/50 transition-colors">
+                            <div className="flex justify-between items-start mb-1">
+                              <Link href={`/candidates/${app.candidate.id}`}>
+                                <div className="font-medium hover:text-primary transition-colors cursor-pointer">
+                                  {app.candidate.name}
+                                </div>
+                              </Link>
+                              {evalData && (
+                                <Badge variant="outline" className={`ml-2 ${getScoreColor(evalData.score)}`}>
+                                  {evalData.score}
+                                </Badge>
+                              )}
+                            </div>
+                            
+                            <div className="text-xs text-muted-foreground flex items-center gap-1 mb-2">
+                              <Mail className="h-3 w-3" />
+                              <span className="truncate">{app.candidate.email}</span>
+                            </div>
+                            
+                            {evalData && (
+                              <div className="mb-4">
+                                <Badge variant="outline" className={`text-[10px] py-0 h-5 ${getRecommendationColor(evalData.recommendation)}`}>
+                                  {evalData.recommendation}
+                                </Badge>
+                              </div>
+                            )}
+                            
+                            <div className="flex justify-between items-center mt-2 border-t border-border pt-3">
+                              <Link href={`/candidates/${app.candidate.id}`}>
+                                <Button variant="ghost" size="sm" className="h-7 text-xs px-2">
+                                  <User className="mr-1 h-3 w-3" />
+                                  Profile
+                                </Button>
+                              </Link>
+                              
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="outline" size="sm" className="h-7 text-xs px-2">
+                                    Move <ArrowRight className="ml-1 h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {stages.filter(s => s !== stage).map((s) => (
+                                    <DropdownMenuItem key={s} onClick={() => handleStageChange(app.id, s)}>
+                                      Move to {s}
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {appsInStage.length === 0 && (
+                        <div className="text-center py-8 text-sm text-muted-foreground italic border-2 border-dashed border-border rounded-md bg-card/50">
+                          Empty
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
     </div>

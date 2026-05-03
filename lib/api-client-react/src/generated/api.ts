@@ -17,6 +17,8 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AgentRun,
+  AgentRunWithLogs,
   Application,
   ApplicationWithDetails,
   Candidate,
@@ -25,7 +27,9 @@ import type {
   CreateJobBody,
   HealthStatus,
   Job,
+  JobWorkflowResult,
   PipelineSummary,
+  RunWorkflowBody,
   UpdateApplicationBody,
 } from "./api.schemas";
 
@@ -1526,6 +1530,343 @@ export const useDeleteApplication = <
 > => {
   return useMutation(getDeleteApplicationMutationOptions(options));
 };
+
+/**
+ * @summary Start an agentic workflow run for a job
+ */
+export const getRunWorkflowUrl = () => {
+  return `/api/workflows/run`;
+};
+
+export const runWorkflow = async (
+  runWorkflowBody: RunWorkflowBody,
+  options?: RequestInit,
+): Promise<AgentRun> => {
+  return customFetch<AgentRun>(getRunWorkflowUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(runWorkflowBody),
+  });
+};
+
+export const getRunWorkflowMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runWorkflow>>,
+    TError,
+    { data: BodyType<RunWorkflowBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof runWorkflow>>,
+  TError,
+  { data: BodyType<RunWorkflowBody> },
+  TContext
+> => {
+  const mutationKey = ["runWorkflow"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof runWorkflow>>,
+    { data: BodyType<RunWorkflowBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return runWorkflow(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RunWorkflowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof runWorkflow>>
+>;
+export type RunWorkflowMutationBody = BodyType<RunWorkflowBody>;
+export type RunWorkflowMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Start an agentic workflow run for a job
+ */
+export const useRunWorkflow = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runWorkflow>>,
+    TError,
+    { data: BodyType<RunWorkflowBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof runWorkflow>>,
+  TError,
+  { data: BodyType<RunWorkflowBody> },
+  TContext
+> => {
+  return useMutation(getRunWorkflowMutationOptions(options));
+};
+
+/**
+ * @summary List all workflow runs
+ */
+export const getListWorkflowRunsUrl = () => {
+  return `/api/workflows/runs`;
+};
+
+export const listWorkflowRuns = async (
+  options?: RequestInit,
+): Promise<AgentRun[]> => {
+  return customFetch<AgentRun[]>(getListWorkflowRunsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListWorkflowRunsQueryKey = () => {
+  return [`/api/workflows/runs`] as const;
+};
+
+export const getListWorkflowRunsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listWorkflowRuns>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listWorkflowRuns>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListWorkflowRunsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listWorkflowRuns>>
+  > = ({ signal }) => listWorkflowRuns({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listWorkflowRuns>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListWorkflowRunsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listWorkflowRuns>>
+>;
+export type ListWorkflowRunsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all workflow runs
+ */
+
+export function useListWorkflowRuns<
+  TData = Awaited<ReturnType<typeof listWorkflowRuns>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listWorkflowRuns>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListWorkflowRunsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get a specific workflow run with logs
+ */
+export const getGetWorkflowRunUrl = (id: number) => {
+  return `/api/workflows/runs/${id}`;
+};
+
+export const getWorkflowRun = async (
+  id: number,
+  options?: RequestInit,
+): Promise<AgentRunWithLogs> => {
+  return customFetch<AgentRunWithLogs>(getGetWorkflowRunUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetWorkflowRunQueryKey = (id: number) => {
+  return [`/api/workflows/runs/${id}`] as const;
+};
+
+export const getGetWorkflowRunQueryOptions = <
+  TData = Awaited<ReturnType<typeof getWorkflowRun>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getWorkflowRun>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetWorkflowRunQueryKey(id);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWorkflowRun>>> = ({
+    signal,
+  }) => getWorkflowRun(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getWorkflowRun>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetWorkflowRunQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getWorkflowRun>>
+>;
+export type GetWorkflowRunQueryError = ErrorType<void>;
+
+/**
+ * @summary Get a specific workflow run with logs
+ */
+
+export function useGetWorkflowRun<
+  TData = Awaited<ReturnType<typeof getWorkflowRun>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getWorkflowRun>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetWorkflowRunQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get the latest workflow run for a job (with results)
+ */
+export const getGetLatestJobWorkflowUrl = (jobId: number) => {
+  return `/api/workflows/jobs/${jobId}/latest`;
+};
+
+export const getLatestJobWorkflow = async (
+  jobId: number,
+  options?: RequestInit,
+): Promise<JobWorkflowResult> => {
+  return customFetch<JobWorkflowResult>(getGetLatestJobWorkflowUrl(jobId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetLatestJobWorkflowQueryKey = (jobId: number) => {
+  return [`/api/workflows/jobs/${jobId}/latest`] as const;
+};
+
+export const getGetLatestJobWorkflowQueryOptions = <
+  TData = Awaited<ReturnType<typeof getLatestJobWorkflow>>,
+  TError = ErrorType<void>,
+>(
+  jobId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLatestJobWorkflow>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetLatestJobWorkflowQueryKey(jobId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getLatestJobWorkflow>>
+  > = ({ signal }) =>
+    getLatestJobWorkflow(jobId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getLatestJobWorkflow>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetLatestJobWorkflowQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getLatestJobWorkflow>>
+>;
+export type GetLatestJobWorkflowQueryError = ErrorType<void>;
+
+/**
+ * @summary Get the latest workflow run for a job (with results)
+ */
+
+export function useGetLatestJobWorkflow<
+  TData = Awaited<ReturnType<typeof getLatestJobWorkflow>>,
+  TError = ErrorType<void>,
+>(
+  jobId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getLatestJobWorkflow>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetLatestJobWorkflowQueryOptions(jobId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get pipeline summary - counts per stage across all jobs

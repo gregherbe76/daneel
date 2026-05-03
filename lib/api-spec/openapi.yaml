@@ -16,6 +16,8 @@ tags:
     description: Candidate operations
   - name: applications
     description: Application pipeline operations
+  - name: workflows
+    description: Agentic workflow operations
 paths:
   /healthz:
     get:
@@ -342,6 +344,83 @@ paths:
         "204":
           description: Deleted
 
+  # ── WORKFLOWS ─────────────────────────────────────────────────────────────
+  /workflows/run:
+    post:
+      operationId: runWorkflow
+      tags: [workflows]
+      summary: Start an agentic workflow run for a job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunWorkflowBody"
+      responses:
+        "201":
+          description: Workflow run created and started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentRun"
+
+  /workflows/runs:
+    get:
+      operationId: listWorkflowRuns
+      tags: [workflows]
+      summary: List all workflow runs
+      responses:
+        "200":
+          description: List of workflow runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentRun"
+
+  /workflows/runs/{id}:
+    get:
+      operationId: getWorkflowRun
+      tags: [workflows]
+      summary: Get a specific workflow run with logs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Workflow run with logs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentRunWithLogs"
+        "404":
+          description: Not found
+
+  /workflows/jobs/{jobId}/latest:
+    get:
+      operationId: getLatestJobWorkflow
+      tags: [workflows]
+      summary: Get the latest workflow run for a job (with results)
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Latest run with insights, evaluations, shortlist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobWorkflowResult"
+        "404":
+          description: No runs found for this job
+
   # ── SUMMARY / WOW ─────────────────────────────────────────────────────────
   /pipeline/summary:
     get:
@@ -536,6 +615,204 @@ components:
           type: string
           nullable: true
       required: [stage]
+
+    # ── WORKFLOWS ──
+    RunWorkflowBody:
+      type: object
+      properties:
+        jobId:
+          type: integer
+      required: [jobId]
+
+    RunStatus:
+      type: string
+      enum: [pending, running, completed, failed]
+
+    StepStatus:
+      type: string
+      enum: [pending, running, completed, failed]
+
+    AgentRun:
+      type: object
+      properties:
+        id:
+          type: integer
+        jobId:
+          type: integer
+        status:
+          $ref: "#/components/schemas/RunStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, jobId, status, createdAt, updatedAt]
+
+    AgentLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        runId:
+          type: integer
+        step:
+          type: string
+        input:
+          nullable: true
+        output:
+          nullable: true
+        status:
+          $ref: "#/components/schemas/StepStatus"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, runId, step, status, createdAt]
+
+    AgentRunWithLogs:
+      type: object
+      properties:
+        id:
+          type: integer
+        jobId:
+          type: integer
+        status:
+          $ref: "#/components/schemas/RunStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentLog"
+      required: [id, jobId, status, createdAt, updatedAt, logs]
+
+    Recommendation:
+      type: string
+      enum: [Strong Yes, Yes, Maybe, No]
+
+    CandidateEvaluation:
+      type: object
+      properties:
+        id:
+          type: integer
+        runId:
+          type: integer
+        jobId:
+          type: integer
+        candidateId:
+          type: integer
+        score:
+          type: integer
+        strengths:
+          type: array
+          items:
+            type: string
+        gaps:
+          type: array
+          items:
+            type: string
+        risks:
+          type: array
+          items:
+            type: string
+        recommendation:
+          $ref: "#/components/schemas/Recommendation"
+        candidate:
+          $ref: "#/components/schemas/Candidate"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, runId, jobId, candidateId, score, strengths, gaps, risks, recommendation, candidate, createdAt]
+
+    JobInsight:
+      type: object
+      properties:
+        id:
+          type: integer
+        runId:
+          type: integer
+        jobId:
+          type: integer
+        mustHaveSkills:
+          type: array
+          items:
+            type: string
+        seniority:
+          type: string
+        evaluationCriteria:
+          type: array
+          items:
+            type: string
+        idealCandidateProfile:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, runId, jobId, mustHaveSkills, seniority, evaluationCriteria, idealCandidateProfile, createdAt]
+
+    ShortlistEntry:
+      type: object
+      properties:
+        candidateId:
+          type: integer
+        candidateName:
+          type: string
+        whyRelevant:
+          type: string
+        keyRisks:
+          type: string
+        finalRecommendation:
+          type: string
+      required: [candidateId, candidateName, whyRelevant, keyRisks, finalRecommendation]
+
+    Shortlist:
+      type: object
+      properties:
+        id:
+          type: integer
+        runId:
+          type: integer
+        jobId:
+          type: integer
+        rankedCandidateIds:
+          type: array
+          items:
+            type: integer
+        summaries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShortlistEntry"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, runId, jobId, rankedCandidateIds, summaries, createdAt]
+
+    JobWorkflowResult:
+      type: object
+      properties:
+        run:
+          $ref: "#/components/schemas/AgentRun"
+        insight:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/JobInsight"
+        evaluations:
+          type: array
+          items:
+            $ref: "#/components/schemas/CandidateEvaluation"
+        shortlist:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Shortlist"
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgentLog"
+      required: [run, evaluations, logs]
 
     # ── SUMMARY ──
     StageCount:

@@ -107,6 +107,115 @@ export interface UpdateApplicationBody {
   notes?: string | null;
 }
 
+export interface RunWorkflowBody {
+  jobId: number;
+}
+
+export type RunStatus = (typeof RunStatus)[keyof typeof RunStatus];
+
+export const RunStatus = {
+  pending: "pending",
+  running: "running",
+  completed: "completed",
+  failed: "failed",
+} as const;
+
+export type StepStatus = (typeof StepStatus)[keyof typeof StepStatus];
+
+export const StepStatus = {
+  pending: "pending",
+  running: "running",
+  completed: "completed",
+  failed: "failed",
+} as const;
+
+export interface AgentRun {
+  id: number;
+  jobId: number;
+  status: RunStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentLog {
+  id: number;
+  runId: number;
+  step: string;
+  input?: unknown | null;
+  output?: unknown | null;
+  status: StepStatus;
+  createdAt: string;
+}
+
+export interface AgentRunWithLogs {
+  id: number;
+  jobId: number;
+  status: RunStatus;
+  createdAt: string;
+  updatedAt: string;
+  logs: AgentLog[];
+}
+
+export type Recommendation =
+  (typeof Recommendation)[keyof typeof Recommendation];
+
+export const Recommendation = {
+  Strong_Yes: "Strong Yes",
+  Yes: "Yes",
+  Maybe: "Maybe",
+  No: "No",
+} as const;
+
+export interface CandidateEvaluation {
+  id: number;
+  runId: number;
+  jobId: number;
+  candidateId: number;
+  score: number;
+  strengths: string[];
+  gaps: string[];
+  risks: string[];
+  recommendation: Recommendation;
+  candidate: Candidate;
+  createdAt: string;
+}
+
+export interface JobInsight {
+  id: number;
+  runId: number;
+  jobId: number;
+  mustHaveSkills: string[];
+  seniority: string;
+  evaluationCriteria: string[];
+  idealCandidateProfile: string;
+  createdAt: string;
+}
+
+export interface ShortlistEntry {
+  candidateId: number;
+  candidateName: string;
+  whyRelevant: string;
+  keyRisks: string;
+  finalRecommendation: string;
+}
+
+export interface Shortlist {
+  id: number;
+  runId: number;
+  jobId: number;
+  rankedCandidateIds: number[];
+  summaries: ShortlistEntry[];
+  createdAt: string;
+}
+
+export interface JobWorkflowResult {
+  run: AgentRun;
+  insight?: JobInsight | null;
+  evaluations: CandidateEvaluation[];
+  shortlist?: Shortlist | null;
+  logs: AgentLog[];
+}
+
 export interface StageCount {
   stage: ApplicationStage;
   count: number;
