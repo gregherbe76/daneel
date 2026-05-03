@@ -460,9 +460,18 @@ export class GithubSourcingProvider implements AgentProvider {
     const stats: SourcingStats = {
       searchTotalCount,
       consideredCount,
+      // GitHub hits the API directly (no LLM extraction step), so the number of
+      // candidates we attempted to extract equals consideredCount. Surface it
+      // explicitly so the funnel badge UI can render the same shape across
+      // providers.
+      extractedCount: consideredCount,
       droppedNoBio,
       droppedStale,
       droppedFetchError,
+      // GitHub returns real URLs from the search API — no fabrication is
+      // possible — but we emit a 0 so the contract stays consistent with the
+      // LLM-backed providers.
+      droppedFabricated: 0,
       returnedCount: results.length,
     };
 
