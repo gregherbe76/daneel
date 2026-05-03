@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
-import { 
-  useGetJob, 
-  useGetJobApplications, 
-  ApplicationStage, 
-  useUpdateApplication, 
+import {
+  useGetJob,
+  useGetJobApplications,
+  ApplicationStage,
+  useUpdateApplication,
   getGetJobApplicationsQueryKey,
   useRunWorkflow,
   useGetLatestJobWorkflow,
@@ -11,6 +11,8 @@ import {
   useRunVariantWorkflow,
   useImproveAndRerun,
   getListJobRunsQueryKey,
+  useListProviderStepSettings,
+  usePreviewGithubQuery,
 } from "@workspace/api-client-react";
 import { useRoute, Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -21,7 +23,7 @@ import {
   Loader2, MapPin, Edit, User, Mail, ArrowRight, Play,
   Sparkles, ChevronDown, ChevronUp, ChevronRight, BrainCircuit, Zap,
   Building2, Github, Linkedin, AlertTriangle, FileText, GitBranch,
-  FlaskConical, Database, Upload, Bot, Users,
+  FlaskConical, Database, Upload, Bot, Users, Eye, Search,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -137,6 +139,122 @@ function SourcedCandidateCard({ candidate }: { candidate: SourcedCandidate }) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ── job-scoped GitHub query preview ──────────────────────────────────────────
+//
+// Shown inline on the job kickoff area when sourcing is enabled and a GitHub
+// provider is assigned to the sourcing step. Lets the recruiter sanity-check
+// the assembled `q=` for THIS job before clicking Run.
+function JobGithubQueryPreview({ jobId }: { jobId: number }) {
+  const { data: stepSettings = [] } = useListProviderStepSettings();
+  const previewMutation = usePreviewGithubQuery();
+
+  const sourcingSetting = stepSettings.find(
+    (s) => s.workflowStep === "sourcing" && s.enabled,
+  );
+  const sourcingProvider = sourcingSetting?.provider;
+  const isGithub = sourcingProvider?.type === "github";
+
+  const [result, setResult] = useState<{
+    query: string;
+    totalCount?: number | null;
+    totalCountError?: string | null;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Auto-build the assembled query as soon as the panel renders for a github
+  // provider — no extra clicks needed for the common "just show me" case.
+  useEffect(() => {
+    if (!isGithub || !sourcingProvider) return;
+    let cancelled = false;
+    setError(null);
+    previewMutation
+      .mutateAsync({ data: { jobId, providerId: sourcingProvider.id, runMatches: false } })
+      .then((res) => {
+        if (!cancelled) setResult(res as typeof result);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Preview failed");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Intentionally re-run only when job or assigned provider changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId, sourcingProvider?.id, isGithub]);
+
+  if (!isGithub || !sourcingProvider) return null;
+
+  async function runMatches() {
+    if (!sourcingProvider) return;
+    setError(null);
+    try {
+      const res = await previewMutation.mutateAsync({
+        data: { jobId, providerId: sourcingProvider.id, runMatches: true },
+      });
+      setResult(res as typeof result);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Preview failed");
+    }
+  }
+
+  const isPending = previewMutation.isPending;
+
+  return (
+    <div className="rounded-md border border-purple-200 bg-purple-500/5 p-2.5 space-y-1.5">
+      <div className="flex items-center gap-1.5">
+        <Github className="h-3 w-3 text-purple-700" />
+        <p className="text-[11px] font-semibold text-purple-900">
+          GitHub Agent query — {sourcingProvider.name}
+        </p>
+      </div>
+      {!result && isPending && (
+        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Building query…
+        </div>
+      )}
+      {result && (
+        <>
+          <pre className="rounded bg-background border border-border p-1.5 text-[10px] font-mono whitespace-pre-wrap break-all text-foreground max-h-24 overflow-auto">
+            {result.query}
+          </pre>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={runMatches}
+              className="inline-flex items-center gap-1 text-[10px] text-purple-800 hover:underline disabled:opacity-50"
+            >
+              {isPending ? (
+                <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              ) : (
+                <Search className="h-2.5 w-2.5" />
+              )}
+              Preview matches
+            </button>
+            {result.totalCount != null && (
+              <span className="text-[10px] text-foreground">
+                <strong className="font-semibold">{result.totalCount.toLocaleString()}</strong>{" "}
+                matching GitHub user{result.totalCount === 1 ? "" : "s"}
+              </span>
+            )}
+            {result.totalCountError && (
+              <span className="text-[10px] text-destructive truncate" title={result.totalCountError}>
+                Match lookup failed
+              </span>
+            )}
+          </div>
+        </>
+      )}
+      {error && <p className="text-[10px] text-destructive">{error}</p>}
+      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+        <Eye className="h-2.5 w-2.5" />
+        Tune in Settings → Providers → {sourcingProvider.name}
+      </p>
+    </div>
   );
 }
 
@@ -498,6 +616,7 @@ export default function JobDetailPage() {
                     </p>
                   </div>
                 </div>
+                {runSourcing && <JobGithubQueryPreview jobId={jobId} />}
                 {/* Enrichment */}
                 <div className={`flex items-start gap-2 px-2.5 py-2 rounded-md border transition-colors ${
                   runEnrichment ? "border-blue-200 bg-blue-500/5" : "border-border bg-muted/30"
