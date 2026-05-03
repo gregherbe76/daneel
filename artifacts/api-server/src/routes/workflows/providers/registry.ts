@@ -72,6 +72,50 @@ function buildProvider(row: typeof agentProvidersTable.$inferSelect): AgentProvi
 }
 
 /**
+ * Provider types that count as "real" sourcing (vs. the native mock generator).
+ * Single source of truth used by both `resolveSourcingProvider` (runtime
+ * dispatch) and `hasRealSourcingProvider` (UI default hint).
+ */
+const REAL_SOURCING_TYPES = new Set([
+  "twin_webhook",
+  "custom_webhook",
+  "github",
+  "web_search",
+]);
+
+/**
+ * Returns true when the sourcing step is configured with an enabled
+ * "real" provider (Twin/custom webhook/GitHub Agent/Web Search).
+ *
+ * Used by the frontend to decide whether to default the workflow kickoff
+ * modal to Real + Run Sourcing on, instead of the historical Mock + off
+ * defaults. Mirrors the resolution logic of `resolveSourcingProvider`.
+ */
+export async function hasRealSourcingProvider(): Promise<boolean> {
+  try {
+    const [setting] = await db
+      .select()
+      .from(workflowProviderSettingsTable)
+      .where(eq(workflowProviderSettingsTable.workflowStep, "sourcing"))
+      .limit(1);
+
+    if (!setting || !setting.enabled) return false;
+
+    const [providerRow] = await db
+      .select()
+      .from(agentProvidersTable)
+      .where(eq(agentProvidersTable.id, setting.providerId))
+      .limit(1);
+
+    if (!providerRow || !providerRow.enabled) return false;
+    return REAL_SOURCING_TYPES.has(providerRow.type);
+  } catch (err) {
+    logger.error({ err }, "Failed to check for real sourcing provider — assuming none");
+    return false;
+  }
+}
+
+/**
  * Resolve the provider for the sourcing step.
  *
  * Returns the provider AND whether it is a "real" (Twin/custom-webhook) provider.
@@ -107,12 +151,9 @@ export async function resolveSourcingProvider(): Promise<{ provider: AgentProvid
       return nativeFallback;
     }
 
-    // twin_webhook, custom_webhook, github and web_search are "real" providers
-    const isTwin =
-      providerRow.type === "twin_webhook" ||
-      providerRow.type === "custom_webhook" ||
-      providerRow.type === "github" ||
-      providerRow.type === "web_search";
+    // twin_webhook, custom_webhook, github and web_search are "real" providers.
+    // Single source of truth: REAL_SOURCING_TYPES (shared with hasRealSourcingProvider).
+    const isTwin = REAL_SOURCING_TYPES.has(providerRow.type);
     return { provider: buildProvider(providerRow), isTwin };
   } catch (err) {
     logger.error({ step: "sourcing", err }, "Failed to resolve sourcing provider — falling back to native");

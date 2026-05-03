@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   useGetJob,
   useGetJobApplications,
@@ -347,14 +347,46 @@ export default function JobDetailPage() {
 
   useEffect(() => {
     if (jobId) markJobRunsSeen(jobId);
+    // Reset the "user explicitly chose toggle values" flag when switching
+    // to a different job, so the new job's defaulting kicks in fresh.
+    userTouchedToggles.current = false;
   }, [jobId]);
 
   const [isInsightsOpen, setIsInsightsOpen] = useState(true);
   const [isAllEvalsOpen, setIsAllEvalsOpen] = useState(false);
   const [isSourcedOpen, setIsSourcedOpen] = useState(true);
-  const [dataMode, setDataMode] = useState<"real" | "mock">("mock");
-  const [runSourcing, setRunSourcing] = useState(false);
+  // Default to mock + sourcing-off until the job query resolves; the effect
+  // below promotes both to "real" when the job has an enabled real sourcing
+  // provider (GitHub Agent, Web Search, Twin/custom webhook). Once the user
+  // touches either toggle we stop auto-defaulting so we never silently
+  // override an explicit choice on a later refetch.
+  const [dataMode, setDataModeState] = useState<"real" | "mock">("mock");
+  const [runSourcing, setRunSourcingState] = useState(false);
   const [runEnrichment, setRunEnrichment] = useState(false);
+  const userTouchedToggles = useRef(false);
+  const setDataMode = (v: "real" | "mock") => {
+    userTouchedToggles.current = true;
+    setDataModeState(v);
+  };
+  const setRunSourcing = (v: boolean) => {
+    userTouchedToggles.current = true;
+    setRunSourcingState(v);
+  };
+  // Promote the kickoff defaults to Real + Run Sourcing on whenever the
+  // job query resolves and reports a real sourcing provider is configured,
+  // unless the user has already touched either toggle for this job.
+  const realSourcingAvailable = job?.hasRealSourcingProvider ?? false;
+  useEffect(() => {
+    if (!job) return;
+    if (userTouchedToggles.current) return;
+    if (realSourcingAvailable) {
+      setDataModeState("real");
+      setRunSourcingState(true);
+    } else {
+      setDataModeState("mock");
+      setRunSourcingState(false);
+    }
+  }, [job, realSourcingAvailable]);
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isFindOpen, setIsFindOpen] = useState(false);
@@ -788,6 +820,29 @@ export default function JobDetailPage() {
                   <p className="text-[10px] text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1 flex items-start gap-1">
                     <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
                     Only imported and Twin-sourced candidates will be scored.
+                  </p>
+                )}
+                {/* Default-source hint — explains why these toggles are
+                    pre-selected the way they are, so recruiters know whether
+                    to expect real sourcing or mock data on the next run. */}
+                {!userTouchedToggles.current && realSourcingAvailable && (
+                  <p
+                    data-testid="kickoff-default-hint-real"
+                    className="text-[10px] text-muted-foreground"
+                  >
+                    Defaulted to real because this job has a real sourcing provider configured.
+                  </p>
+                )}
+                {!userTouchedToggles.current && !realSourcingAvailable && (
+                  <p
+                    data-testid="kickoff-default-hint-mock"
+                    className="text-[10px] text-muted-foreground"
+                  >
+                    No real sourcing provider configured — running in mock mode.{" "}
+                    <Link href="/settings" className="underline">
+                      Add one in Settings → Providers
+                    </Link>{" "}
+                    to enable real sourcing.
                   </p>
                 )}
                 {/* Sourcing */}

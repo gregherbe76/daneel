@@ -68,6 +68,15 @@ export interface Job {
   scoringWeights: ScoringWeights;
   createdAt: string;
   updatedAt: string;
+  /** True when the sourcing workflow step is configured with an enabled
+"real" provider (Twin webhook, custom webhook, GitHub Agent, or
+Web Search). Drives the workflow kickoff modal's default toggles
+so newly opened jobs pre-select Real Data Run + Run Sourcing on
+when a real provider is available, instead of the historical
+Mock + off defaults. Only populated by GET /jobs/:id; absent
+(treated as false) on the list endpoint.
+ */
+  hasRealSourcingProvider?: boolean;
 }
 
 export interface CreateJobBody {

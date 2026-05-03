@@ -64,6 +64,12 @@ export const ListJobsResponseItem = zod.object({
     ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+  hasRealSourcingProvider: zod
+    .boolean()
+    .optional()
+    .describe(
+      'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+    ),
 });
 export const ListJobsResponse = zod.array(ListJobsResponseItem);
 
@@ -169,6 +175,12 @@ export const GetJobResponse = zod.object({
     ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+  hasRealSourcingProvider: zod
+    .boolean()
+    .optional()
+    .describe(
+      'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+    ),
 });
 
 /**
@@ -270,6 +282,12 @@ export const UpdateJobResponse = zod.object({
     ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
+  hasRealSourcingProvider: zod
+    .boolean()
+    .optional()
+    .describe(
+      'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+    ),
 });
 
 /**
@@ -349,6 +367,12 @@ export const GetJobApplicationsResponseItem = zod.object({
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
+    hasRealSourcingProvider: zod
+      .boolean()
+      .optional()
+      .describe(
+        'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+      ),
   }),
   candidate: zod.object({
     id: zod.number(),
@@ -842,6 +866,12 @@ export const GetCandidateApplicationsResponseItem = zod.object({
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
+    hasRealSourcingProvider: zod
+      .boolean()
+      .optional()
+      .describe(
+        'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+      ),
   }),
   candidate: zod.object({
     id: zod.number(),
@@ -946,6 +976,12 @@ export const ListApplicationsResponseItem = zod.object({
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
+    hasRealSourcingProvider: zod
+      .boolean()
+      .optional()
+      .describe(
+        'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+      ),
   }),
   candidate: zod.object({
     id: zod.number(),
@@ -1070,6 +1106,12 @@ export const GetApplicationResponse = zod.object({
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
+    hasRealSourcingProvider: zod
+      .boolean()
+      .optional()
+      .describe(
+        'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+      ),
   }),
   candidate: zod.object({
     id: zod.number(),
@@ -2822,6 +2864,12 @@ export const GetJobReportForRunResponse = zod.object({
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
+    hasRealSourcingProvider: zod
+      .boolean()
+      .optional()
+      .describe(
+        'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+      ),
   }),
   insight: zod
     .object({
@@ -3031,6 +3079,12 @@ export const GetJobReportResponse = zod.object({
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
+    hasRealSourcingProvider: zod
+      .boolean()
+      .optional()
+      .describe(
+        'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+      ),
   }),
   insight: zod
     .object({

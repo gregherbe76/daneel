@@ -10,6 +10,7 @@ import {
   GetJobApplicationsParams,
 } from "@workspace/api-zod";
 import { applicationsTable, candidatesTable } from "@workspace/db";
+import { hasRealSourcingProvider } from "./workflows/providers/registry";
 
 const router = Router();
 
@@ -47,7 +48,11 @@ router.get("/jobs/:id", async (req, res) => {
     res.status(404).json({ error: "Job not found" });
     return;
   }
-  res.json(job);
+  // Derived field: drives the workflow kickoff modal's default toggles.
+  // When a real sourcing provider is configured the modal pre-selects
+  // Real + Run Sourcing on; otherwise it falls back to mock defaults.
+  const realSourcingAvailable = await hasRealSourcingProvider();
+  res.json({ ...job, hasRealSourcingProvider: realSourcingAvailable });
 });
 
 // Update a job
