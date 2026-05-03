@@ -3,10 +3,12 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MapPin, Loader2, Briefcase } from "lucide-react";
+import { Plus, MapPin, Loader2, Briefcase, Sparkles } from "lucide-react";
+import { useUnseenRunsByJob } from "@/lib/pending-runs";
 
 export default function JobsPage() {
   const { data: jobs, isLoading } = useListJobs();
+  const unseenByJob = useUnseenRunsByJob();
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -40,13 +42,23 @@ export default function JobsPage() {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {jobs?.map((job) => (
+          {jobs?.map((job) => {
+            const unseenCount = unseenByJob.get(job.id)?.length ?? 0;
+            return (
             <Link key={job.id} href={`/jobs/${job.id}`}>
-              <Card className="p-6 hover:border-primary/50 transition-colors cursor-pointer group">
+              <Card className="p-6 hover:border-primary/50 transition-colors cursor-pointer group relative">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="text-xl font-semibold group-hover:text-primary transition-colors">
+                    <h3 className="text-xl font-semibold group-hover:text-primary transition-colors flex items-center gap-2">
                       {job.title}
+                      {unseenCount > 0 && (
+                        <Badge className="bg-primary/15 text-primary border border-primary/30 hover:bg-primary/15 gap-1">
+                          <Sparkles className="h-3 w-3" />
+                          {unseenCount === 1
+                            ? "New improved run"
+                            : `${unseenCount} new runs`}
+                        </Badge>
+                      )}
                     </h3>
                     <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1">
@@ -68,7 +80,8 @@ export default function JobsPage() {
                 )}
               </Card>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

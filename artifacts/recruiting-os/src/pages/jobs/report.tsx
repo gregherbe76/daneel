@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useQueryClient } from "@tanstack/react-query";
 import { HumanAIComparison } from "@/components/human-ai-comparison";
 import { ImproveRerunModal, type ImproveRerunCandidate } from "@/components/improve-rerun-modal";
+import { markJobRunsSeen } from "@/lib/pending-runs";
 import { ScoreBreakdownDisplay, ScoreBreakdownPills } from "@/components/score-breakdown";
 import type { ScoreBreakdown } from "@/components/score-breakdown";
 
@@ -475,6 +476,10 @@ export default function JobReportPage() {
   useEffect(() => {
     if (queryRunId !== null) setSelectedRunId(queryRunId);
   }, [queryRunId]);
+
+  useEffect(() => {
+    if (jobId) markJobRunsSeen(jobId);
+  }, [jobId]);
 
   const { data: job } = useGetJob(jobId, {
     query: { enabled: !!jobId, queryKey: [`/api/jobs/${jobId}`] },

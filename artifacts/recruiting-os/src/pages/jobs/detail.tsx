@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   useGetJob, 
   useGetJobApplications, 
@@ -12,7 +12,7 @@ import {
   useImproveAndRerun,
   getListJobRunsQueryKey,
 } from "@workspace/api-client-react";
-import { useRoute, Link, useLocation } from "wouter";
+import { useRoute, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,6 +26,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { RunVariantModal } from "@/components/run-variant-modal";
+import { addPendingImproveRun, markJobRunsSeen } from "@/lib/pending-runs";
 import { ImportCandidatesModal } from "@/components/import-candidates-modal";
 import { FindCandidatesModal } from "@/components/find-candidates-modal";
 import { ImproveRerunModal, type ImproveRerunCandidate } from "@/components/improve-rerun-modal";
@@ -167,7 +168,10 @@ export default function JobDetailPage() {
   const updateApp = useUpdateApplication();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (jobId) markJobRunsSeen(jobId);
+  }, [jobId]);
 
   const [isInsightsOpen, setIsInsightsOpen] = useState(true);
   const [isAllEvalsOpen, setIsAllEvalsOpen] = useState(false);
@@ -224,7 +228,7 @@ export default function JobDetailPage() {
 
   const handleImproveAndRerun = () => {
     const runId = workflowData?.run?.id;
-    if (!runId) return;
+    if (!runId || !job) return;
     improveAndRerun.mutate(
       { data: { runId } },
       {
@@ -232,28 +236,18 @@ export default function JobDetailPage() {
           setIsImproveModalOpen(false);
           toast({
             title: "Improve and Rerun started",
-            description: `Enriching ${result.lowConfidenceCandidateCount} low-confidence profile${result.lowConfidenceCandidateCount === 1 ? "" : "s"} and re-scoring…`,
+            description: `Enriching ${result.lowConfidenceCandidateCount} low-confidence profile${result.lowConfidenceCandidateCount === 1 ? "" : "s"} and re-scoring. We'll notify you when it's ready — you can navigate away.`,
           });
           setTimeout(() => {
             queryClient.invalidateQueries({ queryKey: getGetLatestJobWorkflowQueryKey(jobId) });
             queryClient.invalidateQueries({ queryKey: getListJobRunsQueryKey(jobId) });
           }, 2000);
-          const newRunId = result.run.id;
-          const poll = setInterval(async () => {
-            const res = await fetch(`/api/workflows/runs/${newRunId}`);
-            if (!res.ok) return;
-            const run = await res.json() as { status: string };
-            if (run.status === "completed" || run.status === "failed") {
-              clearInterval(poll);
-              queryClient.invalidateQueries({ queryKey: getGetLatestJobWorkflowQueryKey(jobId) });
-              queryClient.invalidateQueries({ queryKey: getListJobRunsQueryKey(jobId) });
-              if (run.status === "completed") {
-                navigate(`/jobs/${jobId}/report?runId=${newRunId}`);
-              } else {
-                toast({ title: "Improve and Rerun failed", variant: "destructive" });
-              }
-            }
-          }, 3000);
+          addPendingImproveRun({
+            runId: result.run.id,
+            jobId,
+            jobTitle: job.title,
+            startedAt: Date.now(),
+          });
         },
         onError: () => {
           toast({ title: "Failed to start Improve and Rerun", variant: "destructive" });

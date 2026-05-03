@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
+import { PendingRunsWatcher } from "@/lib/pending-runs";
 
 // Pages
 import JobsPage from "./pages/jobs/index";
@@ -45,6 +46,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <PendingRunsWatcher />
           <Router />
         </WouterRouter>
         <Toaster />
