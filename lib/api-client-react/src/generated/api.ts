@@ -29,6 +29,7 @@ import type {
   CreateJobBody,
   CreateProviderBody,
   HealthStatus,
+  HiringReport,
   Job,
   JobWorkflowResult,
   PipelineSummary,
@@ -2632,6 +2633,269 @@ export const useUpsertProviderStepSetting = <
 > => {
   return useMutation(getUpsertProviderStepSettingMutationOptions(options));
 };
+
+/**
+ * @summary Get full hiring manager report for the latest completed workflow run
+ */
+export const getGetJobReportUrl = (jobId: number) => {
+  return `/api/reports/job/${jobId}/latest`;
+};
+
+export const getJobReport = async (
+  jobId: number,
+  options?: RequestInit,
+): Promise<HiringReport> => {
+  return customFetch<HiringReport>(getGetJobReportUrl(jobId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetJobReportQueryKey = (jobId: number) => {
+  return [`/api/reports/job/${jobId}/latest`] as const;
+};
+
+export const getGetJobReportQueryOptions = <
+  TData = Awaited<ReturnType<typeof getJobReport>>,
+  TError = ErrorType<void>,
+>(
+  jobId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getJobReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetJobReportQueryKey(jobId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getJobReport>>> = ({
+    signal,
+  }) => getJobReport(jobId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getJobReport>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetJobReportQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getJobReport>>
+>;
+export type GetJobReportQueryError = ErrorType<void>;
+
+/**
+ * @summary Get full hiring manager report for the latest completed workflow run
+ */
+
+export function useGetJobReport<
+  TData = Awaited<ReturnType<typeof getJobReport>>,
+  TError = ErrorType<void>,
+>(
+  jobId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getJobReport>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetJobReportQueryOptions(jobId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Export hiring manager report as Markdown
+ */
+export const getGetJobReportMarkdownUrl = (jobId: number) => {
+  return `/api/reports/job/${jobId}/latest/markdown`;
+};
+
+export const getJobReportMarkdown = async (
+  jobId: number,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getGetJobReportMarkdownUrl(jobId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetJobReportMarkdownQueryKey = (jobId: number) => {
+  return [`/api/reports/job/${jobId}/latest/markdown`] as const;
+};
+
+export const getGetJobReportMarkdownQueryOptions = <
+  TData = Awaited<ReturnType<typeof getJobReportMarkdown>>,
+  TError = ErrorType<void>,
+>(
+  jobId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getJobReportMarkdown>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetJobReportMarkdownQueryKey(jobId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getJobReportMarkdown>>
+  > = ({ signal }) =>
+    getJobReportMarkdown(jobId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getJobReportMarkdown>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetJobReportMarkdownQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getJobReportMarkdown>>
+>;
+export type GetJobReportMarkdownQueryError = ErrorType<void>;
+
+/**
+ * @summary Export hiring manager report as Markdown
+ */
+
+export function useGetJobReportMarkdown<
+  TData = Awaited<ReturnType<typeof getJobReportMarkdown>>,
+  TError = ErrorType<void>,
+>(
+  jobId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getJobReportMarkdown>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetJobReportMarkdownQueryOptions(jobId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Export hiring manager report as PDF
+ */
+export const getGetJobReportPdfUrl = (jobId: number) => {
+  return `/api/reports/job/${jobId}/latest/pdf`;
+};
+
+export const getJobReportPdf = async (
+  jobId: number,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getGetJobReportPdfUrl(jobId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetJobReportPdfQueryKey = (jobId: number) => {
+  return [`/api/reports/job/${jobId}/latest/pdf`] as const;
+};
+
+export const getGetJobReportPdfQueryOptions = <
+  TData = Awaited<ReturnType<typeof getJobReportPdf>>,
+  TError = ErrorType<void>,
+>(
+  jobId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getJobReportPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetJobReportPdfQueryKey(jobId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getJobReportPdf>>> = ({
+    signal,
+  }) => getJobReportPdf(jobId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getJobReportPdf>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetJobReportPdfQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getJobReportPdf>>
+>;
+export type GetJobReportPdfQueryError = ErrorType<void>;
+
+/**
+ * @summary Export hiring manager report as PDF
+ */
+
+export function useGetJobReportPdf<
+  TData = Awaited<ReturnType<typeof getJobReportPdf>>,
+  TError = ErrorType<void>,
+>(
+  jobId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getJobReportPdf>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetJobReportPdfQueryOptions(jobId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get pipeline summary - counts per stage across all jobs

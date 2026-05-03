@@ -868,6 +868,148 @@ export const UpsertProviderStepSettingResponse = zod.object({
 });
 
 /**
+ * @summary Get full hiring manager report for the latest completed workflow run
+ */
+export const GetJobReportParams = zod.object({
+  jobId: zod.coerce.number(),
+});
+
+export const GetJobReportResponse = zod.object({
+  generatedAt: zod.coerce.date(),
+  run: zod.object({
+    id: zod.number(),
+    runDate: zod.coerce.date(),
+    status: zod.enum(["pending", "running", "completed", "failed"]),
+    runSourcing: zod.boolean(),
+  }),
+  job: zod.object({
+    id: zod.number(),
+    title: zod.string(),
+    description: zod.string(),
+    location: zod.string(),
+    seniority: zod.enum([
+      "Intern",
+      "Junior",
+      "Mid",
+      "Senior",
+      "Lead",
+      "Principal",
+      "Director",
+      "VP",
+    ]),
+    mustHaveSkills: zod.array(zod.string()),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+  insight: zod
+    .object({
+      id: zod.number(),
+      runId: zod.number(),
+      jobId: zod.number(),
+      mustHaveSkills: zod.array(zod.string()),
+      seniority: zod.string(),
+      evaluationCriteria: zod.array(zod.string()),
+      idealCandidateProfile: zod.string(),
+      createdAt: zod.coerce.date(),
+    })
+    .nullish(),
+  top5: zod.array(
+    zod.object({
+      id: zod.number(),
+      candidateId: zod.number(),
+      score: zod.number(),
+      strengths: zod.array(zod.string()),
+      gaps: zod.array(zod.string()),
+      risks: zod.array(zod.string()),
+      recommendation: zod.enum(["Strong Yes", "Yes", "Maybe", "No"]),
+      candidate: zod
+        .object({
+          id: zod.number(),
+          name: zod.string(),
+          email: zod.string(),
+          linkedIn: zod.string().nullish(),
+          summary: zod.string().nullish(),
+          skills: zod.array(zod.string()),
+          headline: zod.string().nullish(),
+          location: zod.string().nullish(),
+          currentCompany: zod.string().nullish(),
+          githubUrl: zod.string().nullish(),
+          source: zod.string().nullish(),
+          createdAt: zod.coerce.date(),
+          updatedAt: zod.coerce.date(),
+        })
+        .nullish(),
+      summary: zod
+        .object({
+          candidateId: zod.number().optional(),
+          whyRelevant: zod.string().optional(),
+          keyRisks: zod.string().optional(),
+          finalRecommendation: zod.string().optional(),
+        })
+        .nullish(),
+    }),
+  ),
+  evaluations: zod.array(
+    zod.object({
+      id: zod.number(),
+      candidateId: zod.number(),
+      score: zod.number(),
+      strengths: zod.array(zod.string()),
+      gaps: zod.array(zod.string()),
+      risks: zod.array(zod.string()),
+      recommendation: zod.enum(["Strong Yes", "Yes", "Maybe", "No"]),
+      candidate: zod
+        .object({
+          id: zod.number(),
+          name: zod.string(),
+          email: zod.string(),
+          linkedIn: zod.string().nullish(),
+          summary: zod.string().nullish(),
+          skills: zod.array(zod.string()),
+          headline: zod.string().nullish(),
+          location: zod.string().nullish(),
+          currentCompany: zod.string().nullish(),
+          githubUrl: zod.string().nullish(),
+          source: zod.string().nullish(),
+          createdAt: zod.coerce.date(),
+          updatedAt: zod.coerce.date(),
+        })
+        .nullish(),
+      summary: zod
+        .object({
+          candidateId: zod.number().optional(),
+          whyRelevant: zod.string().optional(),
+          keyRisks: zod.string().optional(),
+          finalRecommendation: zod.string().optional(),
+        })
+        .nullish(),
+    }),
+  ),
+  recommendationSummary: zod.object({
+    "Strong Yes": zod.number(),
+    Yes: zod.number(),
+    Maybe: zod.number(),
+    No: zod.number(),
+  }),
+  interviewFocusAreas: zod.array(zod.string()),
+  risks: zod.array(zod.string()),
+});
+
+/**
+ * @summary Export hiring manager report as Markdown
+ */
+export const GetJobReportMarkdownParams = zod.object({
+  jobId: zod.coerce.number(),
+});
+
+/**
+ * @summary Export hiring manager report as PDF
+ */
+export const GetJobReportPdfParams = zod.object({
+  jobId: zod.coerce.number(),
+});
+
+/**
  * @summary Get pipeline summary - counts per stage across all jobs
  */
 export const GetPipelineSummaryResponse = zod.object({

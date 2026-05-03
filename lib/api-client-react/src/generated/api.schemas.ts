@@ -309,6 +309,51 @@ export interface JobWorkflowResult {
   logs: AgentLog[];
 }
 
+export interface ReportRunMeta {
+  id: number;
+  runDate: string;
+  status: RunStatus;
+  runSourcing: boolean;
+}
+
+export type ReportEvaluationSummary = {
+  candidateId?: number;
+  whyRelevant?: string;
+  keyRisks?: string;
+  finalRecommendation?: string;
+} | null;
+
+export interface ReportEvaluation {
+  id: number;
+  candidateId: number;
+  score: number;
+  strengths: string[];
+  gaps: string[];
+  risks: string[];
+  recommendation: Recommendation;
+  candidate?: Candidate | null;
+  summary?: ReportEvaluationSummary;
+}
+
+export interface RecommendationSummary {
+  "Strong Yes": number;
+  Yes: number;
+  Maybe: number;
+  No: number;
+}
+
+export interface HiringReport {
+  generatedAt: string;
+  run: ReportRunMeta;
+  job: Job;
+  insight?: JobInsight | null;
+  top5: ReportEvaluation[];
+  evaluations: ReportEvaluation[];
+  recommendationSummary: RecommendationSummary;
+  interviewFocusAreas: string[];
+  risks: string[];
+}
+
 export interface StageCount {
   stage: ApplicationStage;
   count: number;

@@ -9,6 +9,7 @@ import { Layout } from "@/components/layout";
 import JobsPage from "./pages/jobs/index";
 import CreateJobPage from "./pages/jobs/new";
 import JobDetailPage from "./pages/jobs/detail";
+import JobReportPage from "./pages/jobs/report";
 import CandidatesPage from "./pages/candidates/index";
 import AgentProvidersPage from "./pages/settings/providers";
 
@@ -21,6 +22,7 @@ function Router() {
         <Route path="/" component={() => <Redirect to="/jobs" />} />
         <Route path="/jobs" component={JobsPage} />
         <Route path="/jobs/new" component={CreateJobPage} />
+        <Route path="/jobs/:id/report" component={JobReportPage} />
         <Route path="/jobs/:id" component={JobDetailPage} />
         <Route path="/jobs/:id/edit" component={() => <div className="p-8">Job Edit (WIP)</div>} />
         <Route path="/candidates" component={CandidatesPage} />

@@ -20,6 +20,8 @@ tags:
     description: Agentic workflow operations
   - name: providers
     description: Agent provider management
+  - name: reports
+    description: Hiring manager report exports
 paths:
   /healthz:
     get:
@@ -590,6 +592,71 @@ paths:
                 $ref: "#/components/schemas/ProviderStepSettingWithProvider"
 
   # ── SUMMARY / WOW ─────────────────────────────────────────────────────────
+  # ── REPORTS ────────────────────────────────────────────────────────────────
+  /reports/job/{jobId}/latest:
+    get:
+      operationId: getJobReport
+      tags: [reports]
+      summary: Get full hiring manager report for the latest completed workflow run
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Hiring manager report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HiringReport"
+        "404":
+          description: No completed run found
+
+  /reports/job/{jobId}/latest/markdown:
+    get:
+      operationId: getJobReportMarkdown
+      tags: [reports]
+      summary: Export hiring manager report as Markdown
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Markdown report file
+          content:
+            text/markdown:
+              schema:
+                type: string
+        "404":
+          description: No completed run found
+
+  /reports/job/{jobId}/latest/pdf:
+    get:
+      operationId: getJobReportPdf
+      tags: [reports]
+      summary: Export hiring manager report as PDF
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: PDF report file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: No completed run found
+
   /pipeline/summary:
     get:
       operationId: getPipelineSummary
@@ -1156,6 +1223,109 @@ components:
           items:
             $ref: "#/components/schemas/AgentLog"
       required: [run, evaluations, logs, sourcedCandidates]
+
+    # ── REPORTS ──
+    ReportRunMeta:
+      type: object
+      properties:
+        id:
+          type: integer
+        runDate:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/RunStatus"
+        runSourcing:
+          type: boolean
+      required: [id, runDate, status, runSourcing]
+
+    ReportEvaluation:
+      type: object
+      properties:
+        id:
+          type: integer
+        candidateId:
+          type: integer
+        score:
+          type: integer
+        strengths:
+          type: array
+          items:
+            type: string
+        gaps:
+          type: array
+          items:
+            type: string
+        risks:
+          type: array
+          items:
+            type: string
+        recommendation:
+          $ref: "#/components/schemas/Recommendation"
+        candidate:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Candidate"
+        summary:
+          nullable: true
+          type: object
+          properties:
+            candidateId:
+              type: integer
+            whyRelevant:
+              type: string
+            keyRisks:
+              type: string
+            finalRecommendation:
+              type: string
+      required: [id, candidateId, score, strengths, gaps, risks, recommendation]
+
+    RecommendationSummary:
+      type: object
+      properties:
+        Strong Yes:
+          type: integer
+        Yes:
+          type: integer
+        Maybe:
+          type: integer
+        No:
+          type: integer
+      required: ["Strong Yes", "Yes", "Maybe", "No"]
+
+    HiringReport:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        run:
+          $ref: "#/components/schemas/ReportRunMeta"
+        job:
+          $ref: "#/components/schemas/Job"
+        insight:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/JobInsight"
+        top5:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReportEvaluation"
+        evaluations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReportEvaluation"
+        recommendationSummary:
+          $ref: "#/components/schemas/RecommendationSummary"
+        interviewFocusAreas:
+          type: array
+          items:
+            type: string
+        risks:
+          type: array
+          items:
+            type: string
+      required: [generatedAt, run, job, top5, evaluations, recommendationSummary, interviewFocusAreas, risks]
 
     # ── SUMMARY ──
     StageCount:

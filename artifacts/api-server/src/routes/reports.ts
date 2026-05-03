@@ -1,0 +1,458 @@
+import { Router } from "express";
+import {
+  db,
+  agentRunsTable,
+  jobsTable,
+  jobInsightsTable,
+  shortlistsTable,
+  aiEvaluationsTable,
+  candidatesTable,
+} from "@workspace/db";
+import { eq, desc, and } from "drizzle-orm";
+import PDFDocument from "pdfkit";
+import { logger } from "../lib/logger";
+
+const router = Router();
+
+// ── Data Fetching ─────────────────────────────────────────────────────────────
+
+async function buildReport(jobId: number) {
+  const [run] = await db
+    .select()
+    .from(agentRunsTable)
+    .where(and(eq(agentRunsTable.jobId, jobId), eq(agentRunsTable.status, "completed")))
+    .orderBy(desc(agentRunsTable.createdAt))
+    .limit(1);
+
+  if (!run) return null;
+
+  const [job, insights, shortlists, evaluations, candidates] = await Promise.all([
+    db.select().from(jobsTable).where(eq(jobsTable.id, jobId)).limit(1),
+    db.select().from(jobInsightsTable).where(eq(jobInsightsTable.runId, run.id)).limit(1),
+    db.select().from(shortlistsTable).where(eq(shortlistsTable.runId, run.id)).limit(1),
+    db.select().from(aiEvaluationsTable).where(eq(aiEvaluationsTable.runId, run.id)),
+    db.select().from(candidatesTable),
+  ]);
+
+  if (!job[0]) return null;
+
+  const candidateMap = new Map(candidates.map((c) => [c.id, c]));
+  const insight = insights[0] ?? null;
+  const shortlist = shortlists[0] ?? null;
+
+  // Sort evaluations by score descending
+  const sortedEvals = [...evaluations].sort((a, b) => b.score - a.score);
+  const top5Ids = (shortlist?.rankedCandidateIds as number[] ?? sortedEvals.slice(0, 5).map((e) => e.candidateId));
+
+  const top5Evals = top5Ids
+    .map((id) => sortedEvals.find((e) => e.candidateId === id))
+    .filter(Boolean);
+
+  const evaluationsWithCandidates = sortedEvals.map((e) => ({
+    ...e,
+    candidate: candidateMap.get(e.candidateId) ?? null,
+  }));
+
+  const top5WithCandidates = top5Evals.map((e) => ({
+    ...e!,
+    candidate: candidateMap.get(e!.candidateId) ?? null,
+    summary: (shortlist?.summaries as Array<{ candidateId: number; whyRelevant: string; keyRisks: string; finalRecommendation: string }> ?? [])
+      .find((s) => s.candidateId === e!.candidateId) ?? null,
+  }));
+
+  // Derive interview focus areas from top-candidate gaps + evaluation criteria
+  const gapFrequency = new Map<string, number>();
+  top5Evals.forEach((e) => {
+    ((e!.gaps ?? []) as string[]).forEach((g) => {
+      gapFrequency.set(g, (gapFrequency.get(g) ?? 0) + 1);
+    });
+  });
+  const topGaps = [...gapFrequency.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([gap]) => gap);
+
+  const interviewFocusAreas = [
+    ...topGaps.map((gap) => `Probe depth on: ${gap}`),
+    ...((insight?.evaluationCriteria ?? []) as string[]).slice(0, 3).map((c) => `Evaluate: ${c}`),
+  ].slice(0, 6);
+
+  // Aggregate risks from top 5
+  const allRisks: string[] = [];
+  top5Evals.forEach((e) => {
+    ((e!.risks ?? []) as string[]).forEach((r) => allRisks.push(r));
+  });
+  const uniqueRisks = [...new Set(allRisks)].slice(0, 6);
+
+  // Recommendation summary
+  const recCounts = { "Strong Yes": 0, Yes: 0, Maybe: 0, No: 0 };
+  sortedEvals.forEach((e) => {
+    const key = e.recommendation as keyof typeof recCounts;
+    if (key in recCounts) recCounts[key]++;
+  });
+
+  return {
+    generatedAt: new Date().toISOString(),
+    run: {
+      id: run.id,
+      runDate: run.createdAt,
+      status: run.status,
+      runSourcing: run.runSourcing,
+    },
+    job: job[0],
+    insight,
+    top5: top5WithCandidates,
+    evaluations: evaluationsWithCandidates,
+    recommendationSummary: recCounts,
+    interviewFocusAreas,
+    risks: uniqueRisks,
+  };
+}
+
+// ── JSON Report ───────────────────────────────────────────────────────────────
+
+router.get("/reports/job/:jobId/latest", async (req, res) => {
+  const jobId = parseInt(req.params.jobId, 10);
+  const report = await buildReport(jobId);
+  if (!report) {
+    res.status(404).json({ error: "No completed workflow run found for this job" });
+    return;
+  }
+  res.json(report);
+});
+
+// ── Markdown Export ───────────────────────────────────────────────────────────
+
+router.get("/reports/job/:jobId/latest/markdown", async (req, res) => {
+  const jobId = parseInt(req.params.jobId, 10);
+  const report = await buildReport(jobId);
+  if (!report) {
+    res.status(404).json({ error: "No completed workflow run found for this job" });
+    return;
+  }
+
+  const { job, run, insight, top5, evaluations, recommendationSummary, interviewFocusAreas, risks, generatedAt } = report;
+
+  const recLine = Object.entries(recommendationSummary)
+    .filter(([, v]) => v > 0)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(" | ");
+
+  const md: string[] = [];
+
+  md.push(`# Hiring Manager Report — ${job.title}`);
+  md.push(`**Location:** ${job.location} | **Seniority:** ${job.seniority}  `);
+  md.push(`**Report Date:** ${new Date(generatedAt).toLocaleDateString("en-US", { dateStyle: "long" })}  `);
+  md.push(`**Workflow Run:** ${new Date(run.runDate).toLocaleDateString("en-US", { dateStyle: "long" })}${run.runSourcing ? " _(Sourcing enabled)_" : ""}`);
+  md.push("");
+  md.push("---");
+  md.push("");
+
+  if (insight) {
+    md.push("## Job Understanding");
+    md.push("");
+    md.push(`**Ideal Candidate Profile:** ${insight.idealCandidateProfile}`);
+    md.push("");
+    md.push("**Must-Have Skills:**");
+    ((insight.mustHaveSkills ?? []) as string[]).forEach((s) => md.push(`- ${s}`));
+    md.push("");
+    md.push("**Evaluation Criteria:**");
+    ((insight.evaluationCriteria ?? []) as string[]).forEach((c) => md.push(`- ${c}`));
+    md.push("");
+    md.push("---");
+    md.push("");
+  }
+
+  md.push("## Recommendation Summary");
+  md.push("");
+  md.push(`| Rating | Count |`);
+  md.push(`|--------|-------|`);
+  Object.entries(recommendationSummary).forEach(([k, v]) => {
+    md.push(`| ${k} | ${v} |`);
+  });
+  md.push("");
+  md.push(`_Total evaluated: ${evaluations.length}_`);
+  md.push("");
+  md.push("---");
+  md.push("");
+
+  md.push("## Top 5 Shortlisted Candidates");
+  md.push("");
+  top5.forEach((e, i) => {
+    const cand = e.candidate;
+    md.push(`### ${i + 1}. ${cand?.name ?? "Unknown"}`);
+    if (cand?.headline) md.push(`_${cand.headline}_`);
+    md.push("");
+    md.push(`**Score:** ${e.score}/100 | **Recommendation:** ${e.recommendation}`);
+    if (e.summary?.whyRelevant) {
+      md.push("");
+      md.push(`**Why Relevant:** ${e.summary.whyRelevant}`);
+    }
+    md.push("");
+    md.push("**Strengths:**");
+    ((e.strengths ?? []) as string[]).forEach((s) => md.push(`- ${s}`));
+    md.push("");
+    md.push("**Gaps:**");
+    ((e.gaps ?? []) as string[]).forEach((g) => md.push(`- ${g}`));
+    if (((e.risks ?? []) as string[]).length > 0) {
+      md.push("");
+      md.push("**Risks:**");
+      ((e.risks ?? []) as string[]).forEach((r) => md.push(`- ${r}`));
+    }
+    if (e.summary?.keyRisks) {
+      md.push("");
+      md.push(`**Key Risks:** ${e.summary.keyRisks}`);
+    }
+    md.push("");
+  });
+
+  md.push("---");
+  md.push("");
+
+  if (risks.length > 0) {
+    md.push("## Risk Summary");
+    md.push("");
+    risks.forEach((r) => md.push(`- ${r}`));
+    md.push("");
+    md.push("---");
+    md.push("");
+  }
+
+  if (interviewFocusAreas.length > 0) {
+    md.push("## Suggested Interview Focus Areas");
+    md.push("");
+    interviewFocusAreas.forEach((a) => md.push(`- ${a}`));
+    md.push("");
+    md.push("---");
+    md.push("");
+  }
+
+  md.push("## Full Evaluation Table");
+  md.push("");
+  md.push("| Candidate | Score | Recommendation | Top Strength | Top Gap |");
+  md.push("|-----------|-------|---------------|--------------|---------|");
+  evaluations.forEach((e) => {
+    const name = e.candidate?.name ?? "Unknown";
+    const strength = (e.strengths as string[])[0] ?? "-";
+    const gap = (e.gaps as string[])[0] ?? "-";
+    md.push(`| ${name} | ${e.score}/100 | ${e.recommendation} | ${strength} | ${gap} |`);
+  });
+  md.push("");
+  md.push("---");
+  md.push("");
+  md.push(`_Report generated by Recruiting OS on ${new Date(generatedAt).toLocaleString()}_`);
+
+  const filename = `hiring-report-${job.title.replace(/\s+/g, "-").toLowerCase()}.md`;
+  res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+  res.send(md.join("\n"));
+});
+
+// ── PDF Export ────────────────────────────────────────────────────────────────
+
+router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
+  const jobId = parseInt(req.params.jobId, 10);
+  const report = await buildReport(jobId);
+  if (!report) {
+    res.status(404).json({ error: "No completed workflow run found for this job" });
+    return;
+  }
+
+  const { job, run, insight, top5, evaluations, recommendationSummary, interviewFocusAreas, risks, generatedAt } = report;
+
+  const filename = `hiring-report-${job.title.replace(/\s+/g, "-").toLowerCase()}.pdf`;
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+  const doc = new PDFDocument({ margin: 50, size: "A4" });
+  doc.pipe(res);
+
+  // ── Color palette
+  const PRIMARY = "#1e293b";
+  const MUTED = "#64748b";
+  const ACCENT = "#f97316";
+  const DIVIDER = "#e2e8f0";
+  const GREEN = "#16a34a";
+  const AMBER = "#d97706";
+  const RED = "#dc2626";
+
+  const scoreColor = (score: number) => score >= 80 ? GREEN : score >= 60 ? ACCENT : score >= 40 ? AMBER : RED;
+  const recColor = (rec: string) =>
+    rec === "Strong Yes" ? GREEN : rec === "Yes" ? GREEN : rec === "Maybe" ? AMBER : RED;
+
+  const W = doc.page.width - 100; // usable width
+
+  // ── COVER / HEADER
+  doc.rect(0, 0, doc.page.width, 140).fill("#1e293b");
+  doc.fill("#ffffff").fontSize(22).font("Helvetica-Bold").text(job.title, 50, 40, { width: W });
+  doc.fill("#94a3b8").fontSize(11).font("Helvetica").text(
+    `${job.location}  ·  ${job.seniority}  ·  Recruiting OS Hiring Report`,
+    50,
+    70,
+    { width: W }
+  );
+  doc.fill("#64748b").fontSize(9).text(
+    `Workflow: ${new Date(run.runDate).toLocaleDateString("en-US", { dateStyle: "long" })}${run.runSourcing ? "  (Sourcing enabled)" : ""}   |   Generated: ${new Date(generatedAt).toLocaleDateString("en-US", { dateStyle: "long" })}`,
+    50,
+    95,
+    { width: W }
+  );
+
+  doc.moveDown(4);
+
+  // ── helper: section heading
+  function sectionHeading(title: string) {
+    doc.moveDown(0.6);
+    doc.rect(50, doc.y, W, 1).fill(DIVIDER);
+    doc.moveDown(0.3);
+    doc.fill(PRIMARY).fontSize(13).font("Helvetica-Bold").text(title.toUpperCase(), { characterSpacing: 1 });
+    doc.moveDown(0.4);
+    doc.font("Helvetica").fontSize(10);
+  }
+
+  function bodyText(text: string, color = PRIMARY) {
+    doc.fill(color).fontSize(10).font("Helvetica").text(text, { width: W });
+  }
+
+  function bulletList(items: string[], color = PRIMARY) {
+    items.forEach((item) => {
+      doc.fill(color).fontSize(10).font("Helvetica").text(`• ${item}`, { indent: 12, width: W - 12 });
+    });
+  }
+
+  // ── RECOMMENDATION SUMMARY
+  sectionHeading("Recommendation Summary");
+  const recEntries = Object.entries(recommendationSummary);
+  const colW = W / recEntries.length;
+  const startX = 50;
+  const startY = doc.y;
+  recEntries.forEach(([label, count], i) => {
+    const x = startX + i * colW;
+    doc.rect(x, startY, colW - 8, 50).fill("#f8fafc").stroke(DIVIDER);
+    doc.fill(recColor(label)).fontSize(20).font("Helvetica-Bold").text(String(count), x + 10, startY + 6, { width: colW - 20, align: "center" });
+    doc.fill(MUTED).fontSize(8).font("Helvetica").text(label, x + 10, startY + 32, { width: colW - 20, align: "center" });
+  });
+  doc.y = startY + 62;
+  bodyText(`Total candidates evaluated: ${evaluations.length}`, MUTED);
+  doc.moveDown(0.4);
+
+  // ── JOB UNDERSTANDING
+  if (insight) {
+    sectionHeading("Job Understanding");
+    bodyText(insight.idealCandidateProfile as string);
+    doc.moveDown(0.4);
+    if (((insight.mustHaveSkills ?? []) as string[]).length > 0) {
+      doc.fill(MUTED).fontSize(9).text("MUST-HAVE SKILLS");
+      bulletList(insight.mustHaveSkills as string[]);
+    }
+    if (((insight.evaluationCriteria ?? []) as string[]).length > 0) {
+      doc.moveDown(0.3);
+      doc.fill(MUTED).fontSize(9).text("EVALUATION CRITERIA");
+      bulletList(insight.evaluationCriteria as string[]);
+    }
+  }
+
+  // ── TOP 5 CANDIDATES
+  sectionHeading("Top 5 Shortlisted Candidates");
+  top5.forEach((e, i) => {
+    const cand = e.candidate;
+    if (doc.y > doc.page.height - 160) doc.addPage();
+    const boxY = doc.y;
+    doc.rect(50, boxY, W, 8).fill(scoreColor(e.score));
+    doc.y = boxY + 12;
+    doc.fill(PRIMARY).fontSize(11).font("Helvetica-Bold")
+      .text(`${i + 1}. ${cand?.name ?? "Unknown"}`, 50, doc.y, { continued: true });
+    doc.fill(scoreColor(e.score)).font("Helvetica-Bold").fontSize(11)
+      .text(`  ${e.score}/100`, { continued: true });
+    doc.fill(MUTED).font("Helvetica").fontSize(10)
+      .text(`  ${e.recommendation}`);
+    if (cand?.headline) {
+      doc.fill(MUTED).fontSize(9).font("Helvetica").text(cand.headline, { indent: 14 });
+    }
+    if (e.summary?.whyRelevant) {
+      doc.fill(PRIMARY).fontSize(9).font("Helvetica").text(e.summary.whyRelevant, { indent: 14, width: W - 14 });
+    }
+    doc.moveDown(0.2);
+    const strengths = (e.strengths as string[]).slice(0, 2);
+    const gaps = (e.gaps as string[]).slice(0, 2);
+    if (strengths.length > 0) {
+      doc.fill(GREEN).fontSize(8).text("Strengths: " + strengths.join("  ·  "), { indent: 14, width: W - 14 });
+    }
+    if (gaps.length > 0) {
+      doc.fill(RED).fontSize(8).text("Gaps: " + gaps.join("  ·  "), { indent: 14, width: W - 14 });
+    }
+    doc.moveDown(0.6);
+  });
+
+  // ── RISKS
+  if (risks.length > 0) {
+    if (doc.y > doc.page.height - 120) doc.addPage();
+    sectionHeading("Risk Summary");
+    bulletList(risks, RED);
+  }
+
+  // ── INTERVIEW FOCUS AREAS
+  if (interviewFocusAreas.length > 0) {
+    if (doc.y > doc.page.height - 120) doc.addPage();
+    sectionHeading("Suggested Interview Focus Areas");
+    bulletList(interviewFocusAreas, PRIMARY);
+  }
+
+  // ── FULL EVALUATION TABLE
+  if (doc.y > doc.page.height - 160) doc.addPage();
+  sectionHeading("Full Evaluation Table");
+
+  const colWidths = [160, 55, 100, 140, 140];
+  const headers = ["Candidate", "Score", "Recommendation", "Top Strength", "Top Gap"];
+  const tableX = 50;
+  let tableY = doc.y;
+
+  // Table header row
+  doc.rect(tableX, tableY, W, 18).fill("#f1f5f9");
+  let cx = tableX + 4;
+  headers.forEach((h, i) => {
+    doc.fill(MUTED).fontSize(8).font("Helvetica-Bold").text(h, cx, tableY + 5, { width: colWidths[i] - 6 });
+    cx += colWidths[i];
+  });
+  tableY += 18;
+
+  evaluations.forEach((e, rowIdx) => {
+    if (tableY > doc.page.height - 60) {
+      doc.addPage();
+      tableY = 50;
+    }
+    const name = e.candidate?.name ?? "Unknown";
+    const strength = (e.strengths as string[])[0] ?? "-";
+    const gap = (e.gaps as string[])[0] ?? "-";
+    const rowH = 18;
+    if (rowIdx % 2 === 0) {
+      doc.rect(tableX, tableY, W, rowH).fill("#fafafa");
+    }
+    const cells = [name, `${e.score}/100`, e.recommendation, strength, gap];
+    cx = tableX + 4;
+    cells.forEach((cell, i) => {
+      const color = i === 1 ? scoreColor(e.score) : i === 2 ? recColor(e.recommendation) : PRIMARY;
+      doc.fill(color).fontSize(8).font(i < 2 ? "Helvetica-Bold" : "Helvetica")
+        .text(cell, cx, tableY + 5, { width: colWidths[i] - 6, lineBreak: false, ellipsis: true });
+      cx += colWidths[i];
+    });
+    tableY += rowH;
+  });
+
+  doc.y = tableY + 10;
+
+  // ── Footer
+  doc.rect(0, doc.page.height - 35, doc.page.width, 35).fill("#f8fafc");
+  doc.fill(MUTED).fontSize(8).font("Helvetica")
+    .text(
+      `Recruiting OS  |  Confidential — Hiring Manager Report  |  ${new Date(generatedAt).toLocaleString()}`,
+      50,
+      doc.page.height - 22,
+      { width: W, align: "center" }
+    );
+
+  doc.end();
+  logger.info({ jobId }, "PDF report generated");
+});
+
+export default router;

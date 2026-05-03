@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import {
   Loader2, MapPin, Edit, User, Mail, ArrowRight, Play,
   Sparkles, ChevronDown, ChevronUp, BrainCircuit, Zap,
-  Building2, Github, Linkedin, AlertTriangle
+  Building2, Github, Linkedin, AlertTriangle, FileText
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -233,7 +233,7 @@ export default function JobDetailPage() {
             </div>
           </div>
           <div className="flex flex-col items-end gap-3 shrink-0">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Button 
                 onClick={handleRunWorkflow} 
                 disabled={runWorkflow.isPending || workflowRunning}
@@ -247,6 +247,14 @@ export default function JobDetailPage() {
                 )}
                 {workflowRunning ? 'Running Workflow...' : 'Run AI Workflow'}
               </Button>
+              {workflowData?.run?.status === "completed" && (
+                <Link href={`/jobs/${job.id}/report`}>
+                  <Button variant="outline">
+                    <FileText className="mr-2 h-4 w-4" />
+                    View Report
+                  </Button>
+                </Link>
+              )}
               <Link href={`/jobs/${job.id}/edit`}>
                 <Button variant="outline">
                   <Edit className="mr-2 h-4 w-4" />
