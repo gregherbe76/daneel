@@ -34,18 +34,11 @@ import {
   RefreshCw,
   MailWarning,
   X,
-  ChevronDown,
-  ChevronRight,
-  History,
 } from "lucide-react";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { CandidateNotesPanel } from "@/components/candidate-notes-panel";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
 import { EmailSourceBadge } from "@/components/email-source-badge";
+import { EmailStatusHistoryCard } from "@/components/email-status-history-card";
 
 function formatRelativeTime(input: string | Date): string {
   const ts = typeof input === "string" ? new Date(input).getTime() : input.getTime();
@@ -119,7 +112,6 @@ export default function CandidateDetailPage() {
     },
   });
   const emailHistory = historyQuery.data ?? [];
-  const [historyOpen, setHistoryOpen] = useState(false);
 
   const appJobIds = new Set((applications ?? []).map((a) => a.jobId));
   const linkedJobs = (jobs ?? []).filter((j) => appJobIds.has(j.id));
@@ -272,72 +264,10 @@ export default function CandidateDetailPage() {
         </Card>
       )}
 
-      {candidate.email && emailHistory.length > 0 && (
-        <Card data-testid="email-status-history-card">
-          <Collapsible open={historyOpen} onOpenChange={setHistoryOpen}>
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className="w-full flex items-center justify-between gap-2 px-6 py-4 text-left hover:bg-muted/40 rounded-t-lg"
-                data-testid="toggle-email-status-history"
-              >
-                <div className="flex items-center gap-2">
-                  <History className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">
-                    Email status history
-                  </span>
-                  <Badge variant="outline" className="ml-1 font-normal">
-                    {emailHistory.length}
-                  </Badge>
-                </div>
-                {historyOpen ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                )}
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="pt-0">
-                <ul className="divide-y" data-testid="email-status-history-list">
-                  {emailHistory.map((row) => (
-                    <li
-                      key={row.id}
-                      className="py-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
-                      data-testid={`email-status-history-row-${row.id}`}
-                    >
-                      <EmailValidationBadge
-                        status={row.previousStatus}
-                        reason={row.previousReason}
-                      />
-                      <span className="text-muted-foreground">→</span>
-                      <EmailValidationBadge
-                        status={row.newStatus}
-                        reason={row.newReason}
-                      />
-                      {row.newReason && (
-                        <span
-                          className="text-muted-foreground italic truncate max-w-xs"
-                          title={row.newReason}
-                        >
-                          · {row.newReason}
-                        </span>
-                      )}
-                      <span
-                        className="ml-auto text-muted-foreground"
-                        title={new Date(row.changedAt).toLocaleString()}
-                      >
-                        {new Date(row.changedAt).toLocaleDateString()} ·{" "}
-                        {formatRelativeTime(row.changedAt)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </CollapsibleContent>
-          </Collapsible>
-        </Card>
-      )}
+      <EmailStatusHistoryCard
+        candidateEmail={candidate.email}
+        rows={emailHistory}
+      />
 
       {/* Notes & comments scoped to a job */}
       <Card>
