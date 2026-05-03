@@ -23,6 +23,8 @@ import type {
   Application,
   ApplicationWithDetails,
   BrandingSettings,
+  BulkCandidateActionBody,
+  BulkCandidateActionResult,
   Candidate,
   CandidateComment,
   CandidateNote,
@@ -1134,6 +1136,94 @@ export const useRecheckCandidateEmail = <
   TContext
 > => {
   return useMutation(getRecheckCandidateEmailMutationOptions(options));
+};
+
+/**
+ * Single endpoint backing the recruiter "bulk action bar". Accepts up to 500 candidate ids and one of `delete`, `recheck-email`, `move-stage`, `export-csv`. The frontend is expected to chunk selections larger than 500 itself.
+
+ * @summary Run a batched action on a filtered set of candidates
+ */
+export const getBulkCandidateActionUrl = () => {
+  return `/api/candidates/bulk`;
+};
+
+export const bulkCandidateAction = async (
+  bulkCandidateActionBody: BulkCandidateActionBody,
+  options?: RequestInit,
+): Promise<BulkCandidateActionResult> => {
+  return customFetch<BulkCandidateActionResult>(getBulkCandidateActionUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(bulkCandidateActionBody),
+  });
+};
+
+export const getBulkCandidateActionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkCandidateAction>>,
+    TError,
+    { data: BodyType<BulkCandidateActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof bulkCandidateAction>>,
+  TError,
+  { data: BodyType<BulkCandidateActionBody> },
+  TContext
+> => {
+  const mutationKey = ["bulkCandidateAction"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof bulkCandidateAction>>,
+    { data: BodyType<BulkCandidateActionBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return bulkCandidateAction(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type BulkCandidateActionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof bulkCandidateAction>>
+>;
+export type BulkCandidateActionMutationBody = BodyType<BulkCandidateActionBody>;
+export type BulkCandidateActionMutationError = ErrorType<void>;
+
+/**
+ * @summary Run a batched action on a filtered set of candidates
+ */
+export const useBulkCandidateAction = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof bulkCandidateAction>>,
+    TError,
+    { data: BodyType<BulkCandidateActionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof bulkCandidateAction>>,
+  TError,
+  { data: BodyType<BulkCandidateActionBody> },
+  TContext
+> => {
+  return useMutation(getBulkCandidateActionMutationOptions(options));
 };
 
 /**

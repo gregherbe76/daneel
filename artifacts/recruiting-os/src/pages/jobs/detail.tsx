@@ -45,6 +45,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CandidateNotesIndicator } from "@/components/candidate-notes-indicator";
+import { BulkActionBar } from "@/components/bulk-action-bar";
 import { EmailSourceBadge } from "@/components/email-source-badge";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
 import {
@@ -307,9 +308,13 @@ export default function JobDetailPage() {
     query: { enabled: !!jobId, queryKey: [`/api/jobs/${jobId}`] },
   });
 
-  const { data: applications, isLoading: isLoadingApps } = useGetJobApplications(jobId, {
+  const { data: applications, isLoading: isLoadingApps, dataUpdatedAt: appsUpdatedAt } = useGetJobApplications(jobId, {
     query: { enabled: !!jobId, queryKey: getGetJobApplicationsQueryKey(jobId) },
   });
+  // Selection of candidate ids inside the Pipeline. Resets on filter change,
+  // job route change, or list refetch so the bulk bar can never reflect a
+  // stale set.
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<Set<number>>(new Set());
 
   const { data: workflowData, isLoading: isLoadingWorkflow } = useGetLatestJobWorkflow(jobId, {
     query: {
@@ -416,6 +421,47 @@ export default function JobDetailPage() {
       ),
     [applications, emailFilter, selectedSources],
   );
+
+  // Reset selection on filter / job / refetch changes.
+  useEffect(() => {
+    setSelectedCandidateIds(new Set());
+  }, [jobId, emailFilter, selectedSources, appsUpdatedAt]);
+
+  const filteredCandidateIds = useMemo(
+    () => (emailFilteredApplications ?? []).map((app) => app.candidate.id),
+    [emailFilteredApplications],
+  );
+  const allFilteredSelected =
+    filteredCandidateIds.length > 0 &&
+    filteredCandidateIds.every((id) => selectedCandidateIds.has(id));
+  const someFilteredSelected =
+    !allFilteredSelected &&
+    filteredCandidateIds.some((id) => selectedCandidateIds.has(id));
+  const headerCheckedState: boolean | "indeterminate" = allFilteredSelected
+    ? true
+    : someFilteredSelected
+      ? "indeterminate"
+      : false;
+  const togglePipelineHeader = () => {
+    setSelectedCandidateIds((prev) => {
+      if (allFilteredSelected) {
+        const next = new Set(prev);
+        for (const id of filteredCandidateIds) next.delete(id);
+        return next;
+      }
+      const next = new Set(prev);
+      for (const id of filteredCandidateIds) next.add(id);
+      return next;
+    });
+  };
+  const togglePipelineRow = (id: number) => {
+    setSelectedCandidateIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
   const emailCounts = useMemo(() => {
     const c: Partial<Record<EmailStatusFilterValue, number>> = {
       all: 0,
@@ -1404,7 +1450,26 @@ export default function JobDetailPage() {
           {/* ── PIPELINE BOARD ── */}
           <div className="flex-1 overflow-x-auto pb-4">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <h2 className="text-lg font-semibold">Pipeline</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold">Pipeline</h2>
+                {filteredCandidateIds.length > 0 && (
+                  <label className="inline-flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+                    <Checkbox
+                      checked={headerCheckedState}
+                      onCheckedChange={togglePipelineHeader}
+                      aria-label="Select all visible pipeline candidates"
+                      data-testid="select-all-pipeline"
+                    />
+                    <span>
+                      {headerCheckedState === true
+                        ? `All ${filteredCandidateIds.length} selected`
+                        : selectedCandidateIds.size > 0
+                          ? `${selectedCandidateIds.size} selected`
+                          : `Select all visible (${filteredCandidateIds.length})`}
+                    </span>
+                  </label>
+                )}
+              </div>
               {(applications?.length ?? 0) > 0 && (
                 <div className="flex flex-wrap items-center gap-3">
                   <EmailStatusFilter
@@ -1462,9 +1527,17 @@ export default function JobDetailPage() {
                         return (
                           <div key={app.id} className={`bg-card border rounded-md p-4 shadow-sm hover:border-primary/50 transition-colors ${
                             isSourced ? "border-purple-200" : "border-border"
-                          }`}>
+                          } ${selectedCandidateIds.has(app.candidate.id) ? "ring-2 ring-primary/60 bg-primary/5" : ""}`}>
                             <div className="flex justify-between items-start mb-1">
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex items-start gap-2">
+                                <Checkbox
+                                  className="mt-1 shrink-0"
+                                  checked={selectedCandidateIds.has(app.candidate.id)}
+                                  onCheckedChange={() => togglePipelineRow(app.candidate.id)}
+                                  aria-label={`Select ${app.candidate.name}`}
+                                  data-testid={`select-pipeline-candidate-${app.candidate.id}`}
+                                />
+                                <div className="min-w-0">
                                 <Link href={`/candidates/${app.candidate.id}`}>
                                   <div className="font-medium hover:text-primary transition-colors cursor-pointer truncate">
                                     {app.candidate.name}
@@ -1497,6 +1570,7 @@ export default function JobDetailPage() {
                                     </Badge>
                                   )}
                                 </div>
+                              </div>
                               </div>
                               {evalData && (
                                 <Badge variant="outline" className={`ml-2 shrink-0 ${getScoreColor(evalData.score)}`}>
@@ -1615,6 +1689,15 @@ export default function JobDetailPage() {
         candidates={lowConfidenceCandidates}
         onConfirm={handleImproveAndRerun}
         isSubmitting={improveAndRerun.isPending}
+      />
+
+      <BulkActionBar
+        jobId={jobId}
+        selectedIds={Array.from(selectedCandidateIds)}
+        onClear={() => setSelectedCandidateIds(new Set())}
+        onAfterChange={() => {
+          queryClient.invalidateQueries({ queryKey: getGetJobApplicationsQueryKey(jobId) });
+        }}
       />
 
       {job && (

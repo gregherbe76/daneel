@@ -1,11 +1,14 @@
-import { useListCandidates } from "@workspace/api-client-react";
+import { getListCandidatesQueryKey, useListCandidates } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Users, Loader2, Mail, Upload, Filter } from "lucide-react";
 import { ImportCandidatesModal } from "@/components/import-candidates-modal";
+import { BulkActionBar } from "@/components/bulk-action-bar";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
 import { EmailSourceBadge } from "@/components/email-source-badge";
 import {
@@ -50,10 +53,12 @@ const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
 const EMAIL_FILTER_PARAM = "email";
 
 export default function CandidatesPage() {
-  const { data: candidates, isLoading, refetch } = useListCandidates();
+  const { data: candidates, isLoading, refetch, dataUpdatedAt } = useListCandidates();
+  const queryClient = useQueryClient();
   const search = useSearch();
   const [, navigate] = useLocation();
   const [importOpen, setImportOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const selectedSources: Set<string> = useMemo(() => parseEmailSourceParam(search), [search]);
 
@@ -149,6 +154,47 @@ export default function CandidatesPage() {
 
   const totalCount = candidates?.length ?? 0;
   const filteredCount = filteredCandidates?.length ?? 0;
+
+  // Selection should reset when the filter set changes or a fresh fetch lands
+  // — otherwise stale ids from a prior filter could survive into a different
+  // view, and the bulk bar would lie about which rows are checked.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [emailFilter, selectedSources, dataUpdatedAt]);
+
+  const filteredIds = useMemo(
+    () => (filteredCandidates ?? []).map((c) => c.id),
+    [filteredCandidates],
+  );
+  const allFilteredSelected =
+    filteredIds.length > 0 && filteredIds.every((id) => selectedIds.has(id));
+  const someFilteredSelected =
+    !allFilteredSelected && filteredIds.some((id) => selectedIds.has(id));
+  const headerCheckedState: boolean | "indeterminate" = allFilteredSelected
+    ? true
+    : someFilteredSelected
+      ? "indeterminate"
+      : false;
+  const toggleHeader = () => {
+    setSelectedIds((prev) => {
+      if (allFilteredSelected) {
+        const next = new Set(prev);
+        for (const id of filteredIds) next.delete(id);
+        return next;
+      }
+      const next = new Set(prev);
+      for (const id of filteredIds) next.add(id);
+      return next;
+    });
+  };
+  const toggleRow = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
   const isSourceFiltered = selectedSources.size > 0;
   const isStatusFiltered = emailFilter !== "all";
   const isFiltered = isSourceFiltered || isStatusFiltered;
@@ -190,19 +236,52 @@ export default function CandidatesPage() {
         </div>
       )}
 
-      {isFiltered && !isLoading && (
-        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-          <span>
-            Showing {filteredCount} of {totalCount} candidates.
-          </span>
-          <Button
-            variant="link"
-            size="sm"
-            className="h-auto p-0"
-            onClick={clearAllFilters}
-          >
-            Clear all
-          </Button>
+      {!isLoading && filteredCount > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+          <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+            <Checkbox
+              checked={headerCheckedState}
+              onCheckedChange={toggleHeader}
+              aria-label="Select all visible candidates"
+              data-testid="select-all-candidates"
+            />
+            <span className="text-muted-foreground">
+              {headerCheckedState === true
+                ? `All ${filteredCount} selected`
+                : selectedIds.size > 0
+                  ? `${selectedIds.size} selected`
+                  : `Select all visible (${filteredCount})`}
+            </span>
+          </label>
+          {/* When all visible rows are checked but the filtered superset is
+              larger (will become possible once pagination lands), offer to
+              expand the selection to every filtered row. */}
+          {headerCheckedState === true && filteredCount < totalCount && filteredIds.length < filteredCount && (
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto p-0"
+              onClick={() => setSelectedIds(new Set(filteredIds))}
+              data-testid="select-all-filtered"
+            >
+              Select all filtered ({filteredCount})
+            </Button>
+          )}
+          {isFiltered && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <span>
+                Showing {filteredCount} of {totalCount} candidates.
+              </span>
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0"
+                onClick={clearAllFilters}
+              >
+                Clear all
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -249,9 +328,25 @@ export default function CandidatesPage() {
             const sourceTag = candidate.source
               ? SOURCE_LABELS[candidate.source]
               : null;
+            const isSelected = selectedIds.has(candidate.id);
             return (
-              <Link key={candidate.id} href={`/candidates/${candidate.id}`}>
-                <Card className="p-6 hover:border-primary/50 transition-colors cursor-pointer group h-full flex flex-col">
+              <div key={candidate.id} className="relative">
+                <div
+                  className="absolute top-3 left-3 z-10"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => toggleRow(candidate.id)}
+                    aria-label={`Select ${candidate.name}`}
+                    data-testid={`select-candidate-${candidate.id}`}
+                    className="bg-background border-muted-foreground/40"
+                  />
+                </div>
+                <Link href={`/candidates/${candidate.id}`}>
+                <Card className={`p-6 pt-10 hover:border-primary/50 transition-colors cursor-pointer group h-full flex flex-col ${
+                  isSelected ? "ring-2 ring-primary/60 bg-primary/5" : ""
+                }`}>
                   <div className="flex items-start justify-between mb-4">
                     <div className="h-12 w-12 rounded-full bg-secondary flex items-center justify-center text-xl font-bold text-secondary-foreground uppercase shrink-0">
                       {candidate.name.charAt(0)}
@@ -297,6 +392,7 @@ export default function CandidatesPage() {
                   </div>
                 </Card>
               </Link>
+              </div>
             );
           })}
         </div>
@@ -306,6 +402,14 @@ export default function CandidatesPage() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={() => refetch()}
+      />
+
+      <BulkActionBar
+        selectedIds={Array.from(selectedIds)}
+        onClear={() => setSelectedIds(new Set())}
+        onAfterChange={() => {
+          queryClient.invalidateQueries({ queryKey: getListCandidatesQueryKey() });
+        }}
       />
 
     </div>

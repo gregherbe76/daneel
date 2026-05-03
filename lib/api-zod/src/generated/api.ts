@@ -573,6 +573,64 @@ export const RecheckCandidateEmailResponse = zod.object({
 });
 
 /**
+ * Single endpoint backing the recruiter "bulk action bar". Accepts up to 500 candidate ids and one of `delete`, `recheck-email`, `move-stage`, `export-csv`. The frontend is expected to chunk selections larger than 500 itself.
+
+ * @summary Run a batched action on a filtered set of candidates
+ */
+export const bulkCandidateActionBodyIdsMax = 500;
+
+export const BulkCandidateActionBody = zod.object({
+  ids: zod.array(zod.number()).min(1).max(bulkCandidateActionBodyIdsMax),
+  action: zod.enum(["delete", "recheck-email", "move-stage", "export-csv"]),
+  payload: zod
+    .object({
+      stage: zod
+        .enum([
+          "Sourced",
+          "Contacted",
+          "Screened",
+          "Interview",
+          "Offer",
+          "Hired",
+          "Rejected",
+        ])
+        .optional(),
+      jobId: zod.number().optional(),
+    })
+    .optional(),
+});
+
+export const BulkCandidateActionResponse = zod.object({
+  ok: zod.boolean(),
+  action: zod.enum(["delete", "recheck-email", "move-stage", "export-csv"]),
+  processed: zod.number(),
+  skipped: zod.number(),
+  csv: zod
+    .string()
+    .nullish()
+    .describe(
+      "Populated only when action is `export-csv`. The frontend turns this into a Blob download.",
+    ),
+  results: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        status: zod.enum([
+          "valid",
+          "invalid",
+          "risky",
+          "unchecked",
+          "skipped",
+          "error",
+        ]),
+        reason: zod.string().nullish(),
+      }),
+    )
+    .nullish()
+    .describe("Per-id outcomes for `recheck-email`."),
+});
+
+/**
  * @summary Get all applications for a candidate (with job info)
  */
 export const GetCandidateApplicationsParams = zod.object({

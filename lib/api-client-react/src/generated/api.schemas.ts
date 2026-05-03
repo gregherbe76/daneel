@@ -162,6 +162,60 @@ export interface CreateCandidateBody {
   skills: string[];
 }
 
+export type BulkCandidateAction =
+  (typeof BulkCandidateAction)[keyof typeof BulkCandidateAction];
+
+export const BulkCandidateAction = {
+  delete: "delete",
+  "recheck-email": "recheck-email",
+  "move-stage": "move-stage",
+  "export-csv": "export-csv",
+} as const;
+
+export interface BulkCandidateActionPayload {
+  stage?: ApplicationStage;
+  jobId?: number;
+}
+
+export interface BulkCandidateActionBody {
+  /**
+   * @minItems 1
+   * @maxItems 500
+   */
+  ids: number[];
+  action: BulkCandidateAction;
+  payload?: BulkCandidateActionPayload;
+}
+
+export type BulkCandidateRecheckResultStatus =
+  (typeof BulkCandidateRecheckResultStatus)[keyof typeof BulkCandidateRecheckResultStatus];
+
+export const BulkCandidateRecheckResultStatus = {
+  valid: "valid",
+  invalid: "invalid",
+  risky: "risky",
+  unchecked: "unchecked",
+  skipped: "skipped",
+  error: "error",
+} as const;
+
+export interface BulkCandidateRecheckResult {
+  id: number;
+  status: BulkCandidateRecheckResultStatus;
+  reason?: string | null;
+}
+
+export interface BulkCandidateActionResult {
+  ok: boolean;
+  action: BulkCandidateAction;
+  processed: number;
+  skipped: number;
+  /** Populated only when action is `export-csv`. The frontend turns this into a Blob download. */
+  csv?: string | null;
+  /** Per-id outcomes for `recheck-email`. */
+  results?: BulkCandidateRecheckResult[] | null;
+}
+
 export interface Application {
   id: number;
   jobId: number;
