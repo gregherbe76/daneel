@@ -360,6 +360,11 @@ export const GetJobApplicationsResponseItem = zod.object({
     enrichmentSource: zod.string().nullish(),
     enrichmentConfidence: zod.number().nullish(),
     enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
+    emailValidationStatus: zod
+      .enum(["valid", "invalid", "risky", "unchecked"])
+      .nullish(),
+    emailValidationReason: zod.string().nullish(),
+    emailValidatedAt: zod.coerce.date().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -389,6 +394,11 @@ export const ListCandidatesResponseItem = zod.object({
   enrichmentSource: zod.string().nullish(),
   enrichmentConfidence: zod.number().nullish(),
   enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
+  emailValidationStatus: zod
+    .enum(["valid", "invalid", "risky", "unchecked"])
+    .nullish(),
+  emailValidationReason: zod.string().nullish(),
+  emailValidatedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -430,6 +440,11 @@ export const GetCandidateResponse = zod.object({
   enrichmentSource: zod.string().nullish(),
   enrichmentConfidence: zod.number().nullish(),
   enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
+  emailValidationStatus: zod
+    .enum(["valid", "invalid", "risky", "unchecked"])
+    .nullish(),
+  emailValidationReason: zod.string().nullish(),
+  emailValidatedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -467,6 +482,11 @@ export const UpdateCandidateResponse = zod.object({
   enrichmentSource: zod.string().nullish(),
   enrichmentConfidence: zod.number().nullish(),
   enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
+  emailValidationStatus: zod
+    .enum(["valid", "invalid", "risky", "unchecked"])
+    .nullish(),
+  emailValidationReason: zod.string().nullish(),
+  emailValidatedAt: zod.coerce.date().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -569,6 +589,11 @@ export const GetCandidateApplicationsResponseItem = zod.object({
     enrichmentSource: zod.string().nullish(),
     enrichmentConfidence: zod.number().nullish(),
     enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
+    emailValidationStatus: zod
+      .enum(["valid", "invalid", "risky", "unchecked"])
+      .nullish(),
+    emailValidationReason: zod.string().nullish(),
+    emailValidatedAt: zod.coerce.date().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -660,6 +685,11 @@ export const ListApplicationsResponseItem = zod.object({
     enrichmentSource: zod.string().nullish(),
     enrichmentConfidence: zod.number().nullish(),
     enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
+    emailValidationStatus: zod
+      .enum(["valid", "invalid", "risky", "unchecked"])
+      .nullish(),
+    emailValidationReason: zod.string().nullish(),
+    emailValidatedAt: zod.coerce.date().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -771,6 +801,11 @@ export const GetApplicationResponse = zod.object({
     enrichmentSource: zod.string().nullish(),
     enrichmentConfidence: zod.number().nullish(),
     enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
+    emailValidationStatus: zod
+      .enum(["valid", "invalid", "risky", "unchecked"])
+      .nullish(),
+    emailValidationReason: zod.string().nullish(),
+    emailValidatedAt: zod.coerce.date().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -989,6 +1024,11 @@ export const GetLatestJobWorkflowResponse = zod.object({
         enrichmentSource: zod.string().nullish(),
         enrichmentConfidence: zod.number().nullish(),
         enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
+        emailValidationStatus: zod
+          .enum(["valid", "invalid", "risky", "unchecked"])
+          .nullish(),
+        emailValidationReason: zod.string().nullish(),
+        emailValidatedAt: zod.coerce.date().nullish(),
         createdAt: zod.coerce.date(),
         updatedAt: zod.coerce.date(),
       }),
@@ -1818,6 +1858,11 @@ export const GetJobReportForRunResponse = zod.object({
           enrichmentStatus: zod
             .enum(["enriched", "partial", "failed"])
             .nullish(),
+          emailValidationStatus: zod
+            .enum(["valid", "invalid", "risky", "unchecked"])
+            .nullish(),
+          emailValidationReason: zod.string().nullish(),
+          emailValidatedAt: zod.coerce.date().nullish(),
           createdAt: zod.coerce.date(),
           updatedAt: zod.coerce.date(),
         })
@@ -1862,6 +1907,11 @@ export const GetJobReportForRunResponse = zod.object({
           enrichmentStatus: zod
             .enum(["enriched", "partial", "failed"])
             .nullish(),
+          emailValidationStatus: zod
+            .enum(["valid", "invalid", "risky", "unchecked"])
+            .nullish(),
+          emailValidationReason: zod.string().nullish(),
+          emailValidatedAt: zod.coerce.date().nullish(),
           createdAt: zod.coerce.date(),
           updatedAt: zod.coerce.date(),
         })
@@ -2003,6 +2053,11 @@ export const GetJobReportResponse = zod.object({
           enrichmentStatus: zod
             .enum(["enriched", "partial", "failed"])
             .nullish(),
+          emailValidationStatus: zod
+            .enum(["valid", "invalid", "risky", "unchecked"])
+            .nullish(),
+          emailValidationReason: zod.string().nullish(),
+          emailValidatedAt: zod.coerce.date().nullish(),
           createdAt: zod.coerce.date(),
           updatedAt: zod.coerce.date(),
         })
@@ -2047,6 +2102,11 @@ export const GetJobReportResponse = zod.object({
           enrichmentStatus: zod
             .enum(["enriched", "partial", "failed"])
             .nullish(),
+          emailValidationStatus: zod
+            .enum(["valid", "invalid", "risky", "unchecked"])
+            .nullish(),
+          emailValidationReason: zod.string().nullish(),
+          emailValidatedAt: zod.coerce.date().nullish(),
           createdAt: zod.coerce.date(),
           updatedAt: zod.coerce.date(),
         })

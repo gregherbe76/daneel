@@ -12,6 +12,7 @@ import {
 import type { VariantCriteria, DataMode, ScoringWeights } from "@workspace/db";
 import { eq, ne, and, inArray } from "drizzle-orm";
 import { logger } from "../../lib/logger";
+import { validateEmail } from "../../lib/email-validation";
 import { resolveProvider, resolveSourcingProvider, resolveEnrichmentProvider } from "./providers";
 import type { JobInsightResult, CandidateMatchResult, ShortlistResult } from "./engine-types";
 import type { AgentProvider, SourcingCandidate, EnrichmentResult, EnrichmentCandidate } from "./providers";
@@ -110,6 +111,15 @@ async function runSourcing(
       if (emailKey) existingEmails.add(emailKey);
       if (githubKey) existingGithub.add(githubKey);
 
+      // Validate the discovered email so recruiters don't waste outreach on
+      // dead addresses. We use a lightweight MX-record lookup (no third-party
+      // provider needed). The check never throws — on infra failure we mark
+      // the address "unchecked" and let the recruiter decide.
+      const emailToValidate = c.email || null;
+      const validation = emailToValidate
+        ? await validateEmail(emailToValidate)
+        : { status: "invalid" as const, reason: "No email address" };
+
       const [inserted] = await db
         .insert(candidatesTable)
         .values({
@@ -125,6 +135,9 @@ async function runSourcing(
           githubUsername: c.username || null,
           sourcingConfidence: c.confidence ?? null,
           source: sourceTag,
+          emailValidationStatus: validation.status,
+          emailValidationReason: validation.reason,
+          emailValidatedAt: emailToValidate ? new Date() : null,
         })
         .returning({ id: candidatesTable.id });
 

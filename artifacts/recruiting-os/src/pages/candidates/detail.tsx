@@ -28,6 +28,7 @@ import {
   User,
 } from "lucide-react";
 import { CandidateNotesPanel } from "@/components/candidate-notes-panel";
+import { EmailValidationBadge } from "@/components/email-validation-badge";
 
 export default function CandidateDetailPage() {
   const [, params] = useRoute("/candidates/:id");
@@ -87,6 +88,10 @@ export default function CandidateDetailPage() {
               <a href={`mailto:${candidate.email}`} className="flex items-center gap-1 hover:text-foreground">
                 <Mail className="h-3.5 w-3.5" /> {candidate.email}
               </a>
+              <EmailValidationBadge
+                status={candidate.emailValidationStatus}
+                reason={candidate.emailValidationReason}
+              />
               {candidate.location && (
                 <span className="flex items-center gap-1">
                   <MapPin className="h-3.5 w-3.5" /> {candidate.location}

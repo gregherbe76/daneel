@@ -22,6 +22,10 @@ export const candidatesTable = pgTable("candidates", {
   enrichmentSource: text("enrichment_source"),
   enrichmentConfidence: real("enrichment_confidence"),
   enrichmentStatus: text("enrichment_status"), // "enriched" | "partial" | "failed"
+  // Email deliverability validation (lightweight MX-record check at sourcing time)
+  emailValidationStatus: text("email_validation_status"), // "valid" | "invalid" | "risky" | "unchecked"
+  emailValidationReason: text("email_validation_reason"),
+  emailValidatedAt: timestamp("email_validated_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

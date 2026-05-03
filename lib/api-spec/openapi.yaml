@@ -1085,6 +1085,17 @@ components:
           type: string
           enum: [enriched, partial, failed]
           nullable: true
+        emailValidationStatus:
+          type: string
+          enum: [valid, invalid, risky, unchecked]
+          nullable: true
+        emailValidationReason:
+          type: string
+          nullable: true
+        emailValidatedAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
           type: string
           format: date-time

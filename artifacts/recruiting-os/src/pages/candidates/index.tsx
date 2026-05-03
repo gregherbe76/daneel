@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Users, Loader2, Mail, Upload } from "lucide-react";
 import { ImportCandidatesModal } from "@/components/import-candidates-modal";
+import { EmailValidationBadge } from "@/components/email-validation-badge";
 
 const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
   "Imported CSV": {
@@ -94,9 +95,15 @@ export default function CandidatesPage() {
                   <h3 className="text-lg font-semibold group-hover:text-primary transition-colors">
                     {candidate.name}
                   </h3>
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1 mb-4">
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1 mb-2">
                     <Mail className="h-3 w-3" />
                     <span className="truncate">{candidate.email}</span>
+                  </div>
+                  <div className="mb-4">
+                    <EmailValidationBadge
+                      status={candidate.emailValidationStatus}
+                      reason={candidate.emailValidationReason}
+                    />
                   </div>
 
                   <div className="mt-auto">

@@ -87,6 +87,17 @@ export const CandidateEnrichmentStatus = {
   failed: "failed",
 } as const;
 
+export type CandidateEmailValidationStatus =
+  | (typeof CandidateEmailValidationStatus)[keyof typeof CandidateEmailValidationStatus]
+  | null;
+
+export const CandidateEmailValidationStatus = {
+  valid: "valid",
+  invalid: "invalid",
+  risky: "risky",
+  unchecked: "unchecked",
+} as const;
+
 export interface Candidate {
   id: number;
   name: string;
@@ -105,6 +116,9 @@ export interface Candidate {
   enrichmentSource?: string | null;
   enrichmentConfidence?: number | null;
   enrichmentStatus?: CandidateEnrichmentStatus;
+  emailValidationStatus?: CandidateEmailValidationStatus;
+  emailValidationReason?: string | null;
+  emailValidatedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
