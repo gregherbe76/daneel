@@ -305,12 +305,31 @@ export const Recommendation = {
   No: "No",
 } as const;
 
+export type ConfidenceLevel =
+  (typeof ConfidenceLevel)[keyof typeof ConfidenceLevel];
+
+export const ConfidenceLevel = {
+  High: "High",
+  Medium: "Medium",
+  Low: "Low",
+} as const;
+
 export interface CandidateEvaluation {
   id: number;
   runId: number;
   jobId: number;
   candidateId: number;
+  /** Decision score (backward-compat alias). Use decisionScore. */
   score: number;
+  /** AI-assessed candidate fit (0-100). Not penalized by data quality. */
+  fitScore?: number | null;
+  /** How complete and verifiable the candidate's profile is (0-100). */
+  dataConfidenceScore?: number | null;
+  /** fitScore × (0.6 + 0.4 × dataConfidence/100). Main ranking score. */
+  decisionScore?: number | null;
+  confidenceLevel?: ConfidenceLevel | null;
+  confidenceReason?: string | null;
+  missingDataWarnings?: string[];
   strengths: string[];
   gaps: string[];
   risks: string[];

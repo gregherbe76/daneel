@@ -303,12 +303,96 @@ async function runJobUnderstanding(
 
 // ── STEP 2: Candidate Matching ────────────────────────────────────────────────
 
+// ── Data confidence score ─────────────────────────────────────────────────────
+// Derived entirely from profile metadata — independent of AI fit scoring.
+// Measures how complete and verifiable the candidate's profile is (0-100).
+
+type CandidateForConfidence = {
+  enrichmentStatus: string | null;
+  enrichmentConfidence: number | null;
+  linkedIn: string | null;
+  skills: string[];
+  summary: string | null;
+  headline: string | null;
+};
+
+function computeDataConfidenceScore(c: CandidateForConfidence): {
+  score: number;
+  level: "High" | "Medium" | "Low";
+  reason: string;
+} {
+  let points = 0;
+  const parts: string[] = [];
+
+  // Enrichment status — 0-40 pts
+  if (c.enrichmentStatus === "enriched") {
+    const confBonus = Math.round((c.enrichmentConfidence ?? 0.8) * 10);
+    points += 30 + confBonus;
+    parts.push("enriched profile");
+  } else if (c.enrichmentStatus === "partial") {
+    points += 20;
+    parts.push("partially enriched");
+  } else if (c.enrichmentStatus === "failed") {
+    parts.push("enrichment failed");
+  } else {
+    parts.push("not enriched");
+  }
+
+  // LinkedIn URL present — 0-15 pts
+  if (c.linkedIn && !c.linkedIn.includes("placeholder")) {
+    points += 15;
+    parts.push("LinkedIn URL present");
+  }
+
+  // Skills — 0-20 pts
+  if (c.skills.length >= 5) {
+    points += 20;
+    parts.push(`${c.skills.length} skills listed`);
+  } else if (c.skills.length >= 2) {
+    points += 10;
+    parts.push(`${c.skills.length} skills listed`);
+  } else if (c.skills.length === 1) {
+    points += 5;
+    parts.push("1 skill listed");
+  }
+
+  // Summary — 0-20 pts
+  if (c.summary && c.summary.length > 100) {
+    points += 20;
+    parts.push("detailed summary");
+  } else if (c.summary && c.summary.length > 20) {
+    points += 8;
+    parts.push("brief summary");
+  }
+
+  // Headline — 0-5 pts
+  if (c.headline) {
+    points += 5;
+    parts.push("headline present");
+  }
+
+  const score = Math.min(100, points);
+  const level: "High" | "Medium" | "Low" = score >= 70 ? "High" : score >= 40 ? "Medium" : "Low";
+  const reason = parts.length > 0 ? parts.join(", ") : "no profile data";
+  return { score, level, reason };
+}
+
 async function runCandidateMatching(
   runId: number,
   jobId: number,
   job: { title: string; description: string; mustHaveSkills: string[]; seniority: string },
   insight: JobInsightResult,
-  candidates: Array<{ id: number; name: string; email: string; skills: string[]; summary: string | null }>,
+  candidates: Array<{
+    id: number;
+    name: string;
+    email: string;
+    skills: string[];
+    summary: string | null;
+    enrichmentStatus: string | null;
+    enrichmentConfidence: number | null;
+    linkedIn: string | null;
+    headline: string | null;
+  }>,
 ): Promise<void> {
   await logStep(runId, "candidate_matching", "running", { candidateCount: candidates.length });
 
@@ -323,24 +407,40 @@ async function runCandidateMatching(
       payload: { job, insight, candidates },
     })) as CandidateMatchResult[];
 
+    const candidateMap = new Map(candidates.map((c) => [c.id, c]));
+
     await Promise.all(
-      results.map((r) =>
-        db.insert(aiEvaluationsTable).values({
+      results.map((r) => {
+        const candidateData = candidateMap.get(r.candidateId);
+        const dataConf = candidateData
+          ? computeDataConfidenceScore(candidateData)
+          : { score: 0, level: "Low" as const, reason: "candidate data unavailable" };
+
+        const fitScore = r.fitScore ?? r.score;
+        const decisionScore = Math.round(fitScore * (0.6 + 0.4 * dataConf.score / 100));
+
+        return db.insert(aiEvaluationsTable).values({
           runId,
           jobId,
           candidateId: r.candidateId,
-          score: r.score,
+          score: decisionScore, // backward-compat sort key = decisionScore
+          fitScore,
+          dataConfidenceScore: dataConf.score,
+          decisionScore,
+          confidenceLevel: dataConf.level,
+          confidenceReason: r.confidenceReason ?? dataConf.reason,
+          missingDataWarnings: r.missingDataWarnings ?? [],
           strengths: r.strengths,
           gaps: r.gaps,
           risks: r.risks,
           recommendation: r.recommendation,
           scoreBreakdown: r.scoreBreakdown ?? null,
-        }),
-      ),
+        });
+      }),
     );
 
     await logStep(runId, "candidate_matching", "completed", { candidateCount: candidates.length, provider: provider.name }, {
-      scores: results.map((r) => ({ name: r.candidateName, score: r.score, rec: r.recommendation })),
+      scores: results.map((r) => ({ name: r.candidateName, fitScore: r.fitScore ?? r.score, rec: r.recommendation })),
     });
   } catch (err) {
     await logStep(runId, "candidate_matching", "failed", { candidateCount: candidates.length, provider: provider.name }, {

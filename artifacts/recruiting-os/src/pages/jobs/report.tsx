@@ -60,6 +60,12 @@ type ReportEvaluation = {
   id: number;
   candidateId: number;
   score: number;
+  fitScore?: number | null;
+  dataConfidenceScore?: number | null;
+  decisionScore?: number | null;
+  confidenceLevel?: string | null;
+  confidenceReason?: string | null;
+  missingDataWarnings?: string[];
   strengths: string[];
   gaps: string[];
   risks: string[];
@@ -113,6 +119,12 @@ const RecIcon = ({ rec }: { rec: string }) => {
   if (rec === "Strong Yes" || rec === "Yes") return <CheckCircle2 className="h-4 w-4 text-green-600" />;
   if (rec === "Maybe") return <MinusCircle className="h-4 w-4 text-amber-600" />;
   return <XCircle className="h-4 w-4 text-red-600" />;
+};
+
+const confidenceBg = (level?: string | null) => {
+  if (level === "High") return "bg-green-500/10 border-green-200 text-green-700";
+  if (level === "Low") return "bg-red-500/10 border-red-200 text-red-700";
+  return "bg-amber-500/10 border-amber-200 text-amber-700";
 };
 
 // ── Comparison diff helpers ────────────────────────────────────────────────────
@@ -548,6 +560,65 @@ export default function JobReportPage() {
           </div>
         </section>
 
+        {/* ── Score Reliability ── */}
+        {evaluations.some((e) => (e.fitScore ?? e.score) >= 60 && e.confidenceLevel === "Low") && (
+          <section>
+            <h2 className="text-base font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-amber-600" />
+              Score Reliability
+            </h2>
+            <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-5 py-4 mb-4 flex items-start gap-3">
+              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Promising but under-verified candidates</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  The candidates below scored well on fit but have incomplete or unverified profile data. Their Decision Score has been adjusted downward. Review manually before advancing them.
+                </p>
+              </div>
+            </div>
+            <Card>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border">
+                  {evaluations
+                    .filter((e) => (e.fitScore ?? e.score) >= 60 && e.confidenceLevel === "Low")
+                    .map((e) => (
+                      <div key={e.id} className="px-5 py-3 flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm">{e.candidate?.name ?? "Unknown"}</p>
+                          {e.confidenceReason && (
+                            <p className="text-xs text-muted-foreground mt-0.5">{e.confidenceReason}</p>
+                          )}
+                          {e.missingDataWarnings && e.missingDataWarnings.length > 0 && (
+                            <ul className="mt-1 space-y-0.5">
+                              {e.missingDataWarnings.map((w, i) => (
+                                <li key={i} className="text-[11px] text-amber-700 flex items-center gap-1">
+                                  <AlertTriangle className="h-2.5 w-2.5 shrink-0" />{w}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Fit Score</p>
+                            <p className={`text-sm font-bold ${scoreColor(e.fitScore ?? e.score)}`}>{e.fitScore ?? e.score}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Decision Score</p>
+                            <p className={`text-sm font-bold ${scoreColor(e.decisionScore ?? e.score)}`}>{e.decisionScore ?? e.score}</p>
+                          </div>
+                          <Badge variant="outline" className={`text-xs ${confidenceBg("Low")}`}>
+                            Low confidence
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
         {/* ── Job Understanding ── */}
         {insight && (
           <section>
@@ -613,13 +684,23 @@ export default function JobReportPage() {
                         {cand?.headline && <p className="text-sm text-muted-foreground mt-0.5">{cand.headline}</p>}
                         {cand?.currentCompany && <p className="text-xs text-muted-foreground">{cand.currentCompany}</p>}
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Badge variant="outline" className={`font-bold text-sm px-3 py-1 ${scoreBg(e.score)}`}>
-                          {e.score}/100
-                        </Badge>
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                        <div className="flex flex-col items-end gap-0.5">
+                          <Badge variant="outline" className={`font-bold text-sm px-3 py-1 ${scoreBg(e.decisionScore ?? e.score)}`}>
+                            {e.decisionScore ?? e.score}/100
+                          </Badge>
+                          {e.fitScore != null && e.fitScore !== (e.decisionScore ?? e.score) && (
+                            <span className="text-[10px] text-muted-foreground">Fit: {e.fitScore}/100</span>
+                          )}
+                        </div>
                         {scoreDelta !== null && scoreDelta !== 0 && (
                           <Badge variant="outline" className={`text-xs font-medium ${scoreDelta > 0 ? "border-green-200 text-green-700 bg-green-50" : "border-red-200 text-red-700 bg-red-50"}`}>
                             {scoreDelta > 0 ? "+" : ""}{scoreDelta}
+                          </Badge>
+                        )}
+                        {e.confidenceLevel && (
+                          <Badge variant="outline" className={`text-xs ${confidenceBg(e.confidenceLevel)}`}>
+                            {e.confidenceLevel} conf.
                           </Badge>
                         )}
                         <Badge variant="outline" className={`${recBg(e.recommendation)}`}>
@@ -630,10 +711,15 @@ export default function JobReportPage() {
                     </div>
                     <div className="mb-3">
                       <div className="flex justify-between text-xs mb-1">
-                        <span className="text-muted-foreground">Match score</span>
-                        <span className={`font-medium ${scoreColor(e.score)}`}>{e.score}%</span>
+                        <span className="text-muted-foreground">Decision score</span>
+                        <span className={`font-medium ${scoreColor(e.decisionScore ?? e.score)}`}>
+                          {e.decisionScore ?? e.score}%
+                          {e.fitScore != null && e.fitScore !== (e.decisionScore ?? e.score) && (
+                            <span className="text-muted-foreground font-normal ml-1">· fit: {e.fitScore}%</span>
+                          )}
+                        </span>
                       </div>
-                      <Progress value={e.score} className="h-2" />
+                      <Progress value={e.decisionScore ?? e.score} className="h-2" />
                     </div>
                     {e.summary?.whyRelevant && (
                       <p className="text-sm text-muted-foreground mb-3 italic border-l-2 border-primary/20 pl-3">
@@ -768,8 +854,10 @@ export default function JobReportPage() {
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Candidate</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-24">Score</th>
-                      {diff && <th className="text-left px-4 py-3 font-medium text-muted-foreground w-20">Δ Score</th>}
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-24">Decision</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-16">Fit</th>
+                      {diff && <th className="text-left px-4 py-3 font-medium text-muted-foreground w-16">Δ</th>}
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-24">Conf.</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground w-32">Rec.</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Dimensions</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Top Strength</th>
@@ -781,6 +869,7 @@ export default function JobReportPage() {
                       const cand = e.candidate;
                       const isSourced = cand?.source === "AI Generated / Mock Sourcing";
                       const diffRow = diff ? (e as CandidateDiff) : null;
+                      const displayScore = e.decisionScore ?? e.score;
                       return (
                         <tr key={e.id} className={`border-b border-border last:border-0 hover:bg-muted/20 transition-colors ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
                           <td className="px-4 py-3">
@@ -795,13 +884,25 @@ export default function JobReportPage() {
                             {cand?.headline && <p className="text-xs text-muted-foreground truncate max-w-xs">{cand.headline}</p>}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`font-bold ${scoreColor(e.score)}`}>{e.score}/100</span>
+                            <span className={`font-bold ${scoreColor(displayScore)}`}>{displayScore}/100</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-muted-foreground text-xs">{e.fitScore ?? "—"}</span>
                           </td>
                           {diff && (
                             <td className="px-4 py-3">
                               <DeltaBadge delta={diffRow?.scoreDelta ?? null} type="score" />
                             </td>
                           )}
+                          <td className="px-4 py-3">
+                            {e.confidenceLevel ? (
+                              <Badge variant="outline" className={`text-xs ${confidenceBg(e.confidenceLevel)}`}>
+                                {e.confidenceLevel}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3">
                             <Badge variant="outline" className={`text-xs ${recBg(e.recommendation)}`}>
                               {e.recommendation}

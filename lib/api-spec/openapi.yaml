@@ -1232,6 +1232,10 @@ components:
       type: string
       enum: [Strong Yes, Yes, Maybe, No]
 
+    ConfidenceLevel:
+      type: string
+      enum: [High, Medium, Low]
+
     CandidateEvaluation:
       type: object
       properties:
@@ -1245,6 +1249,29 @@ components:
           type: integer
         score:
           type: integer
+          description: "Decision score (backward-compat alias). Use decisionScore."
+        fitScore:
+          type: integer
+          nullable: true
+          description: "AI-assessed candidate fit (0-100). Not penalized by data quality."
+        dataConfidenceScore:
+          type: integer
+          nullable: true
+          description: "How complete and verifiable the candidate's profile is (0-100)."
+        decisionScore:
+          type: integer
+          nullable: true
+          description: "fitScore × (0.6 + 0.4 × dataConfidence/100). Main ranking score."
+        confidenceLevel:
+          $ref: "#/components/schemas/ConfidenceLevel"
+          nullable: true
+        confidenceReason:
+          type: string
+          nullable: true
+        missingDataWarnings:
+          type: array
+          items:
+            type: string
         strengths:
           type: array
           items:

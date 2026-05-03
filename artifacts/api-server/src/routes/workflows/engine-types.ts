@@ -21,12 +21,15 @@ export type ScoreBreakdown = {
 export type CandidateMatchResult = {
   candidateId: number;
   candidateName: string;
-  score: number;
+  score: number;           // = decisionScore (backward-compat for sorting)
+  fitScore: number;        // AI-assessed fit only (no data-quality penalty)
   strengths: string[];
   gaps: string[];
   risks: string[];
   recommendation: "Strong Yes" | "Yes" | "Maybe" | "No";
   scoreBreakdown: ScoreBreakdown;
+  confidenceReason?: string;
+  missingDataWarnings?: string[];
 };
 
 export type ShortlistResult = {

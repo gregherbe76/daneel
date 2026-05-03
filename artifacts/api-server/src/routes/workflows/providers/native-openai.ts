@@ -134,21 +134,28 @@ CANDIDATE: ${candidate.name}
 Skills: ${candidate.skills.length > 0 ? candidate.skills.join(", ") : "none listed"}
 Summary: ${candidate.summary ?? "No summary provided"}
 
-Score this candidate across 4 weighted dimensions. Each dimension score is 0-100.
-The final weighted score = (skillsMatch * 0.35) + (experienceDepth * 0.30) + (autonomy * 0.20) + (productMindset * 0.15).
+Score this candidate's FIT for the role across 4 weighted dimensions. Each dimension score is 0-100.
+The fitScore = round((skillsMatch * 0.35) + (experienceDepth * 0.30) + (autonomy * 0.20) + (productMindset * 0.15)).
+
+IMPORTANT — Fit scoring rules:
+- Score ONLY based on evidence present in the profile. Do NOT assume or invent qualifications.
+- Do NOT penalize for missing data (e.g. an absent summary). Instead, score conservatively on that dimension and flag the gap in missingDataWarnings.
+- If a dimension has no evidence at all (no skills, no summary), score it at 20-30 (not 0) and flag it.
+- Never fabricate experience or skills that are not explicitly listed.
 
 Dimension definitions:
-- skillsMatch (weight 0.35): How well do the candidate's listed skills cover the must-have skills and evaluation criteria? Cite specific skill matches or gaps.
-- experienceDepth (weight 0.30): Does the summary/background suggest deep, hands-on experience at the required seniority level? Be explicit about what is missing or present.
-- autonomy (weight 0.20): Is there evidence the candidate has owned projects end-to-end, worked without heavy direction, or led initiatives? If no evidence, say so explicitly.
-- productMindset (weight 0.15): Does the candidate think about users, product impact, or business outcomes — not just technical execution? Cite specific signals or flag absence.
+- skillsMatch (weight 0.35): Coverage of must-have skills from the job. Cite specific skill matches or gaps.
+- experienceDepth (weight 0.30): Evidence of seniority-appropriate, hands-on depth. Be explicit about what is missing or present.
+- autonomy (weight 0.20): Evidence the candidate has owned projects end-to-end, led initiatives, or worked without heavy direction. If no evidence, say so explicitly.
+- productMindset (weight 0.15): Evidence the candidate thinks about users, product impact, or business outcomes. Cite signals or flag absence.
 
-Rules:
-- reasoning must be 1-2 specific sentences referencing actual candidate details or role requirements
+Additional rules:
+- reasoning must be 1-2 specific sentences referencing actual candidate details
 - Never write "The candidate has strong skills" — always name the specific skill and how it maps to the role
-- If the candidate has no summary and few skills, say so explicitly in reasoning
-- strengths and gaps must be specific (e.g. "Owns React and TypeScript which are the primary must-haves" not "Good technical skills")
-- risks must be concrete (e.g. "No evidence of leading a team at Senior level" not "May lack leadership")
+- strengths and gaps must be specific, not generic
+- risks must be concrete with specific evidence
+- confidenceReason: 1 sentence explaining data limitations that reduce scoring confidence (or "Profile provides sufficient data for reliable scoring" if data is complete)
+- missingDataWarnings: list 0-3 specific data gaps that affect scoring reliability (empty array if none)
 
 Return only valid JSON matching this exact structure:
 {
@@ -158,37 +165,54 @@ Return only valid JSON matching this exact structure:
     "autonomy": { "score": <0-100>, "weight": 0.20, "reasoning": "<specific 1-2 sentences>" },
     "productMindset": { "score": <0-100>, "weight": 0.15, "reasoning": "<specific 1-2 sentences>" }
   },
-  "score": <integer 0-100, must equal round(skillsMatch*0.35 + experienceDepth*0.30 + autonomy*0.20 + productMindset*0.15)>,
+  "fitScore": <integer 0-100, must equal round(skillsMatch*0.35 + experienceDepth*0.30 + autonomy*0.20 + productMindset*0.15)>,
   "strengths": ["<specific strength citing candidate detail>", "<specific strength>"],
   "gaps": ["<specific gap naming missing skill or evidence>"],
   "risks": ["<concrete risk with specific evidence>"],
-  "recommendation": "<Strong Yes|Yes|Maybe|No based on score: 80-100=Strong Yes, 60-79=Yes, 40-59=Maybe, 0-39=No>"
+  "recommendation": "<Strong Yes|Yes|Maybe|No based on fitScore: 80-100=Strong Yes, 60-79=Yes, 40-59=Maybe, 0-39=No>",
+  "confidenceReason": "<1 sentence on data limitations, or 'Profile provides sufficient data for reliable scoring'>",
+  "missingDataWarnings": ["<specific data gap>"]
 }`;
 
         const response = await openai.chat.completions.create({
           model: "gpt-5.1",
-          max_completion_tokens: 900,
+          max_completion_tokens: 1000,
           messages: [{ role: "user", content: prompt }],
         });
-        const raw = json<Omit<CandidateMatchResult, "candidateId" | "candidateName"> & { scoreBreakdown: ScoreBreakdown }>(
-          response.choices[0]?.message?.content ?? "{}",
-        );
+        const raw = json<{
+          scoreBreakdown: ScoreBreakdown;
+          fitScore?: number;
+          score?: number; // backward-compat fallback
+          strengths: string[];
+          gaps: string[];
+          risks: string[];
+          recommendation: CandidateMatchResult["recommendation"];
+          confidenceReason?: string;
+          missingDataWarnings?: string[];
+        }>(response.choices[0]?.message?.content ?? "{}");
 
-        // Recompute weighted score server-side to ensure arithmetic consistency.
+        // Recompute fit score server-side to ensure arithmetic consistency.
         // If you change dimension weights in the prompt, update these multipliers too.
         const bd = raw.scoreBreakdown;
-        const weightedScore = bd
+        const fitScore = bd
           ? Math.round(
               bd.skillsMatch.score * 0.35 +
               bd.experienceDepth.score * 0.30 +
               bd.autonomy.score * 0.20 +
               bd.productMindset.score * 0.15,
             )
-          : raw.score;
+          : (raw.fitScore ?? raw.score ?? 0);
 
         return {
-          ...raw,
-          score: weightedScore,
+          scoreBreakdown: raw.scoreBreakdown,
+          fitScore,
+          score: fitScore, // will be overridden to decisionScore by engine.ts
+          strengths: raw.strengths,
+          gaps: raw.gaps,
+          risks: raw.risks,
+          recommendation: raw.recommendation,
+          confidenceReason: raw.confidenceReason,
+          missingDataWarnings: raw.missingDataWarnings ?? [],
           candidateId: candidate.id,
           candidateName: candidate.name,
         };

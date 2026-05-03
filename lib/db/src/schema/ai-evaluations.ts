@@ -29,7 +29,13 @@ export const aiEvaluationsTable = pgTable("ai_evaluations", {
   candidateId: integer("candidate_id")
     .notNull()
     .references(() => candidatesTable.id, { onDelete: "cascade" }),
-  score: integer("score").notNull(),
+  score: integer("score").notNull(), // = decisionScore (kept for backward compat / sorting)
+  fitScore: integer("fit_score"),           // AI-assessed candidate fit (no data penalty)
+  dataConfidenceScore: integer("data_confidence_score"), // 0-100 based on profile completeness
+  decisionScore: integer("decision_score"), // fitScore * (0.6 + 0.4 * dataConfidence/100)
+  confidenceLevel: text("confidence_level"), // "High" | "Medium" | "Low"
+  confidenceReason: text("confidence_reason"),
+  missingDataWarnings: jsonb("missing_data_warnings").$type<string[]>(),
   strengths: jsonb("strengths").$type<string[]>().notNull().default([]),
   gaps: jsonb("gaps").$type<string[]>().notNull().default([]),
   risks: jsonb("risks").$type<string[]>().notNull().default([]),

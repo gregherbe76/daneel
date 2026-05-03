@@ -629,16 +629,32 @@ export default function JobDetailPage() {
                                       )}
                                     </div>
                                     {evalData && (
-                                      <Badge variant="outline" className={`ml-2 shrink-0 ${getScoreColor(evalData.score)}`}>
-                                        {evalData.score}
-                                      </Badge>
+                                      <div className="ml-2 shrink-0 flex flex-col items-end gap-1">
+                                        <Badge variant="outline" className={`${getScoreColor(evalData.decisionScore ?? evalData.score)}`}>
+                                          {evalData.decisionScore ?? evalData.score}
+                                        </Badge>
+                                        {evalData.confidenceLevel && (
+                                          <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full border ${
+                                            evalData.confidenceLevel === "High" ? "bg-green-500/10 border-green-200 text-green-700" :
+                                            evalData.confidenceLevel === "Low" ? "bg-red-500/10 border-red-200 text-red-700" :
+                                            "bg-amber-500/10 border-amber-200 text-amber-700"
+                                          }`}>
+                                            {evalData.confidenceLevel} conf.
+                                          </span>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
                                   {evalData && (
                                     <CardDescription>
-                                      <Badge variant="outline" className={`mt-1 ${getRecommendationColor(evalData.recommendation)}`}>
-                                        {evalData.recommendation}
-                                      </Badge>
+                                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                        <Badge variant="outline" className={`${getRecommendationColor(evalData.recommendation)}`}>
+                                          {evalData.recommendation}
+                                        </Badge>
+                                        {evalData.fitScore != null && evalData.fitScore !== (evalData.decisionScore ?? evalData.score) && (
+                                          <span className="text-[10px] text-muted-foreground">Fit: {evalData.fitScore}</span>
+                                        )}
+                                      </div>
                                     </CardDescription>
                                   )}
                                 </CardHeader>
@@ -678,11 +694,16 @@ export default function JobDetailPage() {
                         <CollapsibleContent className="p-0 border-t border-border">
                           <div className="divide-y divide-border">
                             {workflowData.evaluations.map((ev: {
-                              id: number; candidateId: number; score: number; recommendation: string;
+                              id: number; candidateId: number; score: number;
+                              fitScore?: number | null; decisionScore?: number | null; confidenceLevel?: string | null;
+                              recommendation: string;
                               strengths: string[]; gaps: string[];
                               candidate: { name: string; source?: string | null };
                             }) => {
                               const isSourced = ev.candidate?.source === "AI Generated / Mock Sourcing";
+                              const displayScore = ev.decisionScore ?? ev.score;
+                              const fitScore = ev.fitScore;
+                              const confLevel = ev.confidenceLevel;
                               return (
                                 <div key={ev.id} className="p-4 flex flex-col md:flex-row gap-4 md:items-center justify-between hover:bg-muted/10">
                                   <div className="min-w-[220px]">
@@ -696,18 +717,32 @@ export default function JobDetailPage() {
                                         </Badge>
                                       )}
                                     </div>
-                                    <div className="mt-1">
+                                    <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                                       <Badge variant="outline" className={getRecommendationColor(ev.recommendation)}>
                                         {ev.recommendation}
                                       </Badge>
+                                      {confLevel && (
+                                        <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full border ${
+                                          confLevel === "High" ? "bg-green-500/10 border-green-200 text-green-700" :
+                                          confLevel === "Low" ? "bg-red-500/10 border-red-200 text-red-700" :
+                                          "bg-amber-500/10 border-amber-200 text-amber-700"
+                                        }`}>
+                                          {confLevel}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="flex-1 w-full max-w-md">
                                     <div className="flex justify-between text-xs mb-1">
-                                      <span className="text-muted-foreground">Match Score</span>
-                                      <span className="font-medium">{ev.score}/100</span>
+                                      <span className="text-muted-foreground">Decision Score</span>
+                                      <span className="font-medium">
+                                        {displayScore}/100
+                                        {fitScore != null && fitScore !== displayScore && (
+                                          <span className="text-muted-foreground ml-1">(fit: {fitScore})</span>
+                                        )}
+                                      </span>
                                     </div>
-                                    <Progress value={ev.score} className="h-2" />
+                                    <Progress value={displayScore} className="h-2" />
                                   </div>
                                   <div className="flex-1 flex gap-2 flex-wrap text-xs">
                                     {ev.strengths.slice(0, 2).map((s, i) => (

@@ -674,7 +674,30 @@ export const GetLatestJobWorkflowResponse = zod.object({
       runId: zod.number(),
       jobId: zod.number(),
       candidateId: zod.number(),
-      score: zod.number(),
+      score: zod
+        .number()
+        .describe("Decision score (backward-compat alias). Use decisionScore."),
+      fitScore: zod
+        .number()
+        .nullish()
+        .describe(
+          "AI-assessed candidate fit (0-100). Not penalized by data quality.",
+        ),
+      dataConfidenceScore: zod
+        .number()
+        .nullish()
+        .describe(
+          "How complete and verifiable the candidate's profile is (0-100).",
+        ),
+      decisionScore: zod
+        .number()
+        .nullish()
+        .describe(
+          "fitScore × (0.6 + 0.4 × dataConfidence\/100). Main ranking score.",
+        ),
+      confidenceLevel: zod.enum(["High", "Medium", "Low"]).nullish(),
+      confidenceReason: zod.string().nullish(),
+      missingDataWarnings: zod.array(zod.string()).optional(),
       strengths: zod.array(zod.string()),
       gaps: zod.array(zod.string()),
       risks: zod.array(zod.string()),
