@@ -33,6 +33,7 @@ import { addPendingImproveRun, markJobRunsSeen } from "@/lib/pending-runs";
 import { ImportCandidatesModal } from "@/components/import-candidates-modal";
 import { FindCandidatesModal } from "@/components/find-candidates-modal";
 import { ImproveRerunModal, type ImproveRerunCandidate } from "@/components/improve-rerun-modal";
+import { CompareRuns } from "@/components/compare-runs";
 import { OnboardingWizard } from "@/components/onboarding-wizard";
 import {
   DropdownMenu,
@@ -1206,6 +1207,11 @@ export default function JobDetailPage() {
                         </div>
                       );
                     })()}
+
+                    {/* Compare any two past sourcing runs side-by-side. Hidden
+                        automatically when there aren't at least two sourcing
+                        runs to compare. */}
+                    <CompareRuns runs={jobRuns ?? []} />
 
                     {/* Job Understanding */}
                     {workflowData.insight && (
