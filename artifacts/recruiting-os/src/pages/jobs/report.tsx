@@ -19,6 +19,7 @@ import {
   Star, AlertTriangle, MessageSquare, Users, Zap, TrendingUp,
   CheckCircle2, XCircle, MinusCircle, ChevronRight, GitBranch,
   ArrowUp, ArrowDown, Minus, Info, FlaskConical, Database, ShieldAlert,
+  ClipboardList,
 } from "lucide-react";
 import { HumanAIComparison } from "@/components/human-ai-comparison";
 import { ScoreBreakdownDisplay, ScoreBreakdownPills } from "@/components/score-breakdown";
@@ -128,6 +129,31 @@ const confidenceBg = (level?: string | null) => {
   return "bg-amber-500/10 border-amber-200 text-amber-700";
 };
 
+// ── Action label logic ────────────────────────────────────────────────────────
+
+type ActionLabel = "Interview now" | "Review manually" | "Enrich before deciding" | "Reject / low priority";
+
+function getActionLabel(e: ReportEvaluation): ActionLabel {
+  const decisionScore = e.decisionScore ?? e.score;
+  const fitScore = e.fitScore ?? decisionScore;
+  const conf = e.confidenceLevel;
+  // Data quality gates take priority — can't decide on sparse profiles
+  if (e.requiresEnrichment || (fitScore >= 60 && conf === "Low")) return "Enrich before deciding";
+  // Strong, verifiable match
+  if (decisionScore >= 70 && conf === "High") return "Interview now";
+  // Below threshold
+  if (decisionScore < 50) return "Reject / low priority";
+  // Middle ground — human review needed
+  return "Review manually";
+}
+
+const ACTION_CONFIG: Record<ActionLabel, { bg: string; border: string; text: string; dot: string; darkText: string }> = {
+  "Interview now":          { bg: "bg-green-500/10",  border: "border-green-300",  text: "text-green-800",  dot: "bg-green-500",  darkText: "text-green-400" },
+  "Review manually":        { bg: "bg-blue-500/10",   border: "border-blue-300",   text: "text-blue-800",   dot: "bg-blue-500",   darkText: "text-blue-400" },
+  "Enrich before deciding": { bg: "bg-amber-500/10",  border: "border-amber-300",  text: "text-amber-800",  dot: "bg-amber-400",  darkText: "text-amber-400" },
+  "Reject / low priority":  { bg: "bg-slate-100",     border: "border-slate-300",  text: "text-slate-600",  dot: "bg-slate-400",  darkText: "text-slate-500" },
+};
+
 // ── Comparison diff helpers ────────────────────────────────────────────────────
 
 type CandidateDiff = ReportEvaluation & {
@@ -216,6 +242,20 @@ export default function JobReportPage() {
     if (!report || !baseReport) return null;
     return buildDiff(report, baseReport);
   }, [report, baseReport]);
+
+  const actionGroups = useMemo(() => {
+    if (!report) return null;
+    const groups: Record<ActionLabel, ReportEvaluation[]> = {
+      "Interview now": [],
+      "Review manually": [],
+      "Enrich before deciding": [],
+      "Reject / low priority": [],
+    };
+    report.evaluations.forEach((e) => {
+      groups[getActionLabel(e)].push(e);
+    });
+    return groups;
+  }, [report]);
 
   const handleDownload = (type: "markdown" | "pdf") => {
     window.open(`/api/reports/job/${jobId}/latest/${type}`, "_blank");
@@ -462,6 +502,105 @@ export default function JobReportPage() {
             </div>
           </div>
         </div>
+
+        {/* ── Decision Summary ── */}
+        {actionGroups && (
+          <section className="rounded-xl border border-slate-800 bg-slate-900 text-white overflow-hidden shadow-md">
+            <div className="px-7 py-5 border-b border-slate-700/80 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                  <ClipboardList className="h-4 w-4 text-slate-400 shrink-0" />
+                  Decision Summary
+                </h2>
+                <p className="text-sm text-slate-400 mt-0.5">
+                  {totalEvaluated} candidates evaluated · {actionGroups["Interview now"].length} ready to advance
+                </p>
+              </div>
+              <p className="text-xs text-slate-600 shrink-0 mt-0.5">
+                {new Date(run.runDate).toLocaleDateString("en-US", { dateStyle: "medium" })}
+              </p>
+            </div>
+
+            {/* 4 action buckets */}
+            <div className="grid grid-cols-2 md:grid-cols-4 divide-y divide-slate-700/60 md:divide-y-0 md:divide-x md:divide-slate-700/60">
+              {([
+                { key: "Interview now" as ActionLabel,          color: "#22c55e", label: "Interview Now",      sub: "High confidence match" },
+                { key: "Review manually" as ActionLabel,        color: "#60a5fa", label: "Review Manually",    sub: "Needs closer look" },
+                { key: "Enrich before deciding" as ActionLabel, color: "#f59e0b", label: "Enrich First",       sub: "Data too sparse" },
+                { key: "Reject / low priority" as ActionLabel,  color: "#64748b", label: "Low Priority",       sub: "Below threshold" },
+              ]).map(({ key, color, label, sub }) => {
+                const group = actionGroups[key];
+                return (
+                  <div key={key} className="px-6 py-5">
+                    <div className="mb-3">
+                      <span className="text-3xl font-black leading-none" style={{ color }}>{group.length}</span>
+                      <div className="mt-1.5">
+                        <p className="text-sm font-semibold text-white leading-tight">{label}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{sub}</p>
+                      </div>
+                    </div>
+                    {group.length > 0 ? (
+                      <ul className="space-y-1.5">
+                        {group.map((e) => (
+                          <li key={e.id} className="flex items-center gap-2">
+                            <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: color }} />
+                            <span className="text-xs text-slate-300 truncate">{e.candidate?.name ?? "Unknown"}</span>
+                            <span className="text-[10px] text-slate-600 ml-auto shrink-0 tabular-nums">{e.decisionScore ?? e.score}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-slate-600 italic">None</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Next actions */}
+            <div className="px-7 py-5 border-t border-slate-700/80 space-y-2.5">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.12em] mb-3">Recommended Next Actions</p>
+              {actionGroups["Interview now"].length > 0 && (
+                <div className="flex items-start gap-2.5">
+                  <span className="text-green-400 font-bold text-sm shrink-0 leading-tight mt-0.5">→</span>
+                  <p className="text-sm text-white leading-relaxed">
+                    <span className="font-semibold">Schedule interviews:</span>{" "}
+                    <span className="text-slate-300">{actionGroups["Interview now"].map((e) => e.candidate?.name ?? "Unknown").join(", ")}</span>
+                  </p>
+                </div>
+              )}
+              {actionGroups["Review manually"].length > 0 && (
+                <div className="flex items-start gap-2.5">
+                  <span className="text-blue-400 font-bold text-sm shrink-0 leading-tight mt-0.5">→</span>
+                  <p className="text-sm text-white leading-relaxed">
+                    <span className="font-semibold">Review before advancing:</span>{" "}
+                    <span className="text-slate-300">{actionGroups["Review manually"].map((e) => e.candidate?.name ?? "Unknown").join(", ")}</span>
+                    <span className="text-slate-500 text-xs ml-1.5">— verify experience depth and fit</span>
+                  </p>
+                </div>
+              )}
+              {actionGroups["Enrich before deciding"].length > 0 && (
+                <div className="flex items-start gap-2.5">
+                  <span className="text-amber-400 font-bold text-sm shrink-0 leading-tight mt-0.5">→</span>
+                  <p className="text-sm text-white leading-relaxed">
+                    <span className="font-semibold">Enrich profiles first:</span>{" "}
+                    <span className="text-slate-300">{actionGroups["Enrich before deciding"].map((e) => e.candidate?.name ?? "Unknown").join(", ")}</span>
+                    <span className="text-slate-500 text-xs ml-1.5">— too sparse to make a reliable call</span>
+                  </p>
+                </div>
+              )}
+              {actionGroups["Reject / low priority"].length > 0 && (
+                <div className="flex items-start gap-2.5">
+                  <span className="text-slate-500 font-bold text-sm shrink-0 leading-tight mt-0.5">→</span>
+                  <p className="text-sm text-slate-400 leading-relaxed">
+                    <span className="font-semibold text-slate-300">Deprioritize:</span>{" "}
+                    {actionGroups["Reject / low priority"].map((e) => e.candidate?.name ?? "Unknown").join(", ")}
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* ── Variant Comparison Table ── */}
         {diff && (
@@ -713,6 +852,15 @@ export default function JobReportPage() {
                           <RecIcon rec={e.recommendation} />
                           <span className="ml-1">{e.recommendation}</span>
                         </Badge>
+                        {(() => {
+                          const action = getActionLabel(e);
+                          const cfg = ACTION_CONFIG[action];
+                          return (
+                            <Badge variant="outline" className={`text-xs font-semibold px-2.5 py-0.5 ${cfg.bg} ${cfg.border} ${cfg.text}`}>
+                              {action}
+                            </Badge>
+                          );
+                        })()}
                       </div>
                     </div>
                     <div className="mb-3">
@@ -864,8 +1012,8 @@ export default function JobReportPage() {
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground w-16">Fit</th>
                       {diff && <th className="text-left px-4 py-3 font-medium text-muted-foreground w-16">Δ</th>}
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground w-24">Conf.</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-20">Enrich</th>
-                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-32">Rec.</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-36">Action</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-28">Rec.</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Dimensions</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Top Strength</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Top Gap</th>
@@ -911,13 +1059,15 @@ export default function JobReportPage() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            {e.requiresEnrichment ? (
-                              <Badge variant="outline" className="text-xs bg-amber-500/10 border-amber-200 text-amber-700">
-                                <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />Needed
-                              </Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
+                            {(() => {
+                              const action = getActionLabel(e);
+                              const cfg = ACTION_CONFIG[action];
+                              return (
+                                <Badge variant="outline" className={`text-xs font-medium ${cfg.bg} ${cfg.border} ${cfg.text}`}>
+                                  {action}
+                                </Badge>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-3">
                             <Badge variant="outline" className={`text-xs ${recBg(e.recommendation)}`}>

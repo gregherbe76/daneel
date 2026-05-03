@@ -123,6 +123,24 @@ async function buildReport(jobId: number, runId?: number) {
   };
 }
 
+// ── Action label helper ───────────────────────────────────────────────────────
+
+function computeActionLabel(e: {
+  score: number;
+  fitScore: number | null;
+  decisionScore: number | null;
+  confidenceLevel: string | null;
+  requiresEnrichment: boolean;
+}): string {
+  const decisionScore = e.decisionScore ?? e.score;
+  const fitScore = e.fitScore ?? decisionScore;
+  const conf = e.confidenceLevel;
+  if (e.requiresEnrichment || (fitScore >= 60 && conf === "Low")) return "Enrich before deciding";
+  if (decisionScore >= 70 && conf === "High") return "Interview now";
+  if (decisionScore < 50) return "Reject / low priority";
+  return "Review manually";
+}
+
 // ── JSON Report ───────────────────────────────────────────────────────────────
 
 router.get("/reports/job/:jobId/run/:runId", async (req, res) => {
@@ -169,6 +187,47 @@ router.get("/reports/job/:jobId/latest/markdown", async (req, res) => {
   md.push(`**Location:** ${job.location} | **Seniority:** ${job.seniority}  `);
   md.push(`**Report Date:** ${new Date(generatedAt).toLocaleDateString("en-US", { dateStyle: "long" })}  `);
   md.push(`**Workflow Run:** ${new Date(run.runDate).toLocaleDateString("en-US", { dateStyle: "long" })}${run.runSourcing ? " _(Sourcing enabled)_" : ""}`);
+  md.push("");
+  md.push("---");
+  md.push("");
+
+  // ── Decision Summary
+  const actionGroupsNamed: Record<string, string[]> = {
+    "Interview now": [],
+    "Review manually": [],
+    "Enrich before deciding": [],
+    "Reject / low priority": [],
+  };
+  evaluations.forEach((e) => {
+    const label = computeActionLabel(e as Parameters<typeof computeActionLabel>[0]);
+    actionGroupsNamed[label].push(e.candidate?.name ?? "Unknown");
+  });
+
+  md.push("## Decision Summary");
+  md.push("");
+  md.push(`_${evaluations.length} candidates evaluated · ${actionGroupsNamed["Interview now"].length} ready to advance_`);
+  md.push("");
+  md.push("| Action | Count | Candidates |");
+  md.push("|--------|-------|------------|");
+  md.push(`| ✅ Interview now | ${actionGroupsNamed["Interview now"].length} | ${actionGroupsNamed["Interview now"].join(", ") || "—"} |`);
+  md.push(`| 👁 Review manually | ${actionGroupsNamed["Review manually"].length} | ${actionGroupsNamed["Review manually"].join(", ") || "—"} |`);
+  md.push(`| 🔍 Enrich before deciding | ${actionGroupsNamed["Enrich before deciding"].length} | ${actionGroupsNamed["Enrich before deciding"].join(", ") || "—"} |`);
+  md.push(`| ⬇ Reject / low priority | ${actionGroupsNamed["Reject / low priority"].length} | ${actionGroupsNamed["Reject / low priority"].join(", ") || "—"} |`);
+  md.push("");
+  md.push("### Recommended Next Actions");
+  md.push("");
+  if (actionGroupsNamed["Interview now"].length > 0) {
+    md.push(`- **→ Schedule interviews:** ${actionGroupsNamed["Interview now"].join(", ")}`);
+  }
+  if (actionGroupsNamed["Review manually"].length > 0) {
+    md.push(`- **→ Review before advancing:** ${actionGroupsNamed["Review manually"].join(", ")} — verify experience depth and cultural fit`);
+  }
+  if (actionGroupsNamed["Enrich before deciding"].length > 0) {
+    md.push(`- **→ Enrich profiles first:** ${actionGroupsNamed["Enrich before deciding"].join(", ")} — insufficient data for a reliable decision`);
+  }
+  if (actionGroupsNamed["Reject / low priority"].length > 0) {
+    md.push(`- **→ Deprioritize:** ${actionGroupsNamed["Reject / low priority"].join(", ")}`);
+  }
   md.push("");
   md.push("---");
   md.push("");
@@ -344,6 +403,55 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
       doc.fill(color).fontSize(10).font("Helvetica").text(`• ${item}`, { indent: 12, width: W - 12 });
     });
   }
+
+  // ── DECISION SUMMARY
+  sectionHeading("Decision Summary");
+  const pdfActionGroups: Record<string, Array<{ name: string; score: number }>> = {
+    "Interview now": [],
+    "Review manually": [],
+    "Enrich before deciding": [],
+    "Reject / low priority": [],
+  };
+  evaluations.forEach((e) => {
+    const label = computeActionLabel(e as Parameters<typeof computeActionLabel>[0]);
+    pdfActionGroups[label].push({ name: e.candidate?.name ?? "Unknown", score: e.decisionScore ?? e.score });
+  });
+
+  const pdfBuckets = [
+    { key: "Interview now",          color: GREEN,   label: "Interview Now",   sub: "High confidence match" },
+    { key: "Review manually",        color: "#3b82f6", label: "Review Manually", sub: "Needs closer look" },
+    { key: "Enrich before deciding", color: AMBER,   label: "Enrich First",    sub: "Data too sparse" },
+    { key: "Reject / low priority",  color: MUTED,   label: "Low Priority",    sub: "Below threshold" },
+  ];
+  const dsBucketW = W / pdfBuckets.length;
+  const dsBucketStartX = 50;
+  const dsBucketStartY = doc.y;
+  pdfBuckets.forEach(({ key, color, label, sub }, i) => {
+    const x = dsBucketStartX + i * dsBucketW;
+    doc.rect(x, dsBucketStartY, dsBucketW - 6, 54).fill("#f8fafc").stroke(DIVIDER);
+    doc.fill(color).fontSize(20).font("Helvetica-Bold").text(String(pdfActionGroups[key].length), x + 6, dsBucketStartY + 4, { width: dsBucketW - 12, align: "center" });
+    doc.fill(PRIMARY).fontSize(8).font("Helvetica-Bold").text(label, x + 6, dsBucketStartY + 30, { width: dsBucketW - 12, align: "center" });
+    doc.fill(MUTED).fontSize(7).font("Helvetica").text(sub, x + 6, dsBucketStartY + 42, { width: dsBucketW - 12, align: "center" });
+  });
+  doc.y = dsBucketStartY + 66;
+
+  // Recommended Next Actions
+  doc.fill(MUTED).fontSize(9).font("Helvetica-Bold").text("RECOMMENDED NEXT ACTIONS");
+  doc.moveDown(0.2);
+  const nextActions: Array<{ arrow: string; color: string; text: string }> = [];
+  if (pdfActionGroups["Interview now"].length > 0)
+    nextActions.push({ arrow: "→", color: GREEN, text: `Schedule interviews: ${pdfActionGroups["Interview now"].map((c) => c.name).join(", ")}` });
+  if (pdfActionGroups["Review manually"].length > 0)
+    nextActions.push({ arrow: "→", color: "#3b82f6", text: `Review before advancing: ${pdfActionGroups["Review manually"].map((c) => c.name).join(", ")} — verify experience depth` });
+  if (pdfActionGroups["Enrich before deciding"].length > 0)
+    nextActions.push({ arrow: "→", color: AMBER, text: `Enrich profiles first: ${pdfActionGroups["Enrich before deciding"].map((c) => c.name).join(", ")} — too sparse to decide` });
+  if (pdfActionGroups["Reject / low priority"].length > 0)
+    nextActions.push({ arrow: "→", color: MUTED, text: `Deprioritize: ${pdfActionGroups["Reject / low priority"].map((c) => c.name).join(", ")}` });
+  nextActions.forEach(({ arrow, color, text }) => {
+    doc.fill(color).fontSize(10).font("Helvetica-Bold").text(arrow, 50, doc.y, { continued: true, width: 14 });
+    doc.fill(PRIMARY).font("Helvetica").text(` ${text}`, { width: W - 14 });
+  });
+  doc.moveDown(0.4);
 
   // ── RECOMMENDATION SUMMARY
   sectionHeading("Recommendation Summary");
