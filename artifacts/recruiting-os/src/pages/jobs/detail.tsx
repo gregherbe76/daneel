@@ -163,7 +163,17 @@ function SourcedCandidateCard({ candidate }: { candidate: SourcedCandidate }) {
 // Shown inline on the job kickoff area when sourcing is enabled and a GitHub
 // provider is assigned to the sourcing step. Lets the recruiter sanity-check
 // the assembled `q=` for THIS job before clicking Run.
-function JobGithubQueryPreview({ jobId }: { jobId: number }) {
+function JobGithubQueryPreview({
+  jobId,
+  jobTitle,
+  jobLocation,
+  jobMustHaveSkills,
+}: {
+  jobId: number;
+  jobTitle?: string | null;
+  jobLocation?: string | null;
+  jobMustHaveSkills?: string[] | null;
+}) {
   const { data: stepSettings = [] } = useListProviderStepSettings();
   const previewMutation = usePreviewGithubQuery();
 
@@ -180,12 +190,24 @@ function JobGithubQueryPreview({ jobId }: { jobId: number }) {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Stable signature of the job fields that affect the assembled query, so
+  // edits made in another tab (title/location/must-have skills) refresh the
+  // preview instead of leaving a stale `q=` on screen.
+  const jobQuerySignature = JSON.stringify([
+    jobTitle ?? "",
+    jobLocation ?? "",
+    [...(jobMustHaveSkills ?? [])].sort(),
+  ]);
+
   // Auto-build the assembled query as soon as the panel renders for a github
   // provider — no extra clicks needed for the common "just show me" case.
   useEffect(() => {
     if (!isGithub || !sourcingProvider) return;
     let cancelled = false;
     setError(null);
+    // Clear the previous query so a stale `q=` is never shown while the
+    // refreshed preview is in flight after a job edit.
+    setResult(null);
     previewMutation
       .mutateAsync({ data: { jobId, providerId: sourcingProvider.id, runMatches: false } })
       .then((res) => {
@@ -199,7 +221,7 @@ function JobGithubQueryPreview({ jobId }: { jobId: number }) {
     };
     // Intentionally re-run only when job or assigned provider changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId, sourcingProvider?.id, isGithub]);
+  }, [jobId, sourcingProvider?.id, isGithub, jobQuerySignature]);
 
   if (!isGithub || !sourcingProvider) return null;
 
@@ -714,7 +736,14 @@ export default function JobDetailPage() {
                     </p>
                   </div>
                 </div>
-                {runSourcing && <JobGithubQueryPreview jobId={jobId} />}
+                {runSourcing && (
+                  <JobGithubQueryPreview
+                    jobId={jobId}
+                    jobTitle={job.title}
+                    jobLocation={job.location}
+                    jobMustHaveSkills={job.mustHaveSkills}
+                  />
+                )}
                 {/* Enrichment */}
                 <div className={`flex items-start gap-2 px-2.5 py-2 rounded-md border transition-colors ${
                   runEnrichment ? "border-blue-200 bg-blue-500/5" : "border-border bg-muted/30"
