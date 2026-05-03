@@ -1,5 +1,5 @@
 import { useListCandidates } from "@workspace/api-client-react";
-import { Link } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,6 +16,12 @@ import { Plus, Users, Loader2, Mail, Upload, Filter } from "lucide-react";
 import { ImportCandidatesModal } from "@/components/import-candidates-modal";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
 import { EmailSourceBadge } from "@/components/email-source-badge";
+import {
+  EmailStatusFilter,
+  EmailStatusFilterValue,
+  isEmailStatusFilterValue,
+  matchesEmailStatusFilter,
+} from "@/components/email-status-filter";
 
 const EMAIL_SOURCE_OPTIONS: { value: string; label: string }[] = [
   { value: "profile", label: "Profile" },
@@ -42,10 +48,31 @@ const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
   },
 };
 
+const EMAIL_FILTER_PARAM = "email";
+
 export default function CandidatesPage() {
   const { data: candidates, isLoading, refetch } = useListCandidates();
   const [importOpen, setImportOpen] = useState(false);
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set());
+  const search = useSearch();
+  const [, navigate] = useLocation();
+
+  const emailFilter: EmailStatusFilterValue = useMemo(() => {
+    const parsed = new URLSearchParams(search);
+    const v = parsed.get(EMAIL_FILTER_PARAM);
+    return isEmailStatusFilterValue(v) ? v : "all";
+  }, [search]);
+
+  const setEmailFilter = (value: EmailStatusFilterValue) => {
+    const parsed = new URLSearchParams(search);
+    if (value === "all") {
+      parsed.delete(EMAIL_FILTER_PARAM);
+    } else {
+      parsed.set(EMAIL_FILTER_PARAM, value);
+    }
+    const qs = parsed.toString();
+    navigate(`/candidates${qs ? `?${qs}` : ""}`, { replace: true });
+  };
 
   const availableSources = useMemo(() => {
     const set = new Set<string>();
@@ -61,15 +88,44 @@ export default function CandidatesPage() {
     return { set, hasUnknown };
   }, [candidates]);
 
+  const matchesSourceFilter = (emailSource: string | null | undefined) => {
+    if (selectedSources.size === 0) return true;
+    if (emailSource && EMAIL_SOURCE_VALUES.has(emailSource)) {
+      return selectedSources.has(emailSource);
+    }
+    return selectedSources.has(UNKNOWN_SOURCE);
+  };
+
+  const counts = useMemo(() => {
+    const c: Partial<Record<EmailStatusFilterValue, number>> = {
+      all: 0,
+      valid: 0,
+      risky: 0,
+      invalid: 0,
+      unchecked: 0,
+    };
+    candidates?.forEach((cand) => {
+      if (!matchesSourceFilter(cand.emailSource)) return;
+      c.all! += 1;
+      const s = cand.emailValidationStatus;
+      if (s === "valid") c.valid! += 1;
+      else if (s === "risky") c.risky! += 1;
+      else if (s === "invalid") c.invalid! += 1;
+      else c.unchecked! += 1;
+    });
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidates, selectedSources]);
+
   const filteredCandidates = useMemo(() => {
     if (!candidates) return candidates;
-    if (selectedSources.size === 0) return candidates;
-    return candidates.filter((c) => {
-      const s = c.emailSource;
-      if (s && EMAIL_SOURCE_VALUES.has(s)) return selectedSources.has(s);
-      return selectedSources.has(UNKNOWN_SOURCE);
-    });
-  }, [candidates, selectedSources]);
+    return candidates.filter(
+      (c) =>
+        matchesSourceFilter(c.emailSource) &&
+        matchesEmailStatusFilter(c.emailValidationStatus, emailFilter),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [candidates, selectedSources, emailFilter]);
 
   const toggleSource = (value: string) => {
     setSelectedSources((prev) => {
@@ -82,7 +138,14 @@ export default function CandidatesPage() {
 
   const totalCount = candidates?.length ?? 0;
   const filteredCount = filteredCandidates?.length ?? 0;
-  const isFiltered = selectedSources.size > 0;
+  const isSourceFiltered = selectedSources.size > 0;
+  const isStatusFiltered = emailFilter !== "all";
+  const isFiltered = isSourceFiltered || isStatusFiltered;
+
+  const clearAllFilters = () => {
+    setSelectedSources(new Set());
+    setEmailFilter("all");
+  };
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -97,7 +160,7 @@ export default function CandidatesPage() {
               <Button variant="outline">
                 <Filter className="mr-2 h-4 w-4" />
                 Email source
-                {isFiltered && (
+                {isSourceFiltered && (
                   <Badge variant="secondary" className="ml-2 h-5 px-1.5">
                     {selectedSources.size}
                   </Badge>
@@ -127,7 +190,7 @@ export default function CandidatesPage() {
                   Unknown
                 </DropdownMenuCheckboxItem>
               )}
-              {isFiltered && (
+              {isSourceFiltered && (
                 <>
                   <DropdownMenuSeparator />
                   <button
@@ -154,18 +217,24 @@ export default function CandidatesPage() {
         </div>
       </div>
 
+      {!isLoading && (candidates?.length ?? 0) > 0 && (
+        <div className="mb-6">
+          <EmailStatusFilter value={emailFilter} onChange={setEmailFilter} counts={counts} />
+        </div>
+      )}
+
       {isFiltered && !isLoading && (
         <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
           <span>
-            Showing {filteredCount} of {totalCount} candidates filtered by email source.
+            Showing {filteredCount} of {totalCount} candidates.
           </span>
           <Button
             variant="link"
             size="sm"
             className="h-auto p-0"
-            onClick={() => setSelectedSources(new Set())}
+            onClick={clearAllFilters}
           >
-            Clear
+            Clear all
           </Button>
         </div>
       )}
@@ -193,18 +262,18 @@ export default function CandidatesPage() {
             </Link>
           </div>
         </Card>
-      ) : isFiltered && filteredCount === 0 ? (
+      ) : filteredCount === 0 ? (
         <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed">
-          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <Filter className="h-6 w-6 text-primary" />
+          <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Filter className="h-6 w-6 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold mb-1">No matching candidates</h3>
+          <h3 className="text-lg font-semibold mb-1">No candidates match these filters</h3>
           <p className="text-muted-foreground mb-4">
-            None of your {totalCount} candidates have an email from the selected
-            sources. Try adjusting the filter.
+            None of your {totalCount} candidates match the current email source and status
+            filters. Try adjusting them.
           </p>
-          <Button variant="outline" onClick={() => setSelectedSources(new Set())}>
-            Clear filter
+          <Button variant="outline" onClick={clearAllFilters}>
+            Clear all filters
           </Button>
         </Card>
       ) : (

@@ -545,6 +545,12 @@ export const RecheckCandidateEmailResponse = zod.object({
   githubUsername: zod.string().nullish(),
   sourcingConfidence: zod.number().nullish(),
   source: zod.string().nullish(),
+  emailSource: zod
+    .enum(["profile", "commit", "noreply", "generated", "manual"])
+    .nullish()
+    .describe(
+      'Where the candidate\'s email came from, so recruiters can gauge\ntrust before outreach. \"profile\" = verified profile email,\n\"commit\" = inferred from public commit metadata,\n\"noreply\" = placeholder noreply (not deliverable),\n\"generated\" = AI\/mock placeholder (not deliverable),\n\"manual\" = entered by a recruiter.\n',
+    ),
   enrichedAt: zod.coerce.date().nullish(),
   enrichmentSource: zod.string().nullish(),
   enrichmentConfidence: zod.number().nullish(),

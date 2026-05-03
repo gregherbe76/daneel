@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   useGetJob,
   useGetJobApplications,
@@ -14,7 +14,7 @@ import {
   useListProviderStepSettings,
   usePreviewGithubQuery,
 } from "@workspace/api-client-react";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -45,6 +45,13 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CandidateNotesIndicator } from "@/components/candidate-notes-indicator";
 import { EmailSourceBadge } from "@/components/email-source-badge";
+import { EmailValidationBadge } from "@/components/email-validation-badge";
+import {
+  EmailStatusFilter,
+  EmailStatusFilterValue,
+  isEmailStatusFilterValue,
+  matchesEmailStatusFilter,
+} from "@/components/email-status-filter";
 
 // ── color helpers ────────────────────────────────────────────────────────────
 
@@ -306,6 +313,45 @@ export default function JobDetailPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [highlightStep2, setHighlightStep2] = useState(false);
   const [isImproveModalOpen, setIsImproveModalOpen] = useState(false);
+
+  const search = useSearch();
+  const [, navigate] = useLocation();
+  const emailFilter: EmailStatusFilterValue = useMemo(() => {
+    const parsed = new URLSearchParams(search);
+    const v = parsed.get("email");
+    return isEmailStatusFilterValue(v) ? v : "all";
+  }, [search]);
+  const setEmailFilter = (value: EmailStatusFilterValue) => {
+    const parsed = new URLSearchParams(search);
+    if (value === "all") parsed.delete("email");
+    else parsed.set("email", value);
+    const qs = parsed.toString();
+    navigate(`/jobs/${jobId}${qs ? `?${qs}` : ""}`, { replace: true });
+  };
+  const emailFilteredApplications = useMemo(
+    () =>
+      applications?.filter((app) =>
+        matchesEmailStatusFilter(app.candidate.emailValidationStatus, emailFilter),
+      ),
+    [applications, emailFilter],
+  );
+  const emailCounts = useMemo(() => {
+    const c: Partial<Record<EmailStatusFilterValue, number>> = {
+      all: applications?.length ?? 0,
+      valid: 0,
+      risky: 0,
+      invalid: 0,
+      unchecked: 0,
+    };
+    applications?.forEach((app) => {
+      const s = app.candidate.emailValidationStatus;
+      if (s === "valid") c.valid! += 1;
+      else if (s === "risky") c.risky! += 1;
+      else if (s === "invalid") c.invalid! += 1;
+      else c.unchecked! += 1;
+    });
+    return c;
+  }, [applications]);
 
   const stages = Object.values(ApplicationStage);
 
@@ -1090,7 +1136,16 @@ export default function JobDetailPage() {
 
           {/* ── PIPELINE BOARD ── */}
           <div className="flex-1 overflow-x-auto pb-4">
-            <h2 className="text-lg font-semibold mb-4">Pipeline</h2>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h2 className="text-lg font-semibold">Pipeline</h2>
+              {(applications?.length ?? 0) > 0 && (
+                <EmailStatusFilter
+                  value={emailFilter}
+                  onChange={setEmailFilter}
+                  counts={emailCounts}
+                />
+              )}
+            </div>
             {applications?.length === 0 && (
               <div className="border-2 border-dashed border-border rounded-xl p-12 flex flex-col items-center justify-center text-center mb-4">
                 <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center mb-4">
@@ -1114,7 +1169,7 @@ export default function JobDetailPage() {
             )}
             <div className="h-full min-w-max flex gap-4">
               {stages.map((stage) => {
-                const appsInStage = applications?.filter((app) => app.stage === stage) || [];
+                const appsInStage = emailFilteredApplications?.filter((app) => app.stage === stage) || [];
                 return (
                   <div key={stage} className="flex-shrink-0 w-80 flex flex-col bg-muted/30 rounded-lg border border-border overflow-hidden">
                     <div className="p-3 border-b border-border bg-muted/50 font-medium flex justify-between items-center">
@@ -1176,10 +1231,16 @@ export default function JobDetailPage() {
                               )}
                             </div>
                             
-                            <div className="text-xs text-muted-foreground flex items-center gap-1.5 mb-2 min-w-0">
+                            <div className="text-xs text-muted-foreground flex items-center gap-1.5 mb-1 min-w-0">
                               <Mail className="h-3 w-3 shrink-0" />
                               <span className="truncate">{app.candidate.email}</span>
                               <EmailSourceBadge source={app.candidate.emailSource} className="shrink-0" />
+                            </div>
+                            <div className="mb-2">
+                              <EmailValidationBadge
+                                status={app.candidate.emailValidationStatus}
+                                reason={app.candidate.emailValidationReason}
+                              />
                             </div>
                             
                             {evalData && (
