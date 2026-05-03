@@ -111,3 +111,35 @@ Workflow steps: `job_understanding`, `candidate_matching`, `shortlist_generation
 - `shortlists` — ranked shortlist with summaries
 - `agent_providers` — configured provider records
 - `workflow_provider_settings` — step → provider assignments
+
+### Re-scoring historical evaluations (rubric changes)
+The HiringAI scoring rubric is currently the 3-dimension startup-tuned set:
+`autonomy 0.35`, `productMindset 0.30`, `impact 0.35`. When the rubric changes,
+historical `ai_evaluations` rows still carry the old `scoreBreakdown` shape and
+need to be re-scored so old reports render the new dimensions.
+
+One-shot script: `scripts/src/rescore-3d.ts`
+
+```bash
+pnpm --filter @workspace/scripts run rescore-3d -- --job 12          # one job
+pnpm --filter @workspace/scripts run rescore-3d -- --run 47          # one agent run
+pnpm --filter @workspace/scripts run rescore-3d -- --all-hiringai    # everything
+pnpm --filter @workspace/scripts run rescore-3d -- --job 12 --dry    # preview, no writes
+```
+
+The script REFUSES to run globally without an explicit scope flag — this
+prevents accidentally overwriting evaluations that came from a different
+rubric variant (the HireFlow/ShortlistPro 6-dimension rubric is tracked in
+a separate task). Use `--all-hiringai` only when every row in `ai_evaluations`
+is known to be a HiringAI evaluation.
+
+It re-runs candidate matching against the 3-D rubric (using stored
+`job_insights` + candidate profile) and updates the row in place — preserving
+`runId/jobId/candidateId` so historical agent runs stay linked.
+`dataConfidenceScore` is preserved when present; for legacy rows where it is
+null, it is recomputed from the candidate profile using the same logic as
+`engine.ts:computeDataConfidenceScore` (no arbitrary defaults).
+`decisionScore` and `score` are recomputed from the new `fitScore`.
+
+If the rubric changes again, edit the `RUBRIC` constant and the prompt in
+`scripts/src/rescore-3d.ts`, then re-run the script.

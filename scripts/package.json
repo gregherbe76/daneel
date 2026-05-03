@@ -5,7 +5,13 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "rescore-3d": "tsx ./src/rescore-3d.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@workspace/db": "workspace:*",
+    "@workspace/integrations-openai-ai-server": "workspace:*",
+    "drizzle-orm": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
