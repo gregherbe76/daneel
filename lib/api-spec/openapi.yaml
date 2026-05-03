@@ -1436,10 +1436,10 @@ components:
             webhook may fail. Drives the workflow kickoff modal's default
             toggles so newly opened jobs pre-select Real Data Run + Run
             Sourcing on when a first-class real provider is available,
-            instead of the historical Mock + off defaults. Only populated
-            by GET /jobs/:id; absent (treated as false) on the list
-            endpoint.
-      required: [id, title, description, location, seniority, mustHaveSkills, scoringWeights, createdAt, updatedAt]
+            instead of the historical Mock + off defaults. Populated by
+            both GET /jobs and GET /jobs/:id; the value is currently
+            global so it is identical across rows in the list response.
+      required: [id, title, description, location, seniority, mustHaveSkills, scoringWeights, createdAt, updatedAt, hasRealSourcingProvider]
 
     CreateJobBody:
       type: object

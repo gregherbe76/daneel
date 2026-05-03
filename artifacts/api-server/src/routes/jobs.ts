@@ -17,7 +17,13 @@ const router = Router();
 // List all jobs
 router.get("/jobs", async (req, res) => {
   const jobs = await db.select().from(jobsTable).orderBy(jobsTable.createdAt);
-  res.json(jobs);
+  // hasRealSourcingProvider is currently a global setting (driven by the
+  // sourcing workflow step's assigned provider), so we resolve it once and
+  // spread the same value onto every row instead of N+1 queries.
+  const realSourcingAvailable = await hasRealSourcingProvider();
+  res.json(
+    jobs.map((job) => ({ ...job, hasRealSourcingProvider: realSourcingAvailable })),
+  );
 });
 
 // Create a job
@@ -34,7 +40,8 @@ router.post("/jobs", async (req, res) => {
       scoringWeights: body.scoringWeights ?? DEFAULT_SCORING_WEIGHTS,
     })
     .returning();
-  res.status(201).json(job);
+  const realSourcingAvailable = await hasRealSourcingProvider();
+  res.status(201).json({ ...job, hasRealSourcingProvider: realSourcingAvailable });
 });
 
 // Get a job by ID
@@ -78,7 +85,8 @@ router.put("/jobs/:id", async (req, res) => {
     res.status(404).json({ error: "Job not found" });
     return;
   }
-  res.json(job);
+  const realSourcingAvailable = await hasRealSourcingProvider();
+  res.json({ ...job, hasRealSourcingProvider: realSourcingAvailable });
 });
 
 // Delete a job
@@ -109,9 +117,10 @@ router.get("/jobs/:id/applications", async (req, res) => {
     )
     .orderBy(applicationsTable.createdAt);
 
+  const realSourcingAvailable = await hasRealSourcingProvider();
   const result = rows.map((r) => ({
     ...r.applications,
-    job: r.jobs,
+    job: { ...r.jobs, hasRealSourcingProvider: realSourcingAvailable },
     candidate: r.candidates,
   }));
   res.json(result);

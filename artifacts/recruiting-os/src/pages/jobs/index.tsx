@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MapPin, Loader2, Briefcase, Sparkles } from "lucide-react";
+import { Plus, MapPin, Loader2, Briefcase, Sparkles, Zap, FlaskConical } from "lucide-react";
 import { useUnseenRunsByJob } from "@/lib/pending-runs";
 
 export default function JobsPage() {
@@ -49,8 +49,26 @@ export default function JobsPage() {
               <Card className="p-6 hover:border-primary/50 transition-colors cursor-pointer group relative">
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="text-xl font-semibold group-hover:text-primary transition-colors flex items-center gap-2">
+                    <h3 className="text-xl font-semibold group-hover:text-primary transition-colors flex items-center gap-2 flex-wrap">
                       {job.title}
+                      {job.hasRealSourcingProvider ? (
+                        <Badge
+                          className="bg-green-500/15 text-green-700 border border-green-500/30 hover:bg-green-500/15 gap-1"
+                          title="A real sourcing provider is configured — workflow runs will use real candidates."
+                        >
+                          <Zap className="h-3 w-3" />
+                          Real sourcing ready
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="secondary"
+                          className="text-muted-foreground gap-1"
+                          title="No real sourcing provider is configured — workflow runs will use mock candidates."
+                        >
+                          <FlaskConical className="h-3 w-3" />
+                          Demo mode
+                        </Badge>
+                      )}
                       {unseenCount > 0 && (
                         <Badge className="bg-primary/15 text-primary border border-primary/30 hover:bg-primary/15 gap-1">
                           <Sparkles className="h-3 w-3" />

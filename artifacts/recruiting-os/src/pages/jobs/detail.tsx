@@ -667,12 +667,30 @@ export default function JobDetailPage() {
         <div className="max-w-7xl mx-auto flex justify-between items-start gap-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight mb-2">{job.title}</h1>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4 flex-wrap">
               <span className="flex items-center gap-1">
                 <MapPin className="h-4 w-4" />
                 {job.location}
               </span>
               <Badge variant="secondary">{job.seniority}</Badge>
+              {job.hasRealSourcingProvider ? (
+                <Badge
+                  className="bg-green-500/15 text-green-700 border border-green-500/30 hover:bg-green-500/15 gap-1"
+                  title="A real sourcing provider is configured — workflow runs will use real candidates."
+                >
+                  <Zap className="h-3 w-3" />
+                  Real sourcing ready
+                </Badge>
+              ) : (
+                <Badge
+                  variant="secondary"
+                  className="text-muted-foreground gap-1"
+                  title="No real sourcing provider is configured — workflow runs will use mock candidates."
+                >
+                  <FlaskConical className="h-3 w-3" />
+                  Demo mode
+                </Badge>
+              )}
             </div>
             <div className="flex gap-2 flex-wrap">
               {job.mustHaveSkills?.map((skill) => (

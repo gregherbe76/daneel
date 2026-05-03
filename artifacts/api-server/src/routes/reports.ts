@@ -16,6 +16,7 @@ import { branding as defaultBranding } from "@workspace/branding";
 import { loadBrandingSettings } from "./branding";
 import { safeFetchLogoBytes } from "../lib/safe-fetch";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import { hasRealSourcingProvider } from "./workflows/providers/registry";
 
 const objectStorageService = new ObjectStorageService();
 
@@ -155,7 +156,7 @@ async function buildReport(jobId: number, runId?: number) {
       variantLabel: run.variantLabel ?? null,
       variantCriteria: run.variantCriteria ?? null,
     },
-    job: job[0],
+    job: { ...job[0], hasRealSourcingProvider: await hasRealSourcingProvider() },
     insight,
     top5: top5WithCandidates,
     evaluations: evaluationsWithCandidates,

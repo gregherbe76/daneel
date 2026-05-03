@@ -13,18 +13,24 @@ import {
   UpdateApplicationParams,
   DeleteApplicationParams,
 } from "@workspace/api-zod";
+import { hasRealSourcingProvider } from "./workflows/providers/registry";
 
 const router = Router();
 
-// Helper: join row to ApplicationWithDetails
-function toWithDetails(r: {
-  applications: typeof applicationsTable.$inferSelect;
-  jobs: typeof jobsTable.$inferSelect;
-  candidates: typeof candidatesTable.$inferSelect;
-}) {
+// Helper: join row to ApplicationWithDetails. The embedded `job` carries the
+// derived `hasRealSourcingProvider` flag (a global setting) so the OpenAPI
+// `Job` schema's required field is always present on nested responses.
+function toWithDetails(
+  r: {
+    applications: typeof applicationsTable.$inferSelect;
+    jobs: typeof jobsTable.$inferSelect;
+    candidates: typeof candidatesTable.$inferSelect;
+  },
+  realSourcingAvailable: boolean,
+) {
   return {
     ...r.applications,
-    job: r.jobs,
+    job: { ...r.jobs, hasRealSourcingProvider: realSourcingAvailable },
     candidate: r.candidates,
   };
 }
@@ -44,7 +50,8 @@ router.get("/applications", async (req, res) => {
     )
     .where(isNull(candidatesTable.deletedAt))
     .orderBy(applicationsTable.createdAt);
-  res.json(rows.map(toWithDetails));
+  const realSourcingAvailable = await hasRealSourcingProvider();
+  res.json(rows.map((r) => toWithDetails(r, realSourcingAvailable)));
 });
 
 // Create an application
@@ -83,7 +90,8 @@ router.get("/applications/:id", async (req, res) => {
     res.status(404).json({ error: "Application not found" });
     return;
   }
-  res.json(toWithDetails(rows[0]));
+  const realSourcingAvailable = await hasRealSourcingProvider();
+  res.json(toWithDetails(rows[0], realSourcingAvailable));
 });
 
 // Update an application (stage, notes)

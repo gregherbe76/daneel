@@ -16,6 +16,7 @@ import {
   RestoreCandidateBatchBody,
 } from "@workspace/api-zod";
 import { revalidateCandidateEmail } from "../lib/email-revalidation";
+import { hasRealSourcingProvider } from "./workflows/providers/registry";
 import {
   enqueueBulkJob,
   getBulkJob,
@@ -409,9 +410,10 @@ router.get("/candidates/:id/applications", async (req, res) => {
     .where(eq(applicationsTable.candidateId, id))
     .orderBy(applicationsTable.createdAt);
 
+  const realSourcingAvailable = await hasRealSourcingProvider();
   const result = rows.map((r) => ({
     ...r.applications,
-    job: r.jobs,
+    job: { ...r.jobs, hasRealSourcingProvider: realSourcingAvailable },
     candidate: r.candidates,
   }));
   res.json(result);
