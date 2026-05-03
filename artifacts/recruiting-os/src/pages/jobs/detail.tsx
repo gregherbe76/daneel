@@ -429,9 +429,9 @@ export default function JobDetailPage() {
                   <div>
                     <Label htmlFor="run-enrichment" className="text-xs font-medium cursor-pointer flex items-center gap-1.5">
                       <Sparkles className="h-3 w-3 text-blue-600" />
-                      Enrich profiles before matching
+                      Enrich candidates before scoring
                     </Label>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Additional signals and confidence scores</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Requires an enrichment provider in Workflow Step Assignments. No native fallback.</p>
                   </div>
                 </div>
                 {/* Edit job */}
@@ -803,7 +803,12 @@ export default function JobDetailPage() {
                     <div className="flex-1 overflow-y-auto p-3 space-y-3">
                       {appsInStage.map((app) => {
                         const evalData = workflowData?.evaluations?.find((e: { candidateId: number }) => e.candidateId === app.candidate.id);
-                        const isSourced = app.candidate.source === "AI Generated / Mock Sourcing";
+                        const isSourced = app.candidate.source === "AI Generated / Mock Sourcing" || app.candidate.source === "Mock";
+                        const enrichmentStatus = app.candidate.enrichmentStatus ?? null;
+                        const isLinkedInImport = app.candidate.source === "LinkedIn Paste";
+                        const showNotEnriched =
+                          !enrichmentStatus &&
+                          (isLinkedInImport || !app.candidate.summary || (app.candidate.skills?.length ?? 0) === 0);
                         return (
                           <div key={app.id} className={`bg-card border rounded-md p-4 shadow-sm hover:border-primary/50 transition-colors ${
                             isSourced ? "border-purple-200" : "border-border"
@@ -815,11 +820,33 @@ export default function JobDetailPage() {
                                     {app.candidate.name}
                                   </div>
                                 </Link>
-                                {isSourced && (
-                                  <Badge variant="outline" className="mt-1 text-[10px] py-0 h-4 bg-purple-500/10 text-purple-700 border-purple-200">
-                                    <Zap className="h-2.5 w-2.5 mr-1" />AI Sourced
-                                  </Badge>
-                                )}
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {isSourced && (
+                                    <Badge variant="outline" className="text-[10px] py-0 h-4 bg-purple-500/10 text-purple-700 border-purple-200">
+                                      <Zap className="h-2.5 w-2.5 mr-1" />AI Sourced
+                                    </Badge>
+                                  )}
+                                  {enrichmentStatus === "enriched" && (
+                                    <Badge variant="outline" className="text-[10px] py-0 h-4 bg-blue-500/10 text-blue-700 border-blue-200">
+                                      <Sparkles className="h-2.5 w-2.5 mr-1" />Enriched
+                                    </Badge>
+                                  )}
+                                  {enrichmentStatus === "partial" && (
+                                    <Badge variant="outline" className="text-[10px] py-0 h-4 bg-amber-500/10 text-amber-700 border-amber-200">
+                                      <Sparkles className="h-2.5 w-2.5 mr-1" />Partial
+                                    </Badge>
+                                  )}
+                                  {enrichmentStatus === "failed" && (
+                                    <Badge variant="outline" className="text-[10px] py-0 h-4 bg-red-500/10 text-red-700 border-red-200">
+                                      <Sparkles className="h-2.5 w-2.5 mr-1" />Enrichment failed
+                                    </Badge>
+                                  )}
+                                  {showNotEnriched && (
+                                    <Badge variant="outline" className="text-[10px] py-0 h-4 bg-muted text-muted-foreground border-border">
+                                      <Sparkles className="h-2.5 w-2.5 mr-1" />Not enriched
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
                               {evalData && (
                                 <Badge variant="outline" className={`ml-2 shrink-0 ${getScoreColor(evalData.score)}`}>

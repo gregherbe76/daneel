@@ -842,6 +842,10 @@ components:
         enrichmentConfidence:
           type: number
           nullable: true
+        enrichmentStatus:
+          type: string
+          enum: [enriched, partial, failed]
+          nullable: true
         createdAt:
           type: string
           format: date-time

@@ -54,6 +54,16 @@ export interface CreateJobBody {
   mustHaveSkills: string[];
 }
 
+export type CandidateEnrichmentStatus =
+  | (typeof CandidateEnrichmentStatus)[keyof typeof CandidateEnrichmentStatus]
+  | null;
+
+export const CandidateEnrichmentStatus = {
+  enriched: "enriched",
+  partial: "partial",
+  failed: "failed",
+} as const;
+
 export interface Candidate {
   id: number;
   name: string;
@@ -69,6 +79,7 @@ export interface Candidate {
   enrichedAt?: string | null;
   enrichmentSource?: string | null;
   enrichmentConfidence?: number | null;
+  enrichmentStatus?: CandidateEnrichmentStatus;
   createdAt: string;
   updatedAt: string;
 }

@@ -113,10 +113,14 @@ export async function resolveSourcingProvider(): Promise<{ provider: AgentProvid
 /**
  * Resolve the provider for the enrichment step.
  *
- * Falls back to NativeOpenAIEnrichmentProvider when no setting is configured.
- * If the configured provider fails, the engine will retry with the native provider.
+ * Unlike other steps, enrichment has NO native fallback. It only runs when an
+ * explicit provider is assigned in Settings → Workflow Step Assignments. If no
+ * provider is configured, returns null and the engine will skip enrichment.
+ *
+ * To use native enrichment, explicitly assign a native_openai provider to the
+ * enrichment step in the Settings UI.
  */
-export async function resolveEnrichmentProvider(): Promise<AgentProvider> {
+export async function resolveEnrichmentProvider(): Promise<AgentProvider | null> {
   try {
     const [setting] = await db
       .select()
@@ -125,7 +129,8 @@ export async function resolveEnrichmentProvider(): Promise<AgentProvider> {
       .limit(1);
 
     if (!setting || !setting.enabled) {
-      return new NativeOpenAIEnrichmentProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME);
+      logger.info({ step: "enrichment" }, "No enrichment provider configured — enrichment will be skipped");
+      return null;
     }
 
     const [providerRow] = await db
@@ -135,14 +140,14 @@ export async function resolveEnrichmentProvider(): Promise<AgentProvider> {
       .limit(1);
 
     if (!providerRow || !providerRow.enabled) {
-      logger.warn({ step: "enrichment", providerId: setting.providerId }, "Enrichment provider not found or disabled — falling back to native");
-      return new NativeOpenAIEnrichmentProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME);
+      logger.warn({ step: "enrichment", providerId: setting.providerId }, "Enrichment provider not found or disabled — skipping enrichment");
+      return null;
     }
 
     return buildProvider(providerRow);
   } catch (err) {
-    logger.error({ step: "enrichment", err }, "Failed to resolve enrichment provider — falling back to native");
-    return new NativeOpenAIEnrichmentProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME);
+    logger.error({ step: "enrichment", err }, "Failed to resolve enrichment provider — skipping enrichment");
+    return null;
   }
 }
 

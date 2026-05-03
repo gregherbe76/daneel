@@ -193,6 +193,7 @@ export const GetJobApplicationsResponseItem = zod.object({
     enrichedAt: zod.coerce.date().nullish(),
     enrichmentSource: zod.string().nullish(),
     enrichmentConfidence: zod.number().nullish(),
+    enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -219,6 +220,7 @@ export const ListCandidatesResponseItem = zod.object({
   enrichedAt: zod.coerce.date().nullish(),
   enrichmentSource: zod.string().nullish(),
   enrichmentConfidence: zod.number().nullish(),
+  enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -257,6 +259,7 @@ export const GetCandidateResponse = zod.object({
   enrichedAt: zod.coerce.date().nullish(),
   enrichmentSource: zod.string().nullish(),
   enrichmentConfidence: zod.number().nullish(),
+  enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -291,6 +294,7 @@ export const UpdateCandidateResponse = zod.object({
   enrichedAt: zod.coerce.date().nullish(),
   enrichmentSource: zod.string().nullish(),
   enrichmentConfidence: zod.number().nullish(),
+  enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -359,6 +363,7 @@ export const GetCandidateApplicationsResponseItem = zod.object({
     enrichedAt: zod.coerce.date().nullish(),
     enrichmentSource: zod.string().nullish(),
     enrichmentConfidence: zod.number().nullish(),
+    enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -420,6 +425,7 @@ export const ListApplicationsResponseItem = zod.object({
     enrichedAt: zod.coerce.date().nullish(),
     enrichmentSource: zod.string().nullish(),
     enrichmentConfidence: zod.number().nullish(),
+    enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -501,6 +507,7 @@ export const GetApplicationResponse = zod.object({
     enrichedAt: zod.coerce.date().nullish(),
     enrichmentSource: zod.string().nullish(),
     enrichmentConfidence: zod.number().nullish(),
+    enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -687,6 +694,7 @@ export const GetLatestJobWorkflowResponse = zod.object({
         enrichedAt: zod.coerce.date().nullish(),
         enrichmentSource: zod.string().nullish(),
         enrichmentConfidence: zod.number().nullish(),
+        enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
         createdAt: zod.coerce.date(),
         updatedAt: zod.coerce.date(),
       }),
@@ -1067,6 +1075,9 @@ export const GetJobReportForRunResponse = zod.object({
           enrichedAt: zod.coerce.date().nullish(),
           enrichmentSource: zod.string().nullish(),
           enrichmentConfidence: zod.number().nullish(),
+          enrichmentStatus: zod
+            .enum(["enriched", "partial", "failed"])
+            .nullish(),
           createdAt: zod.coerce.date(),
           updatedAt: zod.coerce.date(),
         })
@@ -1106,6 +1117,9 @@ export const GetJobReportForRunResponse = zod.object({
           enrichedAt: zod.coerce.date().nullish(),
           enrichmentSource: zod.string().nullish(),
           enrichmentConfidence: zod.number().nullish(),
+          enrichmentStatus: zod
+            .enum(["enriched", "partial", "failed"])
+            .nullish(),
           createdAt: zod.coerce.date(),
           updatedAt: zod.coerce.date(),
         })
@@ -1215,6 +1229,9 @@ export const GetJobReportResponse = zod.object({
           enrichedAt: zod.coerce.date().nullish(),
           enrichmentSource: zod.string().nullish(),
           enrichmentConfidence: zod.number().nullish(),
+          enrichmentStatus: zod
+            .enum(["enriched", "partial", "failed"])
+            .nullish(),
           createdAt: zod.coerce.date(),
           updatedAt: zod.coerce.date(),
         })
@@ -1254,6 +1271,9 @@ export const GetJobReportResponse = zod.object({
           enrichedAt: zod.coerce.date().nullish(),
           enrichmentSource: zod.string().nullish(),
           enrichmentConfidence: zod.number().nullish(),
+          enrichmentStatus: zod
+            .enum(["enriched", "partial", "failed"])
+            .nullish(),
           createdAt: zod.coerce.date(),
           updatedAt: zod.coerce.date(),
         })

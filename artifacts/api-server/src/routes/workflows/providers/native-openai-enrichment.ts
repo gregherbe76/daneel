@@ -17,11 +17,14 @@ export type EnrichmentCandidate = {
 
 export type EnrichmentResult = {
   candidateId: number;
-  enrichedSummary: string;
-  enrichedSkills: string[];
   enrichedHeadline: string | null;
-  additionalSignals: string[];
+  currentCompany: string | null;
+  location: string | null;
+  skills: string[];
+  experienceSummary: string;
+  evidence: string;
   confidence: number;
+  missingFields: string[];
 };
 
 export type EnrichmentPayload = {
@@ -53,39 +56,52 @@ export class NativeOpenAIEnrichmentProvider implements AgentProvider {
 
     logger.info({ runId: input.runId, candidateCount: candidates.length }, "Native enrichment starting");
 
-    const prompt = `You are an expert talent researcher. For each candidate below, enrich their profile based on any available signals in their data and the job context.
+    const prompt = `You are a candidate data normalizer. Your job is to improve candidate records using ONLY data explicitly present in the profile provided — you must NEVER fabricate, infer, or guess information that is not clearly stated in the input.
 
-JOB CONTEXT:
+STRICT RULES:
+1. NEVER invent skills, companies, locations, or any facts not explicitly present in the candidate data
+2. If a field cannot be determined from the available data alone, add it to missingFields and return null/[] for it
+3. Set confidence based on how much verifiable data was available (0.0 = essentially no data, 1.0 = complete profile)
+4. A LinkedIn placeholder email like "linkedin-*@placeholder.import" means the profile was imported from a URL slug — you have almost no real data; set confidence ≤ 0.2 and list most fields as missing
+5. experienceSummary must only describe what is explicitly known — never embellish or speculate
+6. evidence must cite which specific data points you used (e.g. "headline field", "email domain", "existing skills list")
+7. skills may only include skills already listed in the candidate's skills array — do not add new ones unless they appear in the headline or summary verbatim
+
+JOB CONTEXT (for relevance framing only — do not use to invent skills):
 Title: ${jobContext.title} (${jobContext.seniority})
 Must-Have Skills: ${jobContext.mustHaveSkills.join(", ")}
 
 CANDIDATES:
-${candidates.map((c, i) => `[${i}] id=${c.id} name="${c.name}" headline="${c.headline ?? ""}" currentCompany="${c.currentCompany ?? ""}" skills=${JSON.stringify(c.skills)} summary="${(c.summary ?? "").slice(0, 200)}"`).join("\n")}
+${candidates.map((c, i) => `[${i}] id=${c.id}
+  name: "${c.name}"
+  email: "${c.email}"
+  headline: "${c.headline ?? "(none)"}"
+  currentCompany: "${c.currentCompany ?? "(none)"}"
+  location: "${c.location ?? "(none)"}"
+  linkedIn: "${c.linkedIn ?? "(none)"}"
+  skills: ${JSON.stringify(c.skills)}
+  summary: "${(c.summary ?? "(none)").slice(0, 300)}"`).join("\n\n")}
 
-For each candidate, produce:
-- enrichedSummary: a concise 2-3 sentence narrative connecting their background to the job context
-- enrichedSkills: expanded skill list (inferred from role/company signals + existing skills, max 12 total)
-- enrichedHeadline: improved headline if possible, else null
-- additionalSignals: 1-3 concrete inferred signals relevant to this role (e.g. "Likely experienced with React given frontend role at fintech startup")
-- confidence: float 0.0-1.0 representing how confident the enrichment is (higher = more data available)
-
-Return a JSON array with exactly ${candidates.length} objects matching this shape:
+For each candidate return an object in this JSON array:
 [
   {
-    "candidateId": <number matching the id field>,
-    "enrichedSummary": "...",
-    "enrichedSkills": ["skill1", "skill2"],
-    "enrichedHeadline": "...",
-    "additionalSignals": ["signal1"],
-    "confidence": 0.7
+    "candidateId": <number matching id>,
+    "enrichedHeadline": "<improved headline or null if cannot determine>",
+    "currentCompany": "<company name if clearly present in data, else null>",
+    "location": "<location if clearly present, else null>",
+    "skills": ["only skills already in their data or explicitly mentioned in headline/summary"],
+    "experienceSummary": "<brief factual summary of what is known, no invention>",
+    "evidence": "<which data points were used>",
+    "confidence": <float 0.0-1.0 — be conservative, most placeholder profiles should be ≤ 0.2>,
+    "missingFields": ["list of field names that could not be determined from available data"]
   }
 ]
 
-Return only valid JSON, no markdown.`;
+Return only valid JSON array, no markdown.`;
 
     const response = await openai.chat.completions.create({
       model: "gpt-5.1",
-      max_completion_tokens: 3000,
+      max_completion_tokens: 4000,
       messages: [{ role: "user", content: prompt }],
     });
 

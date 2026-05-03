@@ -10,7 +10,7 @@ import {
   applicationsTable,
 } from "@workspace/db";
 import type { VariantCriteria, DataMode } from "@workspace/db";
-import { eq, ne, and } from "drizzle-orm";
+import { eq, ne, and, inArray } from "drizzle-orm";
 import { logger } from "../../lib/logger";
 import { resolveProvider, resolveSourcingProvider, resolveEnrichmentProvider } from "./providers";
 import type { JobInsightResult, CandidateMatchResult, ShortlistResult } from "./engine-types";
@@ -137,16 +137,68 @@ async function runSourcing(
 
 // ── STEP 0b: Enrichment (optional) ───────────────────────────────────────────
 
+/**
+ * Returns true if a candidate needs enrichment — i.e. has sparse or placeholder data.
+ * We only enrich candidates that are likely incomplete to avoid overwriting good data.
+ */
+function needsEnrichment(c: {
+  source: string | null;
+  summary: string | null;
+  skills: string[];
+  headline: string | null;
+}): boolean {
+  if (c.source === "LinkedIn Paste") return true;
+  if (!c.summary || c.summary.startsWith("Imported from LinkedIn")) return true;
+  if (c.skills.length === 0) return true;
+  if (!c.headline) return true;
+  return false;
+}
+
 async function runEnrichment(
   runId: number,
   jobId: number,
   job: { title: string; seniority: string; mustHaveSkills: string[] },
-  candidates: Array<{ id: number; name: string; email: string; skills: string[]; summary: string | null; headline: string | null; location: string | null; currentCompany: string | null; githubUrl: string | null; linkedIn: string | null }>,
 ): Promise<void> {
-  await logStep(runId, "enrichment", "running", { candidateCount: candidates.length });
-
+  // Resolve provider — null means no provider is configured; enrichment is skipped
   const provider = await resolveEnrichmentProvider();
-  logger.info({ runId, step: "enrichment", provider: provider.name }, "Enrichment step dispatched");
+  if (!provider) {
+    await logStep(runId, "enrichment", "failed", null, {
+      note: "No enrichment provider is assigned. Configure one in Settings → Agent Providers → Workflow Step Assignments to enable enrichment.",
+    });
+    logger.info({ runId }, "Enrichment skipped: no provider configured");
+    return;
+  }
+
+  // Only enrich candidates in this job's pipeline
+  const jobApplications = await db
+    .select({ candidateId: applicationsTable.candidateId })
+    .from(applicationsTable)
+    .where(eq(applicationsTable.jobId, jobId));
+
+  if (jobApplications.length === 0) {
+    logger.info({ runId }, "No candidates in pipeline — skipping enrichment");
+    return;
+  }
+
+  const candidateIds = jobApplications.map((a) => a.candidateId);
+  const allCandidates = await db
+    .select()
+    .from(candidatesTable)
+    .where(inArray(candidatesTable.id, candidateIds));
+
+  // Filter to only candidates with sparse / placeholder profiles
+  const candidates = allCandidates.filter(needsEnrichment);
+
+  if (candidates.length === 0) {
+    logger.info({ runId }, "No candidates need enrichment — all profiles are already complete");
+    await logStep(runId, "enrichment", "completed", { note: "All candidates already have complete profiles" }, {
+      enriched: 0,
+    });
+    return;
+  }
+
+  await logStep(runId, "enrichment", "running", { candidateCount: candidates.length, provider: provider.name });
+  logger.info({ runId, step: "enrichment", provider: provider.name, count: candidates.length }, "Enrichment step dispatched");
 
   const rawResponse = await provider.run({
     step: "enrichment",
@@ -165,40 +217,56 @@ async function runEnrichment(
 
   const results = rawResponse as EnrichmentResult[];
 
-  const normalized = results.map((r) => ({
-    candidateId: r.candidateId,
-    enrichedSummary: r.enrichedSummary,
-    enrichedSkills: Array.isArray(r.enrichedSkills) ? r.enrichedSkills : [],
-    enrichedHeadline: r.enrichedHeadline ?? null,
-    additionalSignals: Array.isArray(r.additionalSignals) ? r.additionalSignals : [],
-    confidence: typeof r.confidence === "number" ? Math.min(1, Math.max(0, r.confidence)) : 0.5,
-  }));
-
-  logger.info(
-    { runId, step: "enrichment", normalized: normalized.map((n) => ({ id: n.candidateId, confidence: n.confidence })) },
-    "Enrichment normalized output",
-  );
-
   const now = new Date();
-  for (const n of normalized) {
+  let enrichedCount = 0;
+  let partialCount = 0;
+  let failedCount = 0;
+
+  for (const r of results) {
+    const confidence = typeof r.confidence === "number" ? Math.min(1, Math.max(0, r.confidence)) : 0;
+    const missingSet = new Set<string>(Array.isArray(r.missingFields) ? r.missingFields : []);
+
+    // Determine enrichment outcome based on confidence and missing fields
+    const status: string =
+      confidence >= 0.7 && missingSet.size === 0
+        ? "enriched"
+        : confidence >= 0.4
+        ? "partial"
+        : "failed";
+
+    if (status === "enriched") enrichedCount++;
+    else if (status === "partial") partialCount++;
+    else failedCount++;
+
+    // Only write fields that are actually present in the result and not listed as missing
     await db
       .update(candidatesTable)
       .set({
-        summary: n.enrichedSummary,
-        skills: n.enrichedSkills.length > 0 ? n.enrichedSkills : undefined,
-        headline: n.enrichedHeadline ?? undefined,
+        ...(r.experienceSummary && !missingSet.has("summary") ? { summary: r.experienceSummary } : {}),
+        ...(Array.isArray(r.skills) && r.skills.length > 0 && !missingSet.has("skills") ? { skills: r.skills } : {}),
+        ...(r.enrichedHeadline && !missingSet.has("headline") ? { headline: r.enrichedHeadline } : {}),
+        ...(r.currentCompany && !missingSet.has("currentCompany") ? { currentCompany: r.currentCompany } : {}),
+        ...(r.location && !missingSet.has("location") ? { location: r.location } : {}),
         enrichedAt: now,
         enrichmentSource: provider.name,
-        enrichmentConfidence: n.confidence,
+        enrichmentConfidence: confidence,
+        enrichmentStatus: status,
         updatedAt: now,
       })
-      .where(eq(candidatesTable.id, n.candidateId));
+      .where(eq(candidatesTable.id, r.candidateId));
   }
 
+  logger.info(
+    { runId, step: "enrichment", enrichedCount, partialCount, failedCount },
+    "Enrichment normalized output",
+  );
+
   await logStep(runId, "enrichment", "completed", { candidateCount: candidates.length, provider: provider.name }, {
-    enriched: normalized.length,
-    avgConfidence: normalized.length > 0
-      ? (normalized.reduce((s, n) => s + n.confidence, 0) / normalized.length).toFixed(2)
+    enriched: enrichedCount,
+    partial: partialCount,
+    failed: failedCount,
+    avgConfidence: results.length > 0
+      ? (results.reduce((s, r) => s + (typeof r.confidence === "number" ? r.confidence : 0), 0) / results.length).toFixed(2)
       : null,
   });
 }
@@ -422,55 +490,16 @@ export async function runWorkflowEngine(
 
     // Step 0b: Enrichment (optional, runs after sourcing, before matching)
     if (options.runEnrichment) {
-      const candidatesForEnrichment = await db.select().from(candidatesTable);
-      if (candidatesForEnrichment.length > 0) {
-        try {
-          await runEnrichment(runId, jobId, effectiveJob, candidatesForEnrichment);
-        } catch (err) {
-          logger.error({ runId, jobId, err }, "Enrichment step failed — falling back to native and retrying");
-          // Fallback: retry with native provider
-          try {
-            const { NativeOpenAIEnrichmentProvider } = await import("./providers/native-openai-enrichment");
-            const nativeProvider = new NativeOpenAIEnrichmentProvider(-1, "Native OpenAI (fallback)");
-            const fallbackResult = await nativeProvider.run({
-              step: "enrichment",
-              runId,
-              jobId,
-              payload: {
-                candidates: candidatesForEnrichment,
-                jobContext: { title: effectiveJob.title, seniority: effectiveJob.seniority, mustHaveSkills: effectiveJob.mustHaveSkills },
-              },
-            }) as import("./providers/native-openai-enrichment").EnrichmentResult[];
-
-            const now = new Date();
-            for (const n of fallbackResult) {
-              await db
-                .update(candidatesTable)
-                .set({
-                  summary: n.enrichedSummary,
-                  skills: n.enrichedSkills.length > 0 ? n.enrichedSkills : undefined,
-                  headline: n.enrichedHeadline ?? undefined,
-                  enrichedAt: now,
-                  enrichmentSource: "Native OpenAI (fallback)",
-                  enrichmentConfidence: n.confidence,
-                  updatedAt: now,
-                })
-                .where(eq(candidatesTable.id, n.candidateId));
-            }
-            await logStep(runId, "enrichment", "completed", null, {
-              note: "Fallback to native enrichment succeeded",
-              enriched: fallbackResult.length,
-            });
-          } catch (fallbackErr) {
-            logger.error({ runId, jobId, fallbackErr }, "Enrichment fallback also failed — continuing without enrichment");
-            await logStep(runId, "enrichment", "failed", null, {
-              error: err instanceof Error ? err.message : String(err),
-              note: "Continuing workflow without enrichment",
-            });
-          }
-        }
-      } else {
-        logger.info({ runId }, "No candidates to enrich — skipping enrichment step");
+      try {
+        await runEnrichment(runId, jobId, effectiveJob);
+      } catch (err) {
+        // Enrichment failures are non-fatal — log and continue with existing candidate data.
+        // There is NO silent fallback to a native provider here (see registry.ts).
+        logger.error({ runId, jobId, err }, "Enrichment step failed — continuing without enrichment");
+        await logStep(runId, "enrichment", "failed", null, {
+          error: err instanceof Error ? err.message : String(err),
+          note: "Continuing workflow without enrichment. No fallback provider is used.",
+        });
       }
     }
 
