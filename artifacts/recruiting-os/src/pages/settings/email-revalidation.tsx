@@ -2,7 +2,10 @@ import { useEffect, useState } from "react";
 import {
   useGetEmailRevalidationSettings,
   useUpdateEmailRevalidationSettings,
+  useListEmailRevalidationRuns,
+  useRunEmailRevalidationSweepNow,
   getGetEmailRevalidationSettingsQueryKey,
+  getListEmailRevalidationRunsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -10,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Mail, RotateCcw } from "lucide-react";
+import { Loader2, Mail, RotateCcw, Play, Activity } from "lucide-react";
 import { SettingsTabs } from "@/components/settings-tabs";
 
 const PRESET_INTERVALS: { label: string; ms: number }[] = [
@@ -37,6 +40,13 @@ export default function EmailRevalidationSettingsPage() {
   const queryClient = useQueryClient();
   const settingsQuery = useGetEmailRevalidationSettings();
   const updateMutation = useUpdateEmailRevalidationSettings();
+  const runsQuery = useListEmailRevalidationRuns({
+    query: {
+      queryKey: getListEmailRevalidationRunsQueryKey(),
+      refetchInterval: 15000,
+    },
+  });
+  const sweepMutation = useRunEmailRevalidationSweepNow();
 
   const [thresholdDays, setThresholdDays] = useState("30");
   const [intervalHours, setIntervalHours] = useState("6");
@@ -131,6 +141,28 @@ export default function EmailRevalidationSettingsPage() {
   const updatedAt = settingsQuery.data?.updatedAt
     ? new Date(settingsQuery.data.updatedAt).toLocaleString()
     : "—";
+
+  const handleRunNow = async () => {
+    try {
+      const run = await sweepMutation.mutateAsync();
+      await queryClient.invalidateQueries({
+        queryKey: getListEmailRevalidationRunsQueryKey(),
+      });
+      const errorSuffix = run.errors > 0 ? `, ${run.errors} error${run.errors === 1 ? "" : "s"}` : "";
+      toast({
+        title: "Sweep finished",
+        description: `Re-checked ${run.rechecked} candidate${run.rechecked === 1 ? "" : "s"}${errorSuffix}.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Sweep failed",
+        description: err instanceof Error ? err.message : String(err),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const runs = runsQuery.data ?? [];
 
   return (
     <>
@@ -267,6 +299,106 @@ export default function EmailRevalidationSettingsPage() {
             Last updated: {updatedAt}
           </p>
         </div>
+      </div>
+
+      <div className="border border-border rounded-lg bg-card p-6 mt-6">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <Activity className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Recent activity</h2>
+              <p className="text-sm text-muted-foreground">
+                The last few sweeps run by the scheduler — verify it's actually firing and see how many addresses each pass touched.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={handleRunNow}
+            disabled={sweepMutation.isPending}
+            className="gap-2 shrink-0"
+            data-testid="button-run-sweep-now"
+          >
+            {sweepMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Running…
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4" />
+                Run sweep now
+              </>
+            )}
+          </Button>
+        </div>
+
+        {runsQuery.isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading recent sweeps…
+          </div>
+        ) : runs.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-6 text-center border border-dashed border-border rounded-md">
+            No sweeps have run yet. Use "Run sweep now" to trigger one.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" data-testid="table-recent-sweeps">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground border-b border-border">
+                  <th className="py-2 pr-4 font-medium">Started</th>
+                  <th className="py-2 pr-4 font-medium">Trigger</th>
+                  <th className="py-2 pr-4 font-medium text-right">Re-checked</th>
+                  <th className="py-2 pr-4 font-medium text-right">Errors</th>
+                  <th className="py-2 pr-4 font-medium">Duration</th>
+                  <th className="py-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {runs.map((run) => {
+                  const started = new Date(run.startedAt);
+                  const finished = run.finishedAt ? new Date(run.finishedAt) : null;
+                  const durationMs = finished ? finished.getTime() - started.getTime() : null;
+                  const durationLabel =
+                    durationMs == null
+                      ? "running…"
+                      : durationMs < 1000
+                        ? `${durationMs}ms`
+                        : `${(durationMs / 1000).toFixed(durationMs < 10000 ? 1 : 0)}s`;
+                  const isError = !!run.errorMessage;
+                  return (
+                    <tr key={run.id} className="border-b border-border last:border-0">
+                      <td className="py-2 pr-4 whitespace-nowrap">{started.toLocaleString()}</td>
+                      <td className="py-2 pr-4">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${run.trigger === "manual" ? "bg-blue-50 text-blue-700" : "bg-muted text-muted-foreground"}`}>
+                          {run.trigger}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4 text-right tabular-nums">{run.rechecked}</td>
+                      <td className={`py-2 pr-4 text-right tabular-nums ${run.errors > 0 ? "text-destructive font-medium" : ""}`}>
+                        {run.errors}
+                      </td>
+                      <td className="py-2 pr-4 text-muted-foreground">{durationLabel}</td>
+                      <td className="py-2">
+                        {isError ? (
+                          <span className="text-xs text-destructive" title={run.errorMessage ?? undefined}>
+                            crashed
+                          </span>
+                        ) : finished ? (
+                          <span className="text-xs text-emerald-600">ok</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">in progress</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
       </div>
     </>

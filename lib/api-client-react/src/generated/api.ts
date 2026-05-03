@@ -33,6 +33,7 @@ import type {
   CreateCandidateNoteBody,
   CreateJobBody,
   CreateProviderBody,
+  EmailRevalidationRun,
   EmailRevalidationSettings,
   EmailStatusChange,
   HealthStatus,
@@ -3000,6 +3001,169 @@ export const useUpdateEmailRevalidationSettings = <
   return useMutation(
     getUpdateEmailRevalidationSettingsMutationOptions(options),
   );
+};
+
+/**
+ * @summary List recent email re-validation sweep runs (newest first)
+ */
+export const getListEmailRevalidationRunsUrl = () => {
+  return `/api/settings/email-revalidation/runs`;
+};
+
+export const listEmailRevalidationRuns = async (
+  options?: RequestInit,
+): Promise<EmailRevalidationRun[]> => {
+  return customFetch<EmailRevalidationRun[]>(
+    getListEmailRevalidationRunsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListEmailRevalidationRunsQueryKey = () => {
+  return [`/api/settings/email-revalidation/runs`] as const;
+};
+
+export const getListEmailRevalidationRunsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listEmailRevalidationRuns>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listEmailRevalidationRuns>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListEmailRevalidationRunsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listEmailRevalidationRuns>>
+  > = ({ signal }) => listEmailRevalidationRuns({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listEmailRevalidationRuns>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListEmailRevalidationRunsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listEmailRevalidationRuns>>
+>;
+export type ListEmailRevalidationRunsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List recent email re-validation sweep runs (newest first)
+ */
+
+export function useListEmailRevalidationRuns<
+  TData = Awaited<ReturnType<typeof listEmailRevalidationRuns>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listEmailRevalidationRuns>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListEmailRevalidationRunsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Trigger a one-off email re-validation sweep immediately
+ */
+export const getRunEmailRevalidationSweepNowUrl = () => {
+  return `/api/settings/email-revalidation/sweep`;
+};
+
+export const runEmailRevalidationSweepNow = async (
+  options?: RequestInit,
+): Promise<EmailRevalidationRun> => {
+  return customFetch<EmailRevalidationRun>(
+    getRunEmailRevalidationSweepNowUrl(),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getRunEmailRevalidationSweepNowMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runEmailRevalidationSweepNow>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof runEmailRevalidationSweepNow>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["runEmailRevalidationSweepNow"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof runEmailRevalidationSweepNow>>,
+    void
+  > = () => {
+    return runEmailRevalidationSweepNow(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RunEmailRevalidationSweepNowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof runEmailRevalidationSweepNow>>
+>;
+
+export type RunEmailRevalidationSweepNowMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Trigger a one-off email re-validation sweep immediately
+ */
+export const useRunEmailRevalidationSweepNow = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runEmailRevalidationSweepNow>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof runEmailRevalidationSweepNow>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getRunEmailRevalidationSweepNowMutationOptions(options));
 };
 
 /**

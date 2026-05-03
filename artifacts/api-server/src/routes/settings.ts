@@ -3,6 +3,8 @@ import { UpdateEmailRevalidationSettingsBody } from "@workspace/api-zod";
 import {
   getEmailRevalidationSettings,
   updateEmailRevalidationSettings,
+  listRecentEmailRevalidationRuns,
+  sweepStaleEmailValidations,
 } from "../lib/email-revalidation";
 
 const router: IRouter = Router();
@@ -30,5 +32,25 @@ router.put("/settings/email-revalidation", async (req, res): Promise<void> => {
   );
   res.json(updated);
 });
+
+router.get(
+  "/settings/email-revalidation/runs",
+  async (_req, res): Promise<void> => {
+    const runs = await listRecentEmailRevalidationRuns(10);
+    res.json(runs);
+  },
+);
+
+router.post(
+  "/settings/email-revalidation/sweep",
+  async (req, res): Promise<void> => {
+    const run = await sweepStaleEmailValidations("manual");
+    req.log.info(
+      { runId: run.id, rechecked: run.rechecked, errors: run.errors },
+      "Manual email re-validation sweep finished",
+    );
+    res.json(run);
+  },
+);
 
 export default router;

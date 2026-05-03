@@ -8,3 +8,4 @@ export * from "./candidate-notes";
 export * from "./email-revalidation-settings";
 export * from "./email-status-changes";
 export * from "./branding-settings";
+export * from "./email-revalidation-runs";

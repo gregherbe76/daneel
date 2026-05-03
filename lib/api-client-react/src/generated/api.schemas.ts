@@ -449,6 +449,31 @@ export interface UpdateEmailRevalidationSettingsBody {
 }
 
 /**
+ * Whether the sweep was triggered by the background scheduler or an admin.
+ */
+export type EmailRevalidationRunTrigger =
+  (typeof EmailRevalidationRunTrigger)[keyof typeof EmailRevalidationRunTrigger];
+
+export const EmailRevalidationRunTrigger = {
+  scheduled: "scheduled",
+  manual: "manual",
+} as const;
+
+export interface EmailRevalidationRun {
+  id: number;
+  startedAt: string;
+  finishedAt?: string | null;
+  /** Number of candidates re-validated successfully in this sweep. */
+  rechecked: number;
+  /** Number of candidates that threw while re-validating. */
+  errors: number;
+  /** Whether the sweep was triggered by the background scheduler or an admin. */
+  trigger: EmailRevalidationRunTrigger;
+  /** Populated only when the sweep itself crashed before completing. */
+  errorMessage?: string | null;
+}
+
+/**
  * Enforces strict data separation. "real" uses only Twin-sourced or imported candidates. "mock" uses only AI-generated mock candidates. "fallback" means a real run where the Twin provider failed and native was used instead.
 
  */

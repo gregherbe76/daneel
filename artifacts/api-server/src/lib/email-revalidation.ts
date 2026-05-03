@@ -4,7 +4,9 @@ import {
   candidatesTable,
   emailStatusChangesTable,
   emailRevalidationSettingsTable,
+  emailRevalidationRunsTable,
   type EmailRevalidationSettings,
+  type EmailRevalidationRun,
 } from "@workspace/db";
 import { validateEmail } from "./email-validation";
 import { logger } from "./logger";
@@ -204,44 +206,85 @@ export async function revalidateCandidateEmail(candidateId: number) {
 
 /**
  * Find candidates whose `emailValidatedAt` is older than the configured
- * staleness threshold and re-run validation on each. Returns the number of
- * candidates that were re-checked in this sweep.
+ * staleness threshold and re-run validation on each. Records a row in
+ * `email_revalidation_runs` so admins can see scheduler activity in the UI.
+ * Returns the persisted run row.
  */
-export async function sweepStaleEmailValidations(): Promise<number> {
-  const settings = await getEmailRevalidationSettings();
-  const cutoff = new Date(
-    Date.now() - settings.thresholdDays * 24 * 60 * 60 * 1000,
-  );
-
-  const stale = await db
-    .select({ id: candidatesTable.id })
-    .from(candidatesTable)
-    .where(
-      and(
-        isNotNull(candidatesTable.email),
-        or(
-          isNull(candidatesTable.emailValidatedAt),
-          lt(candidatesTable.emailValidatedAt, cutoff),
-        ),
-      ),
-    )
-    .limit(settings.batchSize);
-
-  if (stale.length === 0) return 0;
+export async function sweepStaleEmailValidations(
+  trigger: "scheduled" | "manual" = "scheduled",
+): Promise<EmailRevalidationRun> {
+  const [runRow] = await db
+    .insert(emailRevalidationRunsTable)
+    .values({ trigger })
+    .returning();
 
   let rechecked = 0;
-  for (const row of stale) {
-    try {
-      await revalidateCandidateEmail(row.id);
-      rechecked += 1;
-    } catch (err) {
-      logger.warn(
-        { candidateId: row.id, err: err instanceof Error ? err.message : String(err) },
-        "Stale email re-validation failed for candidate",
-      );
+  let errors = 0;
+  let errorMessage: string | null = null;
+
+  try {
+    const settings = await getEmailRevalidationSettings();
+    const cutoff = new Date(
+      Date.now() - settings.thresholdDays * 24 * 60 * 60 * 1000,
+    );
+
+    const stale = await db
+      .select({ id: candidatesTable.id })
+      .from(candidatesTable)
+      .where(
+        and(
+          isNotNull(candidatesTable.email),
+          or(
+            isNull(candidatesTable.emailValidatedAt),
+            lt(candidatesTable.emailValidatedAt, cutoff),
+          ),
+        ),
+      )
+      .limit(settings.batchSize);
+
+    for (const row of stale) {
+      try {
+        await revalidateCandidateEmail(row.id);
+        rechecked += 1;
+      } catch (err) {
+        errors += 1;
+        logger.warn(
+          { candidateId: row.id, err: err instanceof Error ? err.message : String(err) },
+          "Stale email re-validation failed for candidate",
+        );
+      }
     }
+  } catch (err) {
+    errorMessage = err instanceof Error ? err.message : String(err);
+    logger.error({ err: errorMessage }, "Email re-validation sweep crashed");
   }
-  return rechecked;
+
+  const [finished] = await db
+    .update(emailRevalidationRunsTable)
+    .set({
+      finishedAt: new Date(),
+      rechecked,
+      errors,
+      errorMessage,
+    })
+    .where(eq(emailRevalidationRunsTable.id, runRow.id))
+    .returning();
+
+  return finished ?? runRow;
+}
+
+/**
+ * Return the most recent sweep rows, newest first. Used by the settings UI to
+ * render a small "Recent activity" panel.
+ */
+export async function listRecentEmailRevalidationRuns(
+  limit = 10,
+): Promise<EmailRevalidationRun[]> {
+  return db
+    .select()
+    .from(emailRevalidationRunsTable)
+    .orderBy(desc(emailRevalidationRunsTable.startedAt))
+    .limit(limit);
 }
 
 let timer: NodeJS.Timeout | undefined;
@@ -288,8 +331,13 @@ export function startEmailRevalidationScheduler() {
   const runSweepThenReschedule = async (shouldSweep: boolean) => {
     if (shouldSweep) {
       try {
-        const n = await sweepStaleEmailValidations();
-        if (n > 0) logger.info({ rechecked: n }, "Stale email validations refreshed");
+        const run = await sweepStaleEmailValidations("scheduled");
+        if (run.rechecked > 0) {
+          logger.info(
+            { rechecked: run.rechecked, errors: run.errors },
+            "Stale email validations refreshed",
+          );
+        }
       } catch (err) {
         logger.error(
           { err: err instanceof Error ? err.message : String(err) },

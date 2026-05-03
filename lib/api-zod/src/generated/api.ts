@@ -2202,6 +2202,61 @@ export const UpdateEmailRevalidationSettingsResponse = zod.object({
 });
 
 /**
+ * @summary List recent email re-validation sweep runs (newest first)
+ */
+export const ListEmailRevalidationRunsResponseItem = zod.object({
+  id: zod.number(),
+  startedAt: zod.coerce.date(),
+  finishedAt: zod.coerce.date().nullish(),
+  rechecked: zod
+    .number()
+    .describe("Number of candidates re-validated successfully in this sweep."),
+  errors: zod
+    .number()
+    .describe("Number of candidates that threw while re-validating."),
+  trigger: zod
+    .enum(["scheduled", "manual"])
+    .describe(
+      "Whether the sweep was triggered by the background scheduler or an admin.",
+    ),
+  errorMessage: zod
+    .string()
+    .nullish()
+    .describe(
+      "Populated only when the sweep itself crashed before completing.",
+    ),
+});
+export const ListEmailRevalidationRunsResponse = zod.array(
+  ListEmailRevalidationRunsResponseItem,
+);
+
+/**
+ * @summary Trigger a one-off email re-validation sweep immediately
+ */
+export const RunEmailRevalidationSweepNowResponse = zod.object({
+  id: zod.number(),
+  startedAt: zod.coerce.date(),
+  finishedAt: zod.coerce.date().nullish(),
+  rechecked: zod
+    .number()
+    .describe("Number of candidates re-validated successfully in this sweep."),
+  errors: zod
+    .number()
+    .describe("Number of candidates that threw while re-validating."),
+  trigger: zod
+    .enum(["scheduled", "manual"])
+    .describe(
+      "Whether the sweep was triggered by the background scheduler or an admin.",
+    ),
+  errorMessage: zod
+    .string()
+    .nullish()
+    .describe(
+      "Populated only when the sweep itself crashed before completing.",
+    ),
+});
+
+/**
  * @summary Enrich low-confidence candidates from a completed run and re-score them
  */
 export const ImproveAndRerunBody = zod.object({

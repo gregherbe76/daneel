@@ -683,6 +683,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/EmailRevalidationSettings"
 
+  /settings/email-revalidation/runs:
+    get:
+      operationId: listEmailRevalidationRuns
+      tags: [settings]
+      summary: List recent email re-validation sweep runs (newest first)
+      responses:
+        "200":
+          description: Recent sweep runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmailRevalidationRun"
+
+  /settings/email-revalidation/sweep:
+    post:
+      operationId: runEmailRevalidationSweepNow
+      tags: [settings]
+      summary: Trigger a one-off email re-validation sweep immediately
+      responses:
+        "200":
+          description: Sweep completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailRevalidationRun"
+
   /workflows/improve-and-rerun:
     post:
       operationId: improveAndRerun
@@ -1824,6 +1852,34 @@ components:
         enabled:
           type: boolean
       required: [thresholdDays, intervalMs, batchSize, enabled]
+
+    EmailRevalidationRun:
+      type: object
+      properties:
+        id:
+          type: integer
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        rechecked:
+          type: integer
+          description: Number of candidates re-validated successfully in this sweep.
+        errors:
+          type: integer
+          description: Number of candidates that threw while re-validating.
+        trigger:
+          type: string
+          enum: [scheduled, manual]
+          description: Whether the sweep was triggered by the background scheduler or an admin.
+        errorMessage:
+          type: string
+          nullable: true
+          description: Populated only when the sweep itself crashed before completing.
+      required: [id, startedAt, rechecked, errors, trigger]
 
     # ── WORKFLOWS ──
     RunWorkflowBody:
