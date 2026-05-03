@@ -185,13 +185,34 @@ function buildDiff(currentReport: HiringReport, baseReport: HiringReport): Candi
   });
 }
 
-function DeltaBadge({ delta, type }: { delta: number | null; type: "rank" | "score" }) {
+function DeltaBadge({
+  delta,
+  type,
+  emphasize = false,
+}: {
+  delta: number | null;
+  type: "rank" | "score";
+  emphasize?: boolean;
+}) {
   if (delta === null) return <span className="text-xs text-muted-foreground">new</span>;
   if (delta === 0) return <Minus className="h-3 w-3 text-muted-foreground" />;
   const isPositive = delta > 0;
   const Icon = isPositive ? ArrowUp : ArrowDown;
-  const color = isPositive ? "text-green-600" : "text-red-600";
   const label = type === "rank" ? `${Math.abs(delta)}` : `${isPositive ? "+" : ""}${delta}`;
+
+  if (emphasize) {
+    const pillCls = isPositive
+      ? "bg-green-100 text-green-800 ring-1 ring-green-300"
+      : "bg-red-100 text-red-800 ring-1 ring-red-300";
+    return (
+      <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-bold ${pillCls}`}>
+        <Icon className="h-3 w-3" />
+        {label}
+      </span>
+    );
+  }
+
+  const color = isPositive ? "text-green-600" : "text-red-600";
   return (
     <span className={`flex items-center gap-0.5 text-xs font-medium ${color}`}>
       <Icon className="h-3 w-3" />
@@ -836,7 +857,17 @@ export default function JobReportPage() {
         )}
 
         {/* ── Variant Comparison Table ── */}
-        {diff && (
+        {diff && (() => {
+          const topGainerId = isImprovedRun
+            ? diff.reduce<{ id: number | null; delta: number }>(
+                (acc, d) =>
+                  d.scoreDelta !== null && d.scoreDelta > acc.delta
+                    ? { id: d.candidateId, delta: d.scoreDelta }
+                    : acc,
+                { id: null, delta: 0 },
+              ).id
+            : null;
+          return (
           <section>
             <h2 className="text-base font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
               <GitBranch className="h-4 w-4 text-indigo-500" />
@@ -856,51 +887,74 @@ export default function JobReportPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {diff.map((d) => (
-                        <tr
-                          key={d.id}
-                          className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors"
-                        >
-                          <td className="px-4 py-3">
-                            <span className="font-medium">{d.candidate?.name ?? "Unknown"}</span>
-                            {d.candidate?.headline && (
-                              <p className="text-xs text-muted-foreground truncate max-w-xs">{d.candidate.headline}</p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">#{d.currentRank}</span>
-                              <DeltaBadge delta={d.rankDelta} type="rank" />
-                            </div>
-                            {d.baseRank && (
-                              <p className="text-[10px] text-muted-foreground">was #{d.baseRank}</p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`font-bold ${scoreColor(d.score)}`}>{d.score}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-col gap-0.5">
-                              <Badge variant="outline" className={`text-xs w-fit ${recBg(d.recommendation)}`}>
-                                {d.recommendation}
-                              </Badge>
-                              {d.recChanged && d.baseRec && (
-                                <span className="text-[10px] text-muted-foreground line-through">{d.baseRec}</span>
+                      {diff.map((d) => {
+                        const bigImprovement =
+                          isImprovedRun && d.scoreDelta !== null && d.scoreDelta >= 10;
+                        const isTopGainer = isImprovedRun && d.candidateId === topGainerId;
+                        const rowCls = bigImprovement
+                          ? "bg-teal-50/60 hover:bg-teal-50"
+                          : "hover:bg-muted/20";
+                        return (
+                          <tr
+                            key={d.id}
+                            className={`border-b border-border last:border-0 transition-colors ${rowCls}`}
+                          >
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium">{d.candidate?.name ?? "Unknown"}</span>
+                                {isTopGainer && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm animate-in fade-in slide-in-from-left-1 duration-500">
+                                    <Sparkles className="h-2.5 w-2.5" />
+                                    Most Improved
+                                  </span>
+                                )}
+                                {bigImprovement && !isTopGainer && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-teal-100 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700 ring-1 ring-teal-200">
+                                    <TrendingUp className="h-2.5 w-2.5" />
+                                    Big jump
+                                  </span>
+                                )}
+                              </div>
+                              {d.candidate?.headline && (
+                                <p className="text-xs text-muted-foreground truncate max-w-xs">{d.candidate.headline}</p>
                               )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <DeltaBadge delta={d.scoreDelta} type="score" />
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">#{d.currentRank}</span>
+                                <DeltaBadge delta={d.rankDelta} type="rank" emphasize={isImprovedRun} />
+                              </div>
+                              {d.baseRank && (
+                                <p className="text-[10px] text-muted-foreground">was #{d.baseRank}</p>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`font-bold ${scoreColor(d.score)}`}>{d.score}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-col gap-0.5">
+                                <Badge variant="outline" className={`text-xs w-fit ${recBg(d.recommendation)}`}>
+                                  {d.recommendation}
+                                </Badge>
+                                {d.recChanged && d.baseRec && (
+                                  <span className="text-[10px] text-muted-foreground line-through">{d.baseRec}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <DeltaBadge delta={d.scoreDelta} type="score" emphasize={isImprovedRun} />
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </CardContent>
             </Card>
           </section>
-        )}
+          );
+        })()}
 
         {/* ── Recommendation Summary ── */}
         <section>
