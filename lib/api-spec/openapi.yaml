@@ -1916,13 +1916,18 @@ components:
           description: Maximum number of candidates re-checked per sweep.
           minimum: 1
           maximum: 10000
+        retentionDays:
+          type: integer
+          description: How many days of sweep history to keep. Older rows are pruned at the end of each sweep.
+          minimum: 1
+          maximum: 365
         enabled:
           type: boolean
           description: When false, the scheduler is paused.
         updatedAt:
           type: string
           format: date-time
-      required: [thresholdDays, intervalMs, batchSize, enabled, updatedAt]
+      required: [thresholdDays, intervalMs, batchSize, retentionDays, enabled, updatedAt]
 
     UpdateEmailRevalidationSettingsBody:
       type: object
@@ -1938,9 +1943,13 @@ components:
           type: integer
           minimum: 1
           maximum: 10000
+        retentionDays:
+          type: integer
+          minimum: 1
+          maximum: 365
         enabled:
           type: boolean
-      required: [thresholdDays, intervalMs, batchSize, enabled]
+      required: [thresholdDays, intervalMs, batchSize, retentionDays, enabled]
 
     EmailRevalidationRun:
       type: object

@@ -2183,6 +2183,8 @@ export const getEmailRevalidationSettingsResponseIntervalMsMin = 0;
 
 export const getEmailRevalidationSettingsResponseBatchSizeMax = 10000;
 
+export const getEmailRevalidationSettingsResponseRetentionDaysMax = 365;
+
 export const GetEmailRevalidationSettingsResponse = zod.object({
   thresholdDays: zod
     .number()
@@ -2202,6 +2204,13 @@ export const GetEmailRevalidationSettingsResponse = zod.object({
     .min(1)
     .max(getEmailRevalidationSettingsResponseBatchSizeMax)
     .describe("Maximum number of candidates re-checked per sweep."),
+  retentionDays: zod
+    .number()
+    .min(1)
+    .max(getEmailRevalidationSettingsResponseRetentionDaysMax)
+    .describe(
+      "How many days of sweep history to keep. Older rows are pruned at the end of each sweep.",
+    ),
   enabled: zod.boolean().describe("When false, the scheduler is paused."),
   updatedAt: zod.coerce.date(),
 });
@@ -2215,6 +2224,8 @@ export const updateEmailRevalidationSettingsBodyIntervalMsMin = 0;
 
 export const updateEmailRevalidationSettingsBodyBatchSizeMax = 10000;
 
+export const updateEmailRevalidationSettingsBodyRetentionDaysMax = 365;
+
 export const UpdateEmailRevalidationSettingsBody = zod.object({
   thresholdDays: zod
     .number()
@@ -2227,6 +2238,10 @@ export const UpdateEmailRevalidationSettingsBody = zod.object({
     .number()
     .min(1)
     .max(updateEmailRevalidationSettingsBodyBatchSizeMax),
+  retentionDays: zod
+    .number()
+    .min(1)
+    .max(updateEmailRevalidationSettingsBodyRetentionDaysMax),
   enabled: zod.boolean(),
 });
 
@@ -2235,6 +2250,8 @@ export const updateEmailRevalidationSettingsResponseThresholdDaysMax = 365;
 export const updateEmailRevalidationSettingsResponseIntervalMsMin = 0;
 
 export const updateEmailRevalidationSettingsResponseBatchSizeMax = 10000;
+
+export const updateEmailRevalidationSettingsResponseRetentionDaysMax = 365;
 
 export const UpdateEmailRevalidationSettingsResponse = zod.object({
   thresholdDays: zod
@@ -2255,6 +2272,13 @@ export const UpdateEmailRevalidationSettingsResponse = zod.object({
     .min(1)
     .max(updateEmailRevalidationSettingsResponseBatchSizeMax)
     .describe("Maximum number of candidates re-checked per sweep."),
+  retentionDays: zod
+    .number()
+    .min(1)
+    .max(updateEmailRevalidationSettingsResponseRetentionDaysMax)
+    .describe(
+      "How many days of sweep history to keep. Older rows are pruned at the end of each sweep.",
+    ),
   enabled: zod.boolean().describe("When false, the scheduler is paused."),
   updatedAt: zod.coerce.date(),
 });

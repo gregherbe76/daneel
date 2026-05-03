@@ -51,6 +51,7 @@ export default function EmailRevalidationSettingsPage() {
   const [thresholdDays, setThresholdDays] = useState("30");
   const [intervalHours, setIntervalHours] = useState("6");
   const [batchSize, setBatchSize] = useState("50");
+  const [retentionDays, setRetentionDays] = useState("30");
   const [enabled, setEnabled] = useState(true);
   const [dirty, setDirty] = useState(false);
 
@@ -59,6 +60,7 @@ export default function EmailRevalidationSettingsPage() {
       setThresholdDays(String(settingsQuery.data.thresholdDays));
       setIntervalHours(msToHours(settingsQuery.data.intervalMs));
       setBatchSize(String(settingsQuery.data.batchSize));
+      setRetentionDays(String(settingsQuery.data.retentionDays));
       setEnabled(settingsQuery.data.enabled);
     }
   }, [settingsQuery.data, dirty]);
@@ -69,6 +71,7 @@ export default function EmailRevalidationSettingsPage() {
     const days = Number(thresholdDays);
     const intervalMs = hoursToMs(intervalHours);
     const batch = Number(batchSize);
+    const retention = Number(retentionDays);
 
     if (!Number.isFinite(days) || days < 1 || days > 365) {
       toast({ title: "Invalid threshold", description: "Threshold must be between 1 and 365 days.", variant: "destructive" });
@@ -82,6 +85,10 @@ export default function EmailRevalidationSettingsPage() {
       toast({ title: "Invalid batch size", description: "Batch size must be between 1 and 10,000.", variant: "destructive" });
       return;
     }
+    if (!Number.isFinite(retention) || retention < 1 || retention > 365) {
+      toast({ title: "Invalid retention", description: "History retention must be between 1 and 365 days.", variant: "destructive" });
+      return;
+    }
 
     try {
       await updateMutation.mutateAsync({
@@ -89,6 +96,7 @@ export default function EmailRevalidationSettingsPage() {
           thresholdDays: days,
           intervalMs,
           batchSize: batch,
+          retentionDays: retention,
           enabled,
         },
       });
@@ -111,6 +119,7 @@ export default function EmailRevalidationSettingsPage() {
     setThresholdDays(String(settingsQuery.data.thresholdDays));
     setIntervalHours(msToHours(settingsQuery.data.intervalMs));
     setBatchSize(String(settingsQuery.data.batchSize));
+    setRetentionDays(String(settingsQuery.data.retentionDays));
     setEnabled(settingsQuery.data.enabled);
     setDirty(false);
   };
@@ -268,6 +277,26 @@ export default function EmailRevalidationSettingsPage() {
           />
           <p className="text-xs text-muted-foreground">
             Maximum number of candidates re-checked in a single sweep. Lower values smooth out DNS load.
+          </p>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="retention-days">History retention (days)</Label>
+          <Input
+            id="retention-days"
+            type="number"
+            min={1}
+            max={365}
+            value={retentionDays}
+            onChange={(e) => {
+              setRetentionDays(e.target.value);
+              markDirty();
+            }}
+            className="max-w-xs"
+            data-testid="input-retention-days"
+          />
+          <p className="text-xs text-muted-foreground">
+            Sweep history older than this is pruned automatically at the end of each sweep, so the "Recent activity" table stays fast on long-lived deployments.
           </p>
         </div>
 

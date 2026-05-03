@@ -25,6 +25,14 @@ const DEFAULT_INTERVAL_MS = Number(
 const DEFAULT_BATCH_SIZE = Number(
   process.env["EMAIL_REVALIDATION_BATCH_SIZE"] ?? "50",
 );
+/**
+ * How many days of sweep history we keep in `email_revalidation_runs` by
+ * default. With a 6h cadence that's ~120 rows; with an aggressive 1h cadence
+ * still well under 1k. Tunable from the settings UI per-deployment.
+ */
+const DEFAULT_RETENTION_DAYS = Number(
+  process.env["EMAIL_REVALIDATION_RETENTION_DAYS"] ?? "30",
+);
 /** Floor so a misconfigured 0/negative interval doesn't busy-loop the sweeper. */
 const MIN_INTERVAL_MS = 60_000;
 
@@ -53,6 +61,10 @@ export async function getEmailRevalidationSettings(): Promise<EmailRevalidationS
     Number.isFinite(DEFAULT_BATCH_SIZE) && DEFAULT_BATCH_SIZE > 0
       ? DEFAULT_BATCH_SIZE
       : 50;
+  const seedRetentionDays =
+    Number.isFinite(DEFAULT_RETENTION_DAYS) && DEFAULT_RETENTION_DAYS > 0
+      ? DEFAULT_RETENTION_DAYS
+      : 30;
   const [seeded] = await db
     .insert(emailRevalidationSettingsTable)
     .values({
@@ -60,6 +72,7 @@ export async function getEmailRevalidationSettings(): Promise<EmailRevalidationS
       thresholdDays: seedThresholdDays,
       intervalMs: seedIntervalMs,
       batchSize: seedBatchSize,
+      retentionDays: seedRetentionDays,
       // Use the sanitized interval so a malformed env var doesn't seed
       // `enabled=false` unintentionally.
       enabled: seedIntervalMs > 0,
@@ -84,6 +97,7 @@ export async function updateEmailRevalidationSettings(input: {
   thresholdDays: number;
   intervalMs: number;
   batchSize: number;
+  retentionDays: number;
   enabled: boolean;
 }): Promise<EmailRevalidationSettings> {
   // Make sure the row exists.
@@ -94,6 +108,7 @@ export async function updateEmailRevalidationSettings(input: {
       thresholdDays: input.thresholdDays,
       intervalMs: input.intervalMs,
       batchSize: input.batchSize,
+      retentionDays: input.retentionDays,
       enabled: input.enabled,
       updatedAt: new Date(),
     })
@@ -205,6 +220,32 @@ export async function revalidateCandidateEmail(candidateId: number) {
 }
 
 /**
+ * Delete sweep history rows older than `retentionDays`. Called at the end of
+ * each sweep so the `email_revalidation_runs` table — which would otherwise
+ * grow forever on long-lived deployments with aggressive sweep intervals —
+ * stays bounded and the "Recent activity" query stays cheap.
+ *
+ * Only rows that have already finished are pruned so we never delete a row
+ * that's still being written to. Returns the number of rows deleted.
+ */
+export async function pruneOldEmailRevalidationRuns(
+  retentionDays: number,
+): Promise<number> {
+  if (!Number.isFinite(retentionDays) || retentionDays <= 0) return 0;
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+  const deleted = await db
+    .delete(emailRevalidationRunsTable)
+    .where(
+      and(
+        isNotNull(emailRevalidationRunsTable.finishedAt),
+        lt(emailRevalidationRunsTable.startedAt, cutoff),
+      ),
+    )
+    .returning({ id: emailRevalidationRunsTable.id });
+  return deleted.length;
+}
+
+/**
  * Find candidates whose `emailValidatedAt` is older than the configured
  * staleness threshold and re-run validation on each. Records a row in
  * `email_revalidation_runs` so admins can see scheduler activity in the UI.
@@ -269,6 +310,25 @@ export async function sweepStaleEmailValidations(
     })
     .where(eq(emailRevalidationRunsTable.id, runRow.id))
     .returning();
+
+  // Prune old history rows so the table doesn't grow forever. Best-effort:
+  // a failure here must not fail the sweep, since the sweep itself already
+  // succeeded and the cleanup will get another chance on the next tick.
+  try {
+    const settings = await getEmailRevalidationSettings();
+    const pruned = await pruneOldEmailRevalidationRuns(settings.retentionDays);
+    if (pruned > 0) {
+      logger.info(
+        { pruned, retentionDays: settings.retentionDays },
+        "Pruned old email re-validation sweep history",
+      );
+    }
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "Email re-validation history cleanup failed",
+    );
+  }
 
   return finished ?? runRow;
 }

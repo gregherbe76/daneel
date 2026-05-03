@@ -481,6 +481,12 @@ export interface EmailRevalidationSettings {
    * @maximum 10000
    */
   batchSize: number;
+  /**
+   * How many days of sweep history to keep. Older rows are pruned at the end of each sweep.
+   * @minimum 1
+   * @maximum 365
+   */
+  retentionDays: number;
   /** When false, the scheduler is paused. */
   enabled: boolean;
   updatedAt: string;
@@ -499,6 +505,11 @@ export interface UpdateEmailRevalidationSettingsBody {
    * @maximum 10000
    */
   batchSize: number;
+  /**
+   * @minimum 1
+   * @maximum 365
+   */
+  retentionDays: number;
   enabled: boolean;
 }
 

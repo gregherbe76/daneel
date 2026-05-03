@@ -15,6 +15,13 @@ export const emailRevalidationSettingsTable = pgTable(
     intervalMs: integer("interval_ms").notNull(),
     /** Cap how many candidates a single sweep will re-check. */
     batchSize: integer("batch_size").notNull(),
+    /**
+     * How many days of sweep history to keep in `email_revalidation_runs`.
+     * Older rows are pruned automatically at the end of each sweep so the
+     * "Recent activity" query stays fast on long-lived deployments. Defaults
+     * to 30 days; admins can tune this from the settings UI.
+     */
+    retentionDays: integer("retention_days").notNull().default(30),
     /** When false, the scheduler is paused (no sweeps will run). */
     enabled: boolean("enabled").notNull().default(true),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
