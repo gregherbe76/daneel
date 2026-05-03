@@ -30,6 +30,42 @@ function buildProvider(row: typeof agentProvidersTable.$inferSelect): AgentProvi
 }
 
 /**
+ * Resolve the provider for the sourcing step specifically.
+ * Returns NativeOpenAISourcingProvider as fallback (not NativeOpenAIProvider).
+ */
+export async function resolveSourcingProvider(): Promise<AgentProvider> {
+  const { NativeOpenAISourcingProvider } = await import("./native-openai-sourcing");
+  try {
+    const [setting] = await db
+      .select()
+      .from(workflowProviderSettingsTable)
+      .where(eq(workflowProviderSettingsTable.workflowStep, "sourcing"))
+      .limit(1);
+
+    if (!setting || !setting.enabled) {
+      return new NativeOpenAISourcingProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME);
+    }
+
+    const [providerRow] = await db
+      .select()
+      .from(agentProvidersTable)
+      .where(eq(agentProvidersTable.id, setting.providerId))
+      .limit(1);
+
+    if (!providerRow || !providerRow.enabled) {
+      logger.warn({ step: "sourcing", providerId: setting.providerId }, "Sourcing provider not found or disabled — falling back to native");
+      return new NativeOpenAISourcingProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME);
+    }
+
+    // If a custom/twin webhook is assigned, use the generic provider
+    return buildProvider(providerRow);
+  } catch (err) {
+    logger.error({ step: "sourcing", err }, "Failed to resolve sourcing provider — falling back to native");
+    return new NativeOpenAISourcingProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME);
+  }
+}
+
+/**
  * Resolve which AgentProvider should handle a given workflow step.
  * Falls back to the native OpenAI provider if no setting exists or the
  * configured provider is disabled / missing.

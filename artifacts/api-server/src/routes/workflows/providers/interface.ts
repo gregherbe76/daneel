@@ -2,7 +2,8 @@ export type WorkflowStep =
   | "job_understanding"
   | "candidate_matching"
   | "shortlist_generation"
-  | "sourcing_later";
+  | "sourcing_later"
+  | "sourcing";
 
 export interface AgentProviderRunInput {
   step: WorkflowStep;

@@ -3,6 +3,7 @@ import {
   serial,
   integer,
   text,
+  boolean,
   timestamp,
   pgEnum,
   jsonb,
@@ -29,6 +30,7 @@ export const agentRunsTable = pgTable("agent_runs", {
     .notNull()
     .references(() => jobsTable.id, { onDelete: "cascade" }),
   status: runStatusEnum("status").notNull().default("pending"),
+  runSourcing: boolean("run_sourcing").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

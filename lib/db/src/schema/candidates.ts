@@ -9,6 +9,12 @@ export const candidatesTable = pgTable("candidates", {
   linkedIn: text("linked_in"),
   summary: text("summary"),
   skills: text("skills").array().notNull().default([]),
+  // Sourcing-enriched fields
+  headline: text("headline"),
+  location: text("location"),
+  currentCompany: text("current_company"),
+  githubUrl: text("github_url"),
+  source: text("source"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

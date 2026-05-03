@@ -19,6 +19,7 @@ export const workflowStepEnum = pgEnum("workflow_step", [
   "candidate_matching",
   "shortlist_generation",
   "sourcing_later",
+  "sourcing",
 ]);
 
 export const agentProvidersTable = pgTable("agent_providers", {

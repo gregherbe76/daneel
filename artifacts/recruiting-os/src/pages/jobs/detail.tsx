@@ -12,7 +12,13 @@ import {
 import { useRoute, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, MapPin, Edit, User, Mail, ArrowRight, Play, Sparkles, ChevronDown, ChevronUp, BrainCircuit } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Loader2, MapPin, Edit, User, Mail, ArrowRight, Play,
+  Sparkles, ChevronDown, ChevronUp, BrainCircuit, Zap,
+  Building2, Github, Linkedin, AlertTriangle
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -26,7 +32,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// helper for recommendation color
+// ── color helpers ────────────────────────────────────────────────────────────
+
 const getRecommendationColor = (rec?: string) => {
   if (rec === "Strong Yes") return "bg-green-500/10 text-green-700 hover:bg-green-500/20 border-green-200";
   if (rec === "Yes") return "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border-emerald-200";
@@ -41,6 +48,87 @@ const getScoreColor = (score?: number) => {
   if (score >= 60) return "bg-amber-500/10 text-amber-700 border-amber-200";
   return "bg-red-500/10 text-red-700 border-red-200";
 };
+
+// ── Sourced Candidate Card ────────────────────────────────────────────────────
+
+type SourcedCandidate = {
+  id: number;
+  name: string;
+  headline?: string | null;
+  location?: string | null;
+  currentCompany?: string | null;
+  email: string;
+  linkedIn?: string | null;
+  githubUrl?: string | null;
+  skills: string[];
+  summary?: string | null;
+  source?: string | null;
+};
+
+function SourcedCandidateCard({ candidate }: { candidate: SourcedCandidate }) {
+  return (
+    <Card className="flex flex-col">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <CardTitle className="text-sm font-semibold truncate">{candidate.name}</CardTitle>
+            {candidate.headline && (
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">{candidate.headline}</p>
+            )}
+          </div>
+          <Badge variant="outline" className="text-[10px] shrink-0 bg-purple-500/10 text-purple-700 border-purple-200 whitespace-nowrap">
+            <Zap className="h-2.5 w-2.5 mr-1" />
+            AI Sourced
+          </Badge>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground mt-1">
+          {candidate.location && (
+            <span className="flex items-center gap-1">
+              <MapPin className="h-3 w-3" />{candidate.location}
+            </span>
+          )}
+          {candidate.currentCompany && (
+            <span className="flex items-center gap-1">
+              <Building2 className="h-3 w-3" />{candidate.currentCompany}
+            </span>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 flex flex-col gap-3 text-xs">
+        {candidate.summary && (
+          <p className="text-muted-foreground line-clamp-3">{candidate.summary}</p>
+        )}
+        {candidate.skills.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {candidate.skills.slice(0, 5).map((s) => (
+              <span key={s} className="px-1.5 py-0.5 bg-muted rounded text-muted-foreground border border-border">{s}</span>
+            ))}
+            {candidate.skills.length > 5 && (
+              <span className="px-1.5 py-0.5 text-muted-foreground">+{candidate.skills.length - 5}</span>
+            )}
+          </div>
+        )}
+        <div className="flex gap-2 mt-auto pt-2 border-t border-border">
+          {candidate.linkedIn && (
+            <a href={candidate.linkedIn} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
+              <Linkedin className="h-3.5 w-3.5" />
+            </a>
+          )}
+          {candidate.githubUrl && (
+            <a href={candidate.githubUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors">
+              <Github className="h-3.5 w-3.5" />
+            </a>
+          )}
+          <Link href={`/candidates/${candidate.id}`} className="ml-auto">
+            <Button variant="ghost" size="sm" className="h-6 text-xs px-2">View Profile</Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── main page ─────────────────────────────────────────────────────────────────
 
 export default function JobDetailPage() {
   const [, params] = useRoute("/jobs/:id");
@@ -72,6 +160,8 @@ export default function JobDetailPage() {
 
   const [isInsightsOpen, setIsInsightsOpen] = useState(true);
   const [isAllEvalsOpen, setIsAllEvalsOpen] = useState(false);
+  const [isSourcedOpen, setIsSourcedOpen] = useState(true);
+  const [runSourcing, setRunSourcing] = useState(false);
 
   const stages = Object.values(ApplicationStage);
 
@@ -88,11 +178,17 @@ export default function JobDetailPage() {
   };
 
   const handleRunWorkflow = () => {
-    runWorkflow.mutate({ data: { jobId } }, {
+    runWorkflow.mutate({ data: { jobId, runSourcing } }, {
       onSuccess: () => {
-        toast({ title: "Workflow started" });
+        toast({
+          title: runSourcing ? "Workflow started with sourcing" : "Workflow started",
+          description: runSourcing
+            ? "Generating new candidates before matching..."
+            : "Analysing candidates against the job...",
+        });
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: getGetLatestJobWorkflowQueryKey(jobId) });
+          queryClient.invalidateQueries({ queryKey: getGetJobApplicationsQueryKey(jobId) });
         }, 2000);
       }
     });
@@ -111,11 +207,14 @@ export default function JobDetailPage() {
   }
 
   const workflowRunning = workflowData?.run?.status === 'pending' || workflowData?.run?.status === 'running';
+  const sourcedCandidates = (workflowData?.sourcedCandidates ?? []) as SourcedCandidate[];
+  const hadSourcingRun = workflowData?.run?.runSourcing && sourcedCandidates.length > 0;
 
   return (
     <div className="h-full flex flex-col">
+      {/* ── Header ── */}
       <div className="p-8 border-b border-border bg-card flex-shrink-0">
-        <div className="max-w-7xl mx-auto flex justify-between items-start">
+        <div className="max-w-7xl mx-auto flex justify-between items-start gap-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight mb-2">{job.title}</h1>
             <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
@@ -133,37 +232,62 @@ export default function JobDetailPage() {
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Button 
-              onClick={handleRunWorkflow} 
-              disabled={runWorkflow.isPending || workflowRunning}
-              variant="default"
-              className="bg-primary/90 hover:bg-primary"
-            >
-              {workflowRunning ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="mr-2 h-4 w-4" />
-              )}
-              {workflowRunning ? 'Running Workflow...' : 'Run AI Workflow'}
-            </Button>
-            <Link href={`/jobs/${job.id}/edit`}>
-              <Button variant="outline">
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Job
+          <div className="flex flex-col items-end gap-3 shrink-0">
+            <div className="flex items-center gap-3">
+              <Button 
+                onClick={handleRunWorkflow} 
+                disabled={runWorkflow.isPending || workflowRunning}
+                variant="default"
+                className="bg-primary/90 hover:bg-primary"
+              >
+                {workflowRunning ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                {workflowRunning ? 'Running Workflow...' : 'Run AI Workflow'}
               </Button>
-            </Link>
+              <Link href={`/jobs/${job.id}/edit`}>
+                <Button variant="outline">
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Job
+                </Button>
+              </Link>
+            </div>
+            {/* Sourcing option */}
+            <div className={`flex items-start gap-2 px-3 py-2 rounded-md border transition-colors ${
+              runSourcing
+                ? "border-purple-200 bg-purple-500/5"
+                : "border-border bg-muted/30"
+            }`}>
+              <Checkbox
+                id="run-sourcing"
+                checked={runSourcing}
+                onCheckedChange={(v) => setRunSourcing(!!v)}
+                disabled={workflowRunning}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="run-sourcing" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                  <Zap className="h-3.5 w-3.5 text-purple-600" />
+                  Generate new candidates before matching
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  AI will source 7 mock candidates tailored to this role
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="flex-1 overflow-auto bg-background">
         <div className="p-8 max-w-7xl mx-auto space-y-8">
-          
-          {/* AI WORKFLOW INSIGHTS */}
+
+          {/* ── AI WORKFLOW INSIGHTS ── */}
           <Collapsible open={isInsightsOpen} onOpenChange={setIsInsightsOpen} className="border border-border rounded-lg bg-card shadow-sm">
             <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <BrainCircuit className="h-5 w-5 text-primary" />
                 <h2 className="text-lg font-semibold">AI Workflow Insights</h2>
                 {workflowData?.run && (
@@ -174,6 +298,12 @@ export default function JobDetailPage() {
                     'border-amber-500 text-amber-600'
                   }`}>
                     {workflowData.run.status}
+                  </Badge>
+                )}
+                {workflowData?.run?.runSourcing && (
+                  <Badge variant="outline" className="border-purple-300 text-purple-700 bg-purple-500/5">
+                    <Zap className="h-3 w-3 mr-1" />
+                    Sourcing enabled
                   </Badge>
                 )}
               </div>
@@ -195,6 +325,12 @@ export default function JobDetailPage() {
                   </div>
                 ) : workflowRunning ? (
                   <div className="space-y-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {workflowData.run.runSourcing
+                        ? "Sourcing candidates, then matching and shortlisting…"
+                        : "Analysing job and matching candidates…"}
+                    </div>
                     <Skeleton className="h-24 w-full" />
                     <Skeleton className="h-32 w-full" />
                     <div className="flex gap-4">
@@ -205,6 +341,42 @@ export default function JobDetailPage() {
                   </div>
                 ) : (
                   <div className="space-y-8">
+
+                    {/* Sourcing step status */}
+                    {workflowData.run.runSourcing && (() => {
+                      const sourcingLog = workflowData.logs?.find((l: { step: string; status: string; output?: unknown }) => l.step === "sourcing");
+                      if (!sourcingLog) return null;
+                      const output = sourcingLog.output as { generated?: number; saved?: number; error?: string } | null;
+                      return (
+                        <div className={`rounded-md border p-4 flex items-start gap-3 ${
+                          sourcingLog.status === "completed"
+                            ? "border-purple-200 bg-purple-500/5"
+                            : "border-destructive/30 bg-destructive/5"
+                        }`}>
+                          {sourcingLog.status === "completed" ? (
+                            <Zap className="h-5 w-5 text-purple-600 shrink-0 mt-0.5" />
+                          ) : (
+                            <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                          )}
+                          <div>
+                            <p className="text-sm font-medium">
+                              {sourcingLog.status === "completed"
+                                ? `Sourcing complete — ${output?.saved ?? 0} new candidates generated`
+                                : "Sourcing step failed"}
+                            </p>
+                            {sourcingLog.status === "failed" && output?.error && (
+                              <p className="text-xs text-destructive mt-1">{output.error}</p>
+                            )}
+                            {sourcingLog.status === "completed" && (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                All profiles are AI-generated mock candidates and clearly labelled.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Job Understanding */}
                     {workflowData.insight && (
                       <div>
@@ -218,20 +390,18 @@ export default function JobDetailPage() {
                               <p className="text-sm">{workflowData.insight.idealCandidateProfile}</p>
                             </CardContent>
                           </Card>
-                          <div className="space-y-4">
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-base">Evaluation Criteria</CardTitle>
-                              </CardHeader>
-                              <CardContent>
-                                <ul className="list-disc pl-4 text-sm space-y-1">
-                                  {workflowData.insight.evaluationCriteria.map((crit, i) => (
-                                    <li key={i}>{crit}</li>
-                                  ))}
-                                </ul>
-                              </CardContent>
-                            </Card>
-                          </div>
+                          <Card>
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-base">Evaluation Criteria</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <ul className="list-disc pl-4 text-sm space-y-1">
+                                {workflowData.insight.evaluationCriteria.map((crit: string, i: number) => (
+                                  <li key={i}>{crit}</li>
+                                ))}
+                              </ul>
+                            </CardContent>
+                          </Card>
                         </div>
                       </div>
                     )}
@@ -241,15 +411,23 @@ export default function JobDetailPage() {
                       <div>
                         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Top Candidates</h3>
                         <div className="grid md:grid-cols-3 gap-4">
-                          {workflowData.shortlist.summaries.map((summary) => {
-                            const evalData = workflowData.evaluations.find(e => e.candidateId === summary.candidateId);
+                          {workflowData.shortlist.summaries.map((summary: { candidateId: number; candidateName: string; whyRelevant: string; keyRisks?: string }) => {
+                            const evalData = workflowData.evaluations.find((e: { candidateId: number }) => e.candidateId === summary.candidateId);
+                            const isSourced = sourcedCandidates.some((c) => c.id === summary.candidateId);
                             return (
                               <Card key={summary.candidateId} className="flex flex-col">
                                 <CardHeader className="pb-2">
                                   <div className="flex justify-between items-start">
-                                    <CardTitle className="text-base">{summary.candidateName}</CardTitle>
+                                    <div className="min-w-0">
+                                      <CardTitle className="text-base truncate">{summary.candidateName}</CardTitle>
+                                      {isSourced && (
+                                        <Badge variant="outline" className="mt-1 text-[10px] bg-purple-500/10 text-purple-700 border-purple-200">
+                                          <Zap className="h-2.5 w-2.5 mr-1" />AI Sourced
+                                        </Badge>
+                                      )}
+                                    </div>
                                     {evalData && (
-                                      <Badge variant="outline" className={getScoreColor(evalData.score)}>
+                                      <Badge variant="outline" className={`ml-2 shrink-0 ${getScoreColor(evalData.score)}`}>
                                         {evalData.score}
                                       </Badge>
                                     )}
@@ -280,7 +458,7 @@ export default function JobDetailPage() {
                                   </div>
                                 </CardContent>
                               </Card>
-                            )
+                            );
                           })}
                         </div>
                       </div>
@@ -297,35 +475,49 @@ export default function JobDetailPage() {
                         </CollapsibleTrigger>
                         <CollapsibleContent className="p-0 border-t border-border">
                           <div className="divide-y divide-border">
-                            {workflowData.evaluations.map((ev) => (
-                              <div key={ev.id} className="p-4 flex flex-col md:flex-row gap-4 md:items-center justify-between hover:bg-muted/10">
-                                <div className="min-w-[200px]">
-                                  <Link href={`/candidates/${ev.candidateId}`}>
-                                    <span className="font-semibold hover:text-primary cursor-pointer">{ev.candidate.name}</span>
-                                  </Link>
-                                  <div className="mt-1">
-                                    <Badge variant="outline" className={getRecommendationColor(ev.recommendation)}>
-                                      {ev.recommendation}
-                                    </Badge>
+                            {workflowData.evaluations.map((ev: {
+                              id: number; candidateId: number; score: number; recommendation: string;
+                              strengths: string[]; gaps: string[];
+                              candidate: { name: string; source?: string | null };
+                            }) => {
+                              const isSourced = ev.candidate?.source === "AI Generated / Mock Sourcing";
+                              return (
+                                <div key={ev.id} className="p-4 flex flex-col md:flex-row gap-4 md:items-center justify-between hover:bg-muted/10">
+                                  <div className="min-w-[220px]">
+                                    <div className="flex items-center gap-2">
+                                      <Link href={`/candidates/${ev.candidateId}`}>
+                                        <span className="font-semibold hover:text-primary cursor-pointer">{ev.candidate?.name}</span>
+                                      </Link>
+                                      {isSourced && (
+                                        <Badge variant="outline" className="text-[10px] py-0 h-5 bg-purple-500/10 text-purple-700 border-purple-200">
+                                          <Zap className="h-2.5 w-2.5 mr-1" />AI
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="mt-1">
+                                      <Badge variant="outline" className={getRecommendationColor(ev.recommendation)}>
+                                        {ev.recommendation}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <div className="flex-1 w-full max-w-md">
+                                    <div className="flex justify-between text-xs mb-1">
+                                      <span className="text-muted-foreground">Match Score</span>
+                                      <span className="font-medium">{ev.score}/100</span>
+                                    </div>
+                                    <Progress value={ev.score} className="h-2" />
+                                  </div>
+                                  <div className="flex-1 flex gap-2 flex-wrap text-xs">
+                                    {ev.strengths.slice(0, 2).map((s, i) => (
+                                      <span key={i} className="px-2 py-1 bg-green-500/10 text-green-700 rounded-full border border-green-200/50 truncate max-w-[150px]">+ {s}</span>
+                                    ))}
+                                    {ev.gaps.slice(0, 1).map((g, i) => (
+                                      <span key={i} className="px-2 py-1 bg-red-500/10 text-red-700 rounded-full border border-red-200/50 truncate max-w-[150px]">- {g}</span>
+                                    ))}
                                   </div>
                                 </div>
-                                <div className="flex-1 w-full max-w-md">
-                                  <div className="flex justify-between text-xs mb-1">
-                                    <span className="text-muted-foreground">Match Score</span>
-                                    <span className="font-medium">{ev.score}/100</span>
-                                  </div>
-                                  <Progress value={ev.score} className="h-2" />
-                                </div>
-                                <div className="flex-1 flex gap-2 flex-wrap text-xs">
-                                  {ev.strengths.slice(0, 2).map((s, i) => (
-                                    <span key={i} className="px-2 py-1 bg-green-500/10 text-green-700 rounded-full border border-green-200/50 truncate max-w-[150px]">+ {s}</span>
-                                  ))}
-                                  {ev.gaps.slice(0, 1).map((g, i) => (
-                                    <span key={i} className="px-2 py-1 bg-red-500/10 text-red-700 rounded-full border border-red-200/50 truncate max-w-[150px]">- {g}</span>
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </CollapsibleContent>
                       </Collapsible>
@@ -337,9 +529,45 @@ export default function JobDetailPage() {
             </CollapsibleContent>
           </Collapsible>
 
-          {/* PIPELINE BOARD */}
+          {/* ── GENERATED CANDIDATES ── */}
+          {hadSourcingRun && (
+            <Collapsible open={isSourcedOpen} onOpenChange={setIsSourcedOpen} className="border border-purple-200 rounded-lg bg-card shadow-sm">
+              <div className="p-4 border-b border-purple-200 flex items-center justify-between bg-purple-500/5">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-purple-600" />
+                  <h2 className="text-lg font-semibold">Generated Candidates</h2>
+                  <Badge variant="outline" className="border-purple-200 text-purple-700 bg-purple-500/10">
+                    {sourcedCandidates.length} AI-sourced
+                  </Badge>
+                </div>
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="w-8 h-8 p-0">
+                    {isSourcedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent>
+                <div className="p-6">
+                  <div className="flex items-start gap-2 mb-4 p-3 rounded-md bg-amber-500/5 border border-amber-200">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-800">
+                      These are AI-generated mock profiles created to demonstrate sourcing capability.
+                      All emails, LinkedIn URLs, and GitHub handles are placeholders — verify before outreach.
+                    </p>
+                  </div>
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {sourcedCandidates.map((c) => (
+                      <SourcedCandidateCard key={c.id} candidate={c} />
+                    ))}
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* ── PIPELINE BOARD ── */}
           <div className="flex-1 overflow-x-auto pb-4">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">Pipeline</h2>
+            <h2 className="text-lg font-semibold mb-4">Pipeline</h2>
             <div className="h-full min-w-max flex gap-4">
               {stages.map((stage) => {
                 const appsInStage = applications?.filter((app) => app.stage === stage) || [];
@@ -351,17 +579,27 @@ export default function JobDetailPage() {
                     </div>
                     <div className="flex-1 overflow-y-auto p-3 space-y-3">
                       {appsInStage.map((app) => {
-                        const evalData = workflowData?.evaluations?.find(e => e.candidateId === app.candidate.id);
+                        const evalData = workflowData?.evaluations?.find((e: { candidateId: number }) => e.candidateId === app.candidate.id);
+                        const isSourced = app.candidate.source === "AI Generated / Mock Sourcing";
                         return (
-                          <div key={app.id} className="bg-card border border-border rounded-md p-4 shadow-sm hover:border-primary/50 transition-colors">
+                          <div key={app.id} className={`bg-card border rounded-md p-4 shadow-sm hover:border-primary/50 transition-colors ${
+                            isSourced ? "border-purple-200" : "border-border"
+                          }`}>
                             <div className="flex justify-between items-start mb-1">
-                              <Link href={`/candidates/${app.candidate.id}`}>
-                                <div className="font-medium hover:text-primary transition-colors cursor-pointer">
-                                  {app.candidate.name}
-                                </div>
-                              </Link>
+                              <div className="min-w-0">
+                                <Link href={`/candidates/${app.candidate.id}`}>
+                                  <div className="font-medium hover:text-primary transition-colors cursor-pointer truncate">
+                                    {app.candidate.name}
+                                  </div>
+                                </Link>
+                                {isSourced && (
+                                  <Badge variant="outline" className="mt-1 text-[10px] py-0 h-4 bg-purple-500/10 text-purple-700 border-purple-200">
+                                    <Zap className="h-2.5 w-2.5 mr-1" />AI Sourced
+                                  </Badge>
+                                )}
+                              </div>
                               {evalData && (
-                                <Badge variant="outline" className={`ml-2 ${getScoreColor(evalData.score)}`}>
+                                <Badge variant="outline" className={`ml-2 shrink-0 ${getScoreColor(evalData.score)}`}>
                                   {evalData.score}
                                 </Badge>
                               )}
@@ -373,7 +611,7 @@ export default function JobDetailPage() {
                             </div>
                             
                             {evalData && (
-                              <div className="mb-4">
+                              <div className="mb-3">
                                 <Badge variant="outline" className={`text-[10px] py-0 h-5 ${getRecommendationColor(evalData.recommendation)}`}>
                                   {evalData.recommendation}
                                 </Badge>
@@ -404,7 +642,7 @@ export default function JobDetailPage() {
                               </DropdownMenu>
                             </div>
                           </div>
-                        )
+                        );
                       })}
                       {appsInStage.length === 0 && (
                         <div className="text-center py-8 text-sm text-muted-foreground italic border-2 border-dashed border-border rounded-md bg-card/50">

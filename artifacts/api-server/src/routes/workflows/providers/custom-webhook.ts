@@ -6,7 +6,7 @@ const WEBHOOK_TIMEOUT_MS = 30_000;
 export class CustomWebhookProvider implements AgentProvider {
   readonly id: number;
   readonly name: string;
-  readonly type = "custom_webhook";
+  readonly type: string = "custom_webhook";
   private readonly webhookUrl: string;
   private readonly apiKey?: string;
 

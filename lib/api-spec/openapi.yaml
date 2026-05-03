@@ -684,6 +684,21 @@ components:
           type: array
           items:
             type: string
+        headline:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        currentCompany:
+          type: string
+          nullable: true
+        githubUrl:
+          type: string
+          nullable: true
+        source:
+          type: string
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -791,7 +806,7 @@ components:
 
     WorkflowStepName:
       type: string
-      enum: [job_understanding, candidate_matching, shortlist_generation, sourcing_later]
+      enum: [job_understanding, candidate_matching, shortlist_generation, sourcing_later, sourcing]
 
     AgentProviderRecord:
       type: object
@@ -906,6 +921,8 @@ components:
       properties:
         jobId:
           type: integer
+        runSourcing:
+          type: boolean
       required: [jobId]
 
     RunStatus:
@@ -925,13 +942,15 @@ components:
           type: integer
         status:
           $ref: "#/components/schemas/RunStatus"
+        runSourcing:
+          type: boolean
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
-      required: [id, jobId, status, createdAt, updatedAt]
+      required: [id, jobId, status, runSourcing, createdAt, updatedAt]
 
     AgentLog:
       type: object
@@ -1075,6 +1094,42 @@ components:
           format: date-time
       required: [id, runId, jobId, rankedCandidateIds, summaries, createdAt]
 
+    SourcingCandidateResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        headline:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        currentCompany:
+          type: string
+          nullable: true
+        email:
+          type: string
+        linkedIn:
+          type: string
+          nullable: true
+        githubUrl:
+          type: string
+          nullable: true
+        skills:
+          type: array
+          items:
+            type: string
+        summary:
+          type: string
+          nullable: true
+        source:
+          type: string
+          nullable: true
+      required: [id, name, email, skills]
+
     JobWorkflowResult:
       type: object
       properties:
@@ -1092,11 +1147,15 @@ components:
           nullable: true
           allOf:
             - $ref: "#/components/schemas/Shortlist"
+        sourcedCandidates:
+          type: array
+          items:
+            $ref: "#/components/schemas/SourcingCandidateResult"
         logs:
           type: array
           items:
             $ref: "#/components/schemas/AgentLog"
-      required: [run, evaluations, logs]
+      required: [run, evaluations, logs, sourcedCandidates]
 
     # ── SUMMARY ──
     StageCount:

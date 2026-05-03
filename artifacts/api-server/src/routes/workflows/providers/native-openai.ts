@@ -97,7 +97,7 @@ Return only valid JSON.`;
           messages: [{ role: "user", content: prompt }],
         });
         const match = json<CandidateMatchResult>(response.choices[0]?.message?.content ?? "{}");
-        return { candidateId: candidate.id, candidateName: candidate.name, ...match };
+        return { ...match, candidateId: candidate.id, candidateName: candidate.name };
       },
       { concurrency: 3, retries: 3 },
     );

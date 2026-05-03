@@ -7,11 +7,13 @@ import {
   shortlistsTable,
   jobsTable,
   candidatesTable,
+  applicationsTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../../lib/logger";
-import { resolveProvider } from "./providers";
+import { resolveProvider, resolveSourcingProvider } from "./providers";
 import type { JobInsightResult, CandidateMatchResult, ShortlistResult } from "./engine-types";
+import type { SourcingCandidate } from "./providers";
 
 export type { JobInsightResult, CandidateMatchResult, ShortlistResult };
 
@@ -34,6 +36,80 @@ async function setRunStatus(runId: number, status: "running" | "completed" | "fa
     .update(agentRunsTable)
     .set({ status, updatedAt: new Date() })
     .where(eq(agentRunsTable.id, runId));
+}
+
+// ── STEP 0: Sourcing (optional) ───────────────────────────────────────────────
+
+async function runSourcing(
+  runId: number,
+  jobId: number,
+  job: { title: string; description: string; location: string; seniority: string; mustHaveSkills: string[] },
+  insight: JobInsightResult,
+): Promise<number[]> {
+  await logStep(runId, "sourcing", "running", { jobTitle: job.title });
+
+  const provider = await resolveSourcingProvider();
+  logger.info({ runId, step: "sourcing", provider: provider.name }, "Sourcing step dispatched");
+
+  try {
+    const candidates = (await provider.run({
+      step: "sourcing",
+      runId,
+      jobId,
+      payload: { job, insight },
+    })) as SourcingCandidate[];
+
+    // Deduplicate by email against existing candidates
+    const existing = await db.select({ email: candidatesTable.email }).from(candidatesTable);
+    const existingEmails = new Set(existing.map((c) => c.email.toLowerCase()));
+
+    const newCandidateIds: number[] = [];
+    for (const c of candidates) {
+      const emailKey = c.email.toLowerCase();
+      if (existingEmails.has(emailKey)) {
+        logger.warn({ email: c.email }, "Sourcing skipped duplicate email");
+        continue;
+      }
+      existingEmails.add(emailKey);
+
+      const [inserted] = await db
+        .insert(candidatesTable)
+        .values({
+          name: c.name,
+          email: c.email,
+          linkedIn: c.linkedinUrl || null,
+          summary: c.summary || null,
+          skills: c.skills,
+          headline: c.headline || null,
+          location: c.location || null,
+          currentCompany: c.currentCompany || null,
+          githubUrl: c.githubUrl || null,
+          source: c.source,
+        })
+        .returning({ id: candidatesTable.id });
+
+      newCandidateIds.push(inserted.id);
+
+      // Create application at "Sourced" stage
+      await db.insert(applicationsTable).values({
+        jobId,
+        candidateId: inserted.id,
+        stage: "Sourced",
+        notes: `AI Generated — ${c.evidence}\nPotential risks: ${c.potentialRisks}`,
+      });
+    }
+
+    await logStep(runId, "sourcing", "completed", { jobTitle: job.title, provider: provider.name }, {
+      generated: candidates.length,
+      saved: newCandidateIds.length,
+    });
+    return newCandidateIds;
+  } catch (err) {
+    await logStep(runId, "sourcing", "failed", { jobTitle: job.title, provider: provider.name }, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 // ── STEP 1: Job Understanding ─────────────────────────────────────────────────
@@ -162,20 +238,15 @@ async function runShortlist(
 
 // ── MAIN RUNNER ───────────────────────────────────────────────────────────────
 
-export async function runWorkflowEngine(runId: number, jobId: number) {
+export async function runWorkflowEngine(runId: number, jobId: number, options: { runSourcing?: boolean } = {}) {
   try {
     await setRunStatus(runId, "running");
-    logger.info({ runId, jobId }, "Workflow started");
+    logger.info({ runId, jobId, runSourcing: options.runSourcing }, "Workflow started");
 
     const [job] = await db.select().from(jobsTable).where(eq(jobsTable.id, jobId));
     if (!job) throw new Error(`Job ${jobId} not found`);
 
-    const candidates = await db.select().from(candidatesTable);
-    if (candidates.length === 0) {
-      logger.warn({ runId }, "No candidates found — skipping matching");
-    }
-
-    // Step 1
+    // Step 1: Job Understanding (always runs first)
     const insight = await runJobUnderstanding(runId, jobId, job);
     await db.insert(jobInsightsTable).values({
       runId,
@@ -186,29 +257,45 @@ export async function runWorkflowEngine(runId: number, jobId: number) {
       idealCandidateProfile: insight.idealCandidateProfile,
     });
 
-    // Step 2
-    if (candidates.length > 0) {
-      await runCandidateMatching(runId, jobId, job, insight, candidates);
+    // Step 0: Sourcing (optional, runs after job understanding, before matching)
+    if (options.runSourcing) {
+      try {
+        await runSourcing(runId, jobId, job, insight);
+      } catch (err) {
+        logger.error({ runId, jobId, err }, "Sourcing step failed — continuing with existing candidates");
+        await logStep(runId, "sourcing", "failed", null, {
+          error: err instanceof Error ? err.message : String(err),
+          note: "Continuing workflow with existing candidates",
+        });
+      }
     }
 
-    // Step 3
-    const evaluations = await db
-      .select()
-      .from(aiEvaluationsTable)
-      .where(eq(aiEvaluationsTable.runId, runId));
+    // Step 2: Candidate Matching (all candidates including newly sourced)
+    const candidates = await db.select().from(candidatesTable);
+    if (candidates.length === 0) {
+      logger.warn({ runId }, "No candidates found — skipping matching and shortlist");
+    } else {
+      await runCandidateMatching(runId, jobId, job, insight, candidates);
 
-    const candidateMap = new Map(candidates.map((c) => [c.id, c]));
-    const evalWithNames = evaluations.map((e) => ({
-      candidateId: e.candidateId,
-      candidateName: candidateMap.get(e.candidateId)?.name ?? "Unknown",
-      score: e.score,
-      recommendation: e.recommendation,
-      strengths: (e.strengths ?? []) as string[],
-      gaps: (e.gaps ?? []) as string[],
-    }));
+      // Step 3: Shortlist (fetch fresh evaluations)
+      const evaluations = await db
+        .select()
+        .from(aiEvaluationsTable)
+        .where(eq(aiEvaluationsTable.runId, runId));
 
-    if (evalWithNames.length > 0) {
-      await runShortlist(runId, jobId, job, insight, evalWithNames);
+      const candidateMap = new Map(candidates.map((c) => [c.id, c]));
+      const evalWithNames = evaluations.map((e) => ({
+        candidateId: e.candidateId,
+        candidateName: candidateMap.get(e.candidateId)?.name ?? "Unknown",
+        score: e.score,
+        recommendation: e.recommendation,
+        strengths: (e.strengths ?? []) as string[],
+        gaps: (e.gaps ?? []) as string[],
+      }));
+
+      if (evalWithNames.length > 0) {
+        await runShortlist(runId, jobId, job, insight, evalWithNames);
+      }
     }
 
     await setRunStatus(runId, "completed");

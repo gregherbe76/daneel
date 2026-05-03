@@ -61,6 +61,11 @@ export interface Candidate {
   linkedIn?: string | null;
   summary?: string | null;
   skills: string[];
+  headline?: string | null;
+  location?: string | null;
+  currentCompany?: string | null;
+  githubUrl?: string | null;
+  source?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -123,6 +128,7 @@ export const WorkflowStepName = {
   candidate_matching: "candidate_matching",
   shortlist_generation: "shortlist_generation",
   sourcing_later: "sourcing_later",
+  sourcing: "sourcing",
 } as const;
 
 export interface AgentProviderRecord {
@@ -179,6 +185,7 @@ export interface UpsertStepSettingBody {
 
 export interface RunWorkflowBody {
   jobId: number;
+  runSourcing?: boolean;
 }
 
 export type RunStatus = (typeof RunStatus)[keyof typeof RunStatus];
@@ -203,6 +210,7 @@ export interface AgentRun {
   id: number;
   jobId: number;
   status: RunStatus;
+  runSourcing: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -278,11 +286,26 @@ export interface Shortlist {
   createdAt: string;
 }
 
+export interface SourcingCandidateResult {
+  id: number;
+  name: string;
+  headline?: string | null;
+  location?: string | null;
+  currentCompany?: string | null;
+  email: string;
+  linkedIn?: string | null;
+  githubUrl?: string | null;
+  skills: string[];
+  summary?: string | null;
+  source?: string | null;
+}
+
 export interface JobWorkflowResult {
   run: AgentRun;
   insight?: JobInsight | null;
   evaluations: CandidateEvaluation[];
   shortlist?: Shortlist | null;
+  sourcedCandidates: SourcingCandidateResult[];
   logs: AgentLog[];
 }
 

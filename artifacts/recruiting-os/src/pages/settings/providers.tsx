@@ -85,7 +85,8 @@ const WORKFLOW_STEPS: { key: WorkflowStep; label: string; description: string }[
   { key: "job_understanding", label: "Job Understanding", description: "Analyzes the job posting and extracts requirements" },
   { key: "candidate_matching", label: "Candidate Matching", description: "Scores all candidates against the job criteria" },
   { key: "shortlist_generation", label: "Shortlist Generation", description: "Ranks top candidates and generates hiring summaries" },
-  { key: "sourcing_later", label: "Sourcing (coming soon)", description: "Proactive candidate outreach and sourcing" },
+  { key: "sourcing" as WorkflowStep, label: "Sourcing", description: "Generate new candidate profiles before matching" },
+  { key: "sourcing_later", label: "Sourcing (future)", description: "Proactive outreach and external sourcing (coming soon)" },
 ];
 
 const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
