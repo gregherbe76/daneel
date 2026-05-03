@@ -1,27 +1,103 @@
-import { and, isNotNull, lt, or, isNull, sql } from "drizzle-orm";
-import { db, candidatesTable } from "@workspace/db";
+import { and, isNotNull, lt, or, isNull, sql, eq } from "drizzle-orm";
+import {
+  db,
+  candidatesTable,
+  emailRevalidationSettingsTable,
+  type EmailRevalidationSettings,
+} from "@workspace/db";
 import { validateEmail } from "./email-validation";
 import { logger } from "./logger";
 
 /**
- * Number of days after which a previously validated email is considered stale
- * and eligible for an automatic re-check. Domains lose MX records, employees
- * leave companies, and addresses go dead — so a candidate marked "Verified"
- * months ago may no longer be reliable.
+ * Default values for the singleton settings row, seeded from env vars on first
+ * boot. After that, the live values come from the database so admins can tune
+ * them from the UI without a redeploy.
  */
-export const EMAIL_REVALIDATION_DAYS = Number(
+const DEFAULT_THRESHOLD_DAYS = Number(
   process.env["EMAIL_REVALIDATION_DAYS"] ?? "30",
 );
-
-/** How often the background sweeper wakes up to look for stale rows. */
-export const EMAIL_REVALIDATION_INTERVAL_MS = Number(
+const DEFAULT_INTERVAL_MS = Number(
   process.env["EMAIL_REVALIDATION_INTERVAL_MS"] ?? String(6 * 60 * 60 * 1000),
 );
-
-/** Cap how many candidates a single sweep will re-check, to avoid bursts. */
-export const EMAIL_REVALIDATION_BATCH_SIZE = Number(
+const DEFAULT_BATCH_SIZE = Number(
   process.env["EMAIL_REVALIDATION_BATCH_SIZE"] ?? "50",
 );
+/** Floor so a misconfigured 0/negative interval doesn't busy-loop the sweeper. */
+const MIN_INTERVAL_MS = 60_000;
+
+const SINGLETON_ID = 1;
+
+/**
+ * Read the current settings, inserting the env-var defaults on first call so
+ * later updates always have a row to UPDATE.
+ */
+export async function getEmailRevalidationSettings(): Promise<EmailRevalidationSettings> {
+  const [row] = await db
+    .select()
+    .from(emailRevalidationSettingsTable)
+    .where(eq(emailRevalidationSettingsTable.id, SINGLETON_ID));
+  if (row) return row;
+
+  const seedThresholdDays =
+    Number.isFinite(DEFAULT_THRESHOLD_DAYS) && DEFAULT_THRESHOLD_DAYS > 0
+      ? DEFAULT_THRESHOLD_DAYS
+      : 30;
+  const seedIntervalMs =
+    Number.isFinite(DEFAULT_INTERVAL_MS) && DEFAULT_INTERVAL_MS >= 0
+      ? DEFAULT_INTERVAL_MS
+      : 6 * 60 * 60 * 1000;
+  const seedBatchSize =
+    Number.isFinite(DEFAULT_BATCH_SIZE) && DEFAULT_BATCH_SIZE > 0
+      ? DEFAULT_BATCH_SIZE
+      : 50;
+  const [seeded] = await db
+    .insert(emailRevalidationSettingsTable)
+    .values({
+      id: SINGLETON_ID,
+      thresholdDays: seedThresholdDays,
+      intervalMs: seedIntervalMs,
+      batchSize: seedBatchSize,
+      // Use the sanitized interval so a malformed env var doesn't seed
+      // `enabled=false` unintentionally.
+      enabled: seedIntervalMs > 0,
+    })
+    .onConflictDoNothing()
+    .returning();
+
+  if (seeded) return seeded;
+
+  // Lost a race with another instance — re-read.
+  const [existing] = await db
+    .select()
+    .from(emailRevalidationSettingsTable)
+    .where(eq(emailRevalidationSettingsTable.id, SINGLETON_ID));
+  if (!existing) {
+    throw new Error("Failed to load or seed email revalidation settings");
+  }
+  return existing;
+}
+
+export async function updateEmailRevalidationSettings(input: {
+  thresholdDays: number;
+  intervalMs: number;
+  batchSize: number;
+  enabled: boolean;
+}): Promise<EmailRevalidationSettings> {
+  // Make sure the row exists.
+  await getEmailRevalidationSettings();
+  const [updated] = await db
+    .update(emailRevalidationSettingsTable)
+    .set({
+      thresholdDays: input.thresholdDays,
+      intervalMs: input.intervalMs,
+      batchSize: input.batchSize,
+      enabled: input.enabled,
+      updatedAt: new Date(),
+    })
+    .where(eq(emailRevalidationSettingsTable.id, SINGLETON_ID))
+    .returning();
+  return updated;
+}
 
 /**
  * Re-run the MX-record validator for a single candidate and persist the
@@ -58,7 +134,10 @@ export async function revalidateCandidateEmail(candidateId: number) {
  * candidates that were re-checked in this sweep.
  */
 export async function sweepStaleEmailValidations(): Promise<number> {
-  const cutoff = new Date(Date.now() - EMAIL_REVALIDATION_DAYS * 24 * 60 * 60 * 1000);
+  const settings = await getEmailRevalidationSettings();
+  const cutoff = new Date(
+    Date.now() - settings.thresholdDays * 24 * 60 * 60 * 1000,
+  );
 
   const stale = await db
     .select({ id: candidatesTable.id })
@@ -72,7 +151,7 @@ export async function sweepStaleEmailValidations(): Promise<number> {
         ),
       ),
     )
-    .limit(EMAIL_REVALIDATION_BATCH_SIZE);
+    .limit(settings.batchSize);
 
   if (stale.length === 0) return 0;
 
@@ -92,36 +171,70 @@ export async function sweepStaleEmailValidations(): Promise<number> {
 }
 
 let timer: NodeJS.Timeout | undefined;
+let stopped = false;
 
 /**
- * Start a long-running interval that periodically re-validates stale email
- * addresses. Safe to call once at server boot. The first sweep runs after the
- * configured interval so we don't pile DNS work onto cold start. Disable by
- * setting `EMAIL_REVALIDATION_INTERVAL_MS=0`.
+ * Start a long-running loop that periodically re-validates stale email
+ * addresses. Safe to call once at server boot. Re-reads the settings row
+ * before scheduling each iteration so admin changes (interval, enabled flag)
+ * take effect on the very next tick — no redeploy required.
  */
 export function startEmailRevalidationScheduler() {
-  if (timer) return;
-  if (!Number.isFinite(EMAIL_REVALIDATION_INTERVAL_MS) || EMAIL_REVALIDATION_INTERVAL_MS <= 0) {
-    logger.info("Email re-validation scheduler disabled (interval <= 0)");
-    return;
-  }
-  logger.info(
-    {
-      intervalMs: EMAIL_REVALIDATION_INTERVAL_MS,
-      thresholdDays: EMAIL_REVALIDATION_DAYS,
-      batchSize: EMAIL_REVALIDATION_BATCH_SIZE,
-    },
-    "Email re-validation scheduler started",
-  );
-  timer = setInterval(() => {
-    sweepStaleEmailValidations()
-      .then((n) => {
+  if (timer || stopped) return;
+
+  const scheduleNext = async () => {
+    let intervalMs: number;
+    let enabled: boolean;
+    try {
+      const settings = await getEmailRevalidationSettings();
+      intervalMs = settings.intervalMs;
+      enabled = settings.enabled;
+    } catch (err) {
+      logger.error(
+        { err: err instanceof Error ? err.message : String(err) },
+        "Email re-validation: failed to load settings, retrying in 5m",
+      );
+      intervalMs = 5 * 60 * 1000;
+      enabled = true;
+    }
+
+    // When disabled (or interval is non-positive), poll the settings row at a
+    // slow cadence so re-enabling from the UI takes effect within ~1 minute.
+    const delay = !enabled || intervalMs <= 0
+      ? MIN_INTERVAL_MS
+      : Math.max(intervalMs, MIN_INTERVAL_MS);
+
+    timer = setTimeout(() => {
+      timer = undefined;
+      void runSweepThenReschedule(enabled && intervalMs > 0);
+    }, delay);
+    if (typeof timer.unref === "function") timer.unref();
+  };
+
+  const runSweepThenReschedule = async (shouldSweep: boolean) => {
+    if (shouldSweep) {
+      try {
+        const n = await sweepStaleEmailValidations();
         if (n > 0) logger.info({ rechecked: n }, "Stale email validations refreshed");
-      })
-      .catch((err) => {
-        logger.error({ err: err instanceof Error ? err.message : String(err) }, "Email re-validation sweep crashed");
-      });
-  }, EMAIL_REVALIDATION_INTERVAL_MS);
-  // Don't keep the event loop alive on shutdown.
-  if (typeof timer.unref === "function") timer.unref();
+      } catch (err) {
+        logger.error(
+          { err: err instanceof Error ? err.message : String(err) },
+          "Email re-validation sweep crashed",
+        );
+      }
+    }
+    if (!stopped) await scheduleNext();
+  };
+
+  logger.info("Email re-validation scheduler started");
+  void scheduleNext();
+}
+
+/** Stop the scheduler (test helper / graceful shutdown). */
+export function stopEmailRevalidationScheduler() {
+  stopped = true;
+  if (timer) {
+    clearTimeout(timer);
+    timer = undefined;
+  }
 }

@@ -26,6 +26,8 @@ tags:
     description: Recruiter notes and threaded team comments on candidates
   - name: team
     description: Lightweight team roster used for @mentions
+  - name: settings
+    description: Admin-tunable application settings
 paths:
   /healthz:
     get:
@@ -646,6 +648,36 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProviderStepSettingWithProvider"
+
+  /settings/email-revalidation:
+    get:
+      operationId: getEmailRevalidationSettings
+      tags: [settings]
+      summary: Get the current email re-validation scheduler settings
+      responses:
+        "200":
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailRevalidationSettings"
+    put:
+      operationId: updateEmailRevalidationSettings
+      tags: [settings]
+      summary: Update the email re-validation scheduler settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEmailRevalidationSettingsBody"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailRevalidationSettings"
 
   /workflows/improve-and-rerun:
     post:
@@ -1602,6 +1634,50 @@ components:
         enabled:
           type: boolean
       required: [workflowStep, providerId, enabled]
+
+    # ── SETTINGS ──
+    EmailRevalidationSettings:
+      type: object
+      properties:
+        thresholdDays:
+          type: integer
+          description: Days after which a previously validated email is considered stale.
+          minimum: 1
+          maximum: 365
+        intervalMs:
+          type: integer
+          description: Milliseconds between sweeper runs. Set to 0 (with enabled=false) to disable.
+          minimum: 0
+        batchSize:
+          type: integer
+          description: Maximum number of candidates re-checked per sweep.
+          minimum: 1
+          maximum: 10000
+        enabled:
+          type: boolean
+          description: When false, the scheduler is paused.
+        updatedAt:
+          type: string
+          format: date-time
+      required: [thresholdDays, intervalMs, batchSize, enabled, updatedAt]
+
+    UpdateEmailRevalidationSettingsBody:
+      type: object
+      properties:
+        thresholdDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+        intervalMs:
+          type: integer
+          minimum: 0
+        batchSize:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        enabled:
+          type: boolean
+      required: [thresholdDays, intervalMs, batchSize, enabled]
 
     # ── WORKFLOWS ──
     RunWorkflowBody:

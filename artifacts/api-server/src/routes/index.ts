@@ -8,6 +8,7 @@ import workflowsRouter from "./workflows";
 import providersRouter from "./providers";
 import reportsRouter from "./reports";
 import candidateNotesRouter from "./candidate-notes";
+import settingsRouter from "./settings";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(workflowsRouter);
 router.use(providersRouter);
 router.use(reportsRouter);
 router.use(candidateNotesRouter);
+router.use(settingsRouter);
 
 export default router;

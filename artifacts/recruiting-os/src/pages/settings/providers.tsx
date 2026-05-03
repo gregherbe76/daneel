@@ -65,6 +65,7 @@ import {
   Eye,
   Search,
 } from "lucide-react";
+import { SettingsTabs } from "@/components/settings-tabs";
 
 // ── types ────────────────────────────────────────────────────────────────────
 
@@ -977,6 +978,8 @@ export default function AgentProvidersPage() {
   );
 
   return (
+    <>
+    <SettingsTabs />
     <div className="p-8 max-w-4xl mx-auto">
       {/* Page header */}
       <div className="mb-8">
@@ -1097,5 +1100,6 @@ export default function AgentProvidersPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </>
   );
 }

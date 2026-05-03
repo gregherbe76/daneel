@@ -32,6 +32,7 @@ import type {
   CreateCandidateNoteBody,
   CreateJobBody,
   CreateProviderBody,
+  EmailRevalidationSettings,
   HealthStatus,
   HiringReport,
   ImproveAndRerunBody,
@@ -52,6 +53,7 @@ import type {
   TeamMember,
   ToggleProviderBody,
   UpdateApplicationBody,
+  UpdateEmailRevalidationSettingsBody,
   UpsertStepSettingBody,
 } from "./api.schemas";
 
@@ -2821,6 +2823,178 @@ export const useUpsertProviderStepSetting = <
   TContext
 > => {
   return useMutation(getUpsertProviderStepSettingMutationOptions(options));
+};
+
+/**
+ * @summary Get the current email re-validation scheduler settings
+ */
+export const getGetEmailRevalidationSettingsUrl = () => {
+  return `/api/settings/email-revalidation`;
+};
+
+export const getEmailRevalidationSettings = async (
+  options?: RequestInit,
+): Promise<EmailRevalidationSettings> => {
+  return customFetch<EmailRevalidationSettings>(
+    getGetEmailRevalidationSettingsUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetEmailRevalidationSettingsQueryKey = () => {
+  return [`/api/settings/email-revalidation`] as const;
+};
+
+export const getGetEmailRevalidationSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEmailRevalidationSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEmailRevalidationSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetEmailRevalidationSettingsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getEmailRevalidationSettings>>
+  > = ({ signal }) =>
+    getEmailRevalidationSettings({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEmailRevalidationSettings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEmailRevalidationSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEmailRevalidationSettings>>
+>;
+export type GetEmailRevalidationSettingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the current email re-validation scheduler settings
+ */
+
+export function useGetEmailRevalidationSettings<
+  TData = Awaited<ReturnType<typeof getEmailRevalidationSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getEmailRevalidationSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEmailRevalidationSettingsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update the email re-validation scheduler settings
+ */
+export const getUpdateEmailRevalidationSettingsUrl = () => {
+  return `/api/settings/email-revalidation`;
+};
+
+export const updateEmailRevalidationSettings = async (
+  updateEmailRevalidationSettingsBody: UpdateEmailRevalidationSettingsBody,
+  options?: RequestInit,
+): Promise<EmailRevalidationSettings> => {
+  return customFetch<EmailRevalidationSettings>(
+    getUpdateEmailRevalidationSettingsUrl(),
+    {
+      ...options,
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(updateEmailRevalidationSettingsBody),
+    },
+  );
+};
+
+export const getUpdateEmailRevalidationSettingsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateEmailRevalidationSettings>>,
+    TError,
+    { data: BodyType<UpdateEmailRevalidationSettingsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateEmailRevalidationSettings>>,
+  TError,
+  { data: BodyType<UpdateEmailRevalidationSettingsBody> },
+  TContext
+> => {
+  const mutationKey = ["updateEmailRevalidationSettings"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateEmailRevalidationSettings>>,
+    { data: BodyType<UpdateEmailRevalidationSettingsBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateEmailRevalidationSettings(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateEmailRevalidationSettingsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateEmailRevalidationSettings>>
+>;
+export type UpdateEmailRevalidationSettingsMutationBody =
+  BodyType<UpdateEmailRevalidationSettingsBody>;
+export type UpdateEmailRevalidationSettingsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update the email re-validation scheduler settings
+ */
+export const useUpdateEmailRevalidationSettings = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateEmailRevalidationSettings>>,
+    TError,
+    { data: BodyType<UpdateEmailRevalidationSettingsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateEmailRevalidationSettings>>,
+  TError,
+  { data: BodyType<UpdateEmailRevalidationSettingsBody> },
+  TContext
+> => {
+  return useMutation(
+    getUpdateEmailRevalidationSettingsMutationOptions(options),
+  );
 };
 
 /**

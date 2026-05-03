@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Briefcase, Users, PlayCircle, ListChecks, AtSign } from "lucide-react";
+import { Briefcase, Users, PlayCircle, ListChecks, AtSign, Settings as SettingsIcon } from "lucide-react";
 import {
   useListTeamMembers,
   useListMentionsForMember,
@@ -55,6 +55,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { name: "Jobs", href: "/jobs", icon: Briefcase },
     { name: "Candidates", href: "/candidates", icon: Users },
     { name: "Mentions", href: "/mentions", icon: AtSign, badge: <MentionsBadge /> },
+    { name: "Settings", href: "/settings/providers", icon: SettingsIcon, match: undefined },
   ];
 
   return (
@@ -84,7 +85,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {navigation.map((item) => {
             const isActive = item.match
               ? location === item.match
-              : location.startsWith(item.href);
+              : item.name === "Settings"
+                ? location.startsWith("/settings")
+                : location.startsWith(item.href);
             return (
               <Link key={item.name} href={item.href}>
                 <div

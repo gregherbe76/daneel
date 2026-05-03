@@ -393,6 +393,45 @@ export interface UpsertStepSettingBody {
   enabled: boolean;
 }
 
+export interface EmailRevalidationSettings {
+  /**
+   * Days after which a previously validated email is considered stale.
+   * @minimum 1
+   * @maximum 365
+   */
+  thresholdDays: number;
+  /**
+   * Milliseconds between sweeper runs. Set to 0 (with enabled=false) to disable.
+   * @minimum 0
+   */
+  intervalMs: number;
+  /**
+   * Maximum number of candidates re-checked per sweep.
+   * @minimum 1
+   * @maximum 10000
+   */
+  batchSize: number;
+  /** When false, the scheduler is paused. */
+  enabled: boolean;
+  updatedAt: string;
+}
+
+export interface UpdateEmailRevalidationSettingsBody {
+  /**
+   * @minimum 1
+   * @maximum 365
+   */
+  thresholdDays: number;
+  /** @minimum 0 */
+  intervalMs: number;
+  /**
+   * @minimum 1
+   * @maximum 10000
+   */
+  batchSize: number;
+  enabled: boolean;
+}
+
 /**
  * Enforces strict data separation. "real" uses only Twin-sourced or imported candidates. "mock" uses only AI-generated mock candidates. "fallback" means a real run where the Twin provider failed and native was used instead.
 

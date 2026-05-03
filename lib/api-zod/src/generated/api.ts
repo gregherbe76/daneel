@@ -2117,6 +2117,91 @@ export const UpsertProviderStepSettingResponse = zod.object({
 });
 
 /**
+ * @summary Get the current email re-validation scheduler settings
+ */
+export const getEmailRevalidationSettingsResponseThresholdDaysMax = 365;
+
+export const getEmailRevalidationSettingsResponseIntervalMsMin = 0;
+
+export const getEmailRevalidationSettingsResponseBatchSizeMax = 10000;
+
+export const GetEmailRevalidationSettingsResponse = zod.object({
+  thresholdDays: zod
+    .number()
+    .min(1)
+    .max(getEmailRevalidationSettingsResponseThresholdDaysMax)
+    .describe(
+      "Days after which a previously validated email is considered stale.",
+    ),
+  intervalMs: zod
+    .number()
+    .min(getEmailRevalidationSettingsResponseIntervalMsMin)
+    .describe(
+      "Milliseconds between sweeper runs. Set to 0 (with enabled=false) to disable.",
+    ),
+  batchSize: zod
+    .number()
+    .min(1)
+    .max(getEmailRevalidationSettingsResponseBatchSizeMax)
+    .describe("Maximum number of candidates re-checked per sweep."),
+  enabled: zod.boolean().describe("When false, the scheduler is paused."),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Update the email re-validation scheduler settings
+ */
+export const updateEmailRevalidationSettingsBodyThresholdDaysMax = 365;
+
+export const updateEmailRevalidationSettingsBodyIntervalMsMin = 0;
+
+export const updateEmailRevalidationSettingsBodyBatchSizeMax = 10000;
+
+export const UpdateEmailRevalidationSettingsBody = zod.object({
+  thresholdDays: zod
+    .number()
+    .min(1)
+    .max(updateEmailRevalidationSettingsBodyThresholdDaysMax),
+  intervalMs: zod
+    .number()
+    .min(updateEmailRevalidationSettingsBodyIntervalMsMin),
+  batchSize: zod
+    .number()
+    .min(1)
+    .max(updateEmailRevalidationSettingsBodyBatchSizeMax),
+  enabled: zod.boolean(),
+});
+
+export const updateEmailRevalidationSettingsResponseThresholdDaysMax = 365;
+
+export const updateEmailRevalidationSettingsResponseIntervalMsMin = 0;
+
+export const updateEmailRevalidationSettingsResponseBatchSizeMax = 10000;
+
+export const UpdateEmailRevalidationSettingsResponse = zod.object({
+  thresholdDays: zod
+    .number()
+    .min(1)
+    .max(updateEmailRevalidationSettingsResponseThresholdDaysMax)
+    .describe(
+      "Days after which a previously validated email is considered stale.",
+    ),
+  intervalMs: zod
+    .number()
+    .min(updateEmailRevalidationSettingsResponseIntervalMsMin)
+    .describe(
+      "Milliseconds between sweeper runs. Set to 0 (with enabled=false) to disable.",
+    ),
+  batchSize: zod
+    .number()
+    .min(1)
+    .max(updateEmailRevalidationSettingsResponseBatchSizeMax)
+    .describe("Maximum number of candidates re-checked per sweep."),
+  enabled: zod.boolean().describe("When false, the scheduler is paused."),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary Enrich low-confidence candidates from a completed run and re-score them
  */
 export const ImproveAndRerunBody = zod.object({

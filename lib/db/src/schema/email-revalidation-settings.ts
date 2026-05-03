@@ -1,0 +1,25 @@
+import { pgTable, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+
+/**
+ * Singleton settings row (id is fixed to 1) controlling the background email
+ * re-validation sweeper. Surfaced in the admin UI so non-engineers can trade
+ * DNS noise for freshness without a redeploy.
+ */
+export const emailRevalidationSettingsTable = pgTable(
+  "email_revalidation_settings",
+  {
+    id: integer("id").primaryKey().default(1),
+    /** Days after which a previously validated email is considered stale. */
+    thresholdDays: integer("threshold_days").notNull(),
+    /** How often the background sweeper wakes up to look for stale rows. */
+    intervalMs: integer("interval_ms").notNull(),
+    /** Cap how many candidates a single sweep will re-check. */
+    batchSize: integer("batch_size").notNull(),
+    /** When false, the scheduler is paused (no sweeps will run). */
+    enabled: boolean("enabled").notNull().default(true),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+);
+
+export type EmailRevalidationSettings =
+  typeof emailRevalidationSettingsTable.$inferSelect;
