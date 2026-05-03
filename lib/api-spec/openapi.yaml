@@ -1425,13 +1425,20 @@ components:
         hasRealSourcingProvider:
           type: boolean
           description: |
-            True when the sourcing workflow step is configured with an enabled
-            "real" provider (Twin webhook, custom webhook, GitHub Agent, or
-            Web Search). Drives the workflow kickoff modal's default toggles
-            so newly opened jobs pre-select Real Data Run + Run Sourcing on
-            when a real provider is available, instead of the historical
-            Mock + off defaults. Only populated by GET /jobs/:id; absent
-            (treated as false) on the list endpoint.
+            True when the sourcing workflow step is configured with an
+            enabled first-class real provider — currently GitHub Agent
+            (`github`) or Web Search (`web_search`). Deliberately narrower
+            than the engine's runtime "real provider" check: Twin and
+            custom webhooks are valid real providers for the engine but
+            are NOT counted here, because their webhook configuration
+            may not be wired in every environment and we don't want the
+            kickoff modal to silently auto-promote to Real mode when the
+            webhook may fail. Drives the workflow kickoff modal's default
+            toggles so newly opened jobs pre-select Real Data Run + Run
+            Sourcing on when a first-class real provider is available,
+            instead of the historical Mock + off defaults. Only populated
+            by GET /jobs/:id; absent (treated as false) on the list
+            endpoint.
       required: [id, title, description, location, seniority, mustHaveSkills, scoringWeights, createdAt, updatedAt]
 
     CreateJobBody:

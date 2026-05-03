@@ -68,7 +68,7 @@ export const ListJobsResponseItem = zod.object({
     .boolean()
     .optional()
     .describe(
-      'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+      "True when the sourcing workflow step is configured with an\nenabled first-class real provider — currently GitHub Agent\n(`github`) or Web Search (`web_search`). Deliberately narrower\nthan the engine's runtime \"real provider\" check: Twin and\ncustom webhooks are valid real providers for the engine but\nare NOT counted here, because their webhook configuration\nmay not be wired in every environment and we don't want the\nkickoff modal to silently auto-promote to Real mode when the\nwebhook may fail. Drives the workflow kickoff modal's default\ntoggles so newly opened jobs pre-select Real Data Run + Run\nSourcing on when a first-class real provider is available,\ninstead of the historical Mock + off defaults. Only populated\nby GET \/jobs\/:id; absent (treated as false) on the list\nendpoint.\n",
     ),
 });
 export const ListJobsResponse = zod.array(ListJobsResponseItem);
@@ -179,7 +179,7 @@ export const GetJobResponse = zod.object({
     .boolean()
     .optional()
     .describe(
-      'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+      "True when the sourcing workflow step is configured with an\nenabled first-class real provider — currently GitHub Agent\n(`github`) or Web Search (`web_search`). Deliberately narrower\nthan the engine's runtime \"real provider\" check: Twin and\ncustom webhooks are valid real providers for the engine but\nare NOT counted here, because their webhook configuration\nmay not be wired in every environment and we don't want the\nkickoff modal to silently auto-promote to Real mode when the\nwebhook may fail. Drives the workflow kickoff modal's default\ntoggles so newly opened jobs pre-select Real Data Run + Run\nSourcing on when a first-class real provider is available,\ninstead of the historical Mock + off defaults. Only populated\nby GET \/jobs\/:id; absent (treated as false) on the list\nendpoint.\n",
     ),
 });
 
@@ -286,7 +286,7 @@ export const UpdateJobResponse = zod.object({
     .boolean()
     .optional()
     .describe(
-      'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+      "True when the sourcing workflow step is configured with an\nenabled first-class real provider — currently GitHub Agent\n(`github`) or Web Search (`web_search`). Deliberately narrower\nthan the engine's runtime \"real provider\" check: Twin and\ncustom webhooks are valid real providers for the engine but\nare NOT counted here, because their webhook configuration\nmay not be wired in every environment and we don't want the\nkickoff modal to silently auto-promote to Real mode when the\nwebhook may fail. Drives the workflow kickoff modal's default\ntoggles so newly opened jobs pre-select Real Data Run + Run\nSourcing on when a first-class real provider is available,\ninstead of the historical Mock + off defaults. Only populated\nby GET \/jobs\/:id; absent (treated as false) on the list\nendpoint.\n",
     ),
 });
 
@@ -371,7 +371,7 @@ export const GetJobApplicationsResponseItem = zod.object({
       .boolean()
       .optional()
       .describe(
-        'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+        "True when the sourcing workflow step is configured with an\nenabled first-class real provider — currently GitHub Agent\n(`github`) or Web Search (`web_search`). Deliberately narrower\nthan the engine's runtime \"real provider\" check: Twin and\ncustom webhooks are valid real providers for the engine but\nare NOT counted here, because their webhook configuration\nmay not be wired in every environment and we don't want the\nkickoff modal to silently auto-promote to Real mode when the\nwebhook may fail. Drives the workflow kickoff modal's default\ntoggles so newly opened jobs pre-select Real Data Run + Run\nSourcing on when a first-class real provider is available,\ninstead of the historical Mock + off defaults. Only populated\nby GET \/jobs\/:id; absent (treated as false) on the list\nendpoint.\n",
       ),
   }),
   candidate: zod.object({
@@ -870,7 +870,7 @@ export const GetCandidateApplicationsResponseItem = zod.object({
       .boolean()
       .optional()
       .describe(
-        'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+        "True when the sourcing workflow step is configured with an\nenabled first-class real provider — currently GitHub Agent\n(`github`) or Web Search (`web_search`). Deliberately narrower\nthan the engine's runtime \"real provider\" check: Twin and\ncustom webhooks are valid real providers for the engine but\nare NOT counted here, because their webhook configuration\nmay not be wired in every environment and we don't want the\nkickoff modal to silently auto-promote to Real mode when the\nwebhook may fail. Drives the workflow kickoff modal's default\ntoggles so newly opened jobs pre-select Real Data Run + Run\nSourcing on when a first-class real provider is available,\ninstead of the historical Mock + off defaults. Only populated\nby GET \/jobs\/:id; absent (treated as false) on the list\nendpoint.\n",
       ),
   }),
   candidate: zod.object({
@@ -980,7 +980,7 @@ export const ListApplicationsResponseItem = zod.object({
       .boolean()
       .optional()
       .describe(
-        'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+        "True when the sourcing workflow step is configured with an\nenabled first-class real provider — currently GitHub Agent\n(`github`) or Web Search (`web_search`). Deliberately narrower\nthan the engine's runtime \"real provider\" check: Twin and\ncustom webhooks are valid real providers for the engine but\nare NOT counted here, because their webhook configuration\nmay not be wired in every environment and we don't want the\nkickoff modal to silently auto-promote to Real mode when the\nwebhook may fail. Drives the workflow kickoff modal's default\ntoggles so newly opened jobs pre-select Real Data Run + Run\nSourcing on when a first-class real provider is available,\ninstead of the historical Mock + off defaults. Only populated\nby GET \/jobs\/:id; absent (treated as false) on the list\nendpoint.\n",
       ),
   }),
   candidate: zod.object({
@@ -1110,7 +1110,7 @@ export const GetApplicationResponse = zod.object({
       .boolean()
       .optional()
       .describe(
-        'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+        "True when the sourcing workflow step is configured with an\nenabled first-class real provider — currently GitHub Agent\n(`github`) or Web Search (`web_search`). Deliberately narrower\nthan the engine's runtime \"real provider\" check: Twin and\ncustom webhooks are valid real providers for the engine but\nare NOT counted here, because their webhook configuration\nmay not be wired in every environment and we don't want the\nkickoff modal to silently auto-promote to Real mode when the\nwebhook may fail. Drives the workflow kickoff modal's default\ntoggles so newly opened jobs pre-select Real Data Run + Run\nSourcing on when a first-class real provider is available,\ninstead of the historical Mock + off defaults. Only populated\nby GET \/jobs\/:id; absent (treated as false) on the list\nendpoint.\n",
       ),
   }),
   candidate: zod.object({
@@ -2868,7 +2868,7 @@ export const GetJobReportForRunResponse = zod.object({
       .boolean()
       .optional()
       .describe(
-        'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+        "True when the sourcing workflow step is configured with an\nenabled first-class real provider — currently GitHub Agent\n(`github`) or Web Search (`web_search`). Deliberately narrower\nthan the engine's runtime \"real provider\" check: Twin and\ncustom webhooks are valid real providers for the engine but\nare NOT counted here, because their webhook configuration\nmay not be wired in every environment and we don't want the\nkickoff modal to silently auto-promote to Real mode when the\nwebhook may fail. Drives the workflow kickoff modal's default\ntoggles so newly opened jobs pre-select Real Data Run + Run\nSourcing on when a first-class real provider is available,\ninstead of the historical Mock + off defaults. Only populated\nby GET \/jobs\/:id; absent (treated as false) on the list\nendpoint.\n",
       ),
   }),
   insight: zod
@@ -3083,7 +3083,7 @@ export const GetJobReportResponse = zod.object({
       .boolean()
       .optional()
       .describe(
-        'True when the sourcing workflow step is configured with an enabled\n\"real\" provider (Twin webhook, custom webhook, GitHub Agent, or\nWeb Search). Drives the workflow kickoff modal\'s default toggles\nso newly opened jobs pre-select Real Data Run + Run Sourcing on\nwhen a real provider is available, instead of the historical\nMock + off defaults. Only populated by GET \/jobs\/:id; absent\n(treated as false) on the list endpoint.\n',
+        "True when the sourcing workflow step is configured with an\nenabled first-class real provider — currently GitHub Agent\n(`github`) or Web Search (`web_search`). Deliberately narrower\nthan the engine's runtime \"real provider\" check: Twin and\ncustom webhooks are valid real providers for the engine but\nare NOT counted here, because their webhook configuration\nmay not be wired in every environment and we don't want the\nkickoff modal to silently auto-promote to Real mode when the\nwebhook may fail. Drives the workflow kickoff modal's default\ntoggles so newly opened jobs pre-select Real Data Run + Run\nSourcing on when a first-class real provider is available,\ninstead of the historical Mock + off defaults. Only populated\nby GET \/jobs\/:id; absent (treated as false) on the list\nendpoint.\n",
       ),
   }),
   insight: zod
