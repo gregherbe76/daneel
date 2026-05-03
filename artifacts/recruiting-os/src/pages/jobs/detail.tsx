@@ -52,6 +52,13 @@ import {
   isEmailStatusFilterValue,
   matchesEmailStatusFilter,
 } from "@/components/email-status-filter";
+import {
+  EmailSourceFilter,
+  EMAIL_SOURCE_VALUES,
+  parseEmailSourceParam,
+  serializeEmailSourceParam,
+  matchesEmailSourceFilter,
+} from "@/components/email-source-filter";
 
 // ── color helpers ────────────────────────────────────────────────────────────
 
@@ -321,29 +328,59 @@ export default function JobDetailPage() {
     const v = parsed.get("email");
     return isEmailStatusFilterValue(v) ? v : "all";
   }, [search]);
-  const setEmailFilter = (value: EmailStatusFilterValue) => {
+  const selectedSources: Set<string> = useMemo(
+    () => parseEmailSourceParam(search),
+    [search],
+  );
+  const updateUrl = (mutate: (params: URLSearchParams) => void) => {
     const parsed = new URLSearchParams(search);
-    if (value === "all") parsed.delete("email");
-    else parsed.set("email", value);
+    mutate(parsed);
     const qs = parsed.toString();
     navigate(`/jobs/${jobId}${qs ? `?${qs}` : ""}`, { replace: true });
   };
+  const setEmailFilter = (value: EmailStatusFilterValue) => {
+    updateUrl((p) => {
+      if (value === "all") p.delete("email");
+      else p.set("email", value);
+    });
+  };
+  const setSelectedSources = (next: Set<string>) => {
+    const serialized = serializeEmailSourceParam(next);
+    updateUrl((p) => {
+      if (serialized) p.set("emailSource", serialized);
+      else p.delete("emailSource");
+    });
+  };
+  const availableSources = useMemo(() => {
+    const set = new Set<string>();
+    let hasUnknown = false;
+    for (const app of applications ?? []) {
+      const s = app.candidate.emailSource;
+      if (s && EMAIL_SOURCE_VALUES.has(s)) set.add(s);
+      else hasUnknown = true;
+    }
+    return { set, hasUnknown };
+  }, [applications]);
   const emailFilteredApplications = useMemo(
     () =>
-      applications?.filter((app) =>
-        matchesEmailStatusFilter(app.candidate.emailValidationStatus, emailFilter),
+      applications?.filter(
+        (app) =>
+          matchesEmailSourceFilter(app.candidate.emailSource, selectedSources) &&
+          matchesEmailStatusFilter(app.candidate.emailValidationStatus, emailFilter),
       ),
-    [applications, emailFilter],
+    [applications, emailFilter, selectedSources],
   );
   const emailCounts = useMemo(() => {
     const c: Partial<Record<EmailStatusFilterValue, number>> = {
-      all: applications?.length ?? 0,
+      all: 0,
       valid: 0,
       risky: 0,
       invalid: 0,
       unchecked: 0,
     };
     applications?.forEach((app) => {
+      if (!matchesEmailSourceFilter(app.candidate.emailSource, selectedSources)) return;
+      c.all! += 1;
       const s = app.candidate.emailValidationStatus;
       if (s === "valid") c.valid! += 1;
       else if (s === "risky") c.risky! += 1;
@@ -351,7 +388,7 @@ export default function JobDetailPage() {
       else c.unchecked! += 1;
     });
     return c;
-  }, [applications]);
+  }, [applications, selectedSources]);
 
   const stages = Object.values(ApplicationStage);
 
@@ -1139,11 +1176,18 @@ export default function JobDetailPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <h2 className="text-lg font-semibold">Pipeline</h2>
               {(applications?.length ?? 0) > 0 && (
-                <EmailStatusFilter
-                  value={emailFilter}
-                  onChange={setEmailFilter}
-                  counts={emailCounts}
-                />
+                <div className="flex flex-wrap items-center gap-3">
+                  <EmailStatusFilter
+                    value={emailFilter}
+                    onChange={setEmailFilter}
+                    counts={emailCounts}
+                  />
+                  <EmailSourceFilter
+                    selected={selectedSources}
+                    onChange={setSelectedSources}
+                    availableSources={availableSources}
+                  />
+                </div>
               )}
             </div>
             {applications?.length === 0 && (

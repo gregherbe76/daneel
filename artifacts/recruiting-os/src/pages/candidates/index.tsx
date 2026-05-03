@@ -4,14 +4,6 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Plus, Users, Loader2, Mail, Upload, Filter } from "lucide-react";
 import { ImportCandidatesModal } from "@/components/import-candidates-modal";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
@@ -22,37 +14,13 @@ import {
   isEmailStatusFilterValue,
   matchesEmailStatusFilter,
 } from "@/components/email-status-filter";
-
-const EMAIL_SOURCE_OPTIONS: { value: string; label: string }[] = [
-  { value: "profile", label: "Profile" },
-  { value: "commit", label: "From commits" },
-  { value: "manual", label: "Manual" },
-  { value: "noreply", label: "Noreply" },
-  { value: "generated", label: "Mock" },
-];
-const EMAIL_SOURCE_VALUES = new Set(EMAIL_SOURCE_OPTIONS.map((o) => o.value));
-const UNKNOWN_SOURCE = "__unknown__";
-const UNKNOWN_URL_VALUE = "unknown";
-
-function parseEmailSourceParam(search: string): Set<string> {
-  const parsed = new URLSearchParams(search);
-  const raw = parsed.get("emailSource");
-  if (!raw) return new Set();
-  const next = new Set<string>();
-  for (const part of raw.split(",")) {
-    const v = part.trim();
-    if (!v) continue;
-    if (v === UNKNOWN_URL_VALUE) next.add(UNKNOWN_SOURCE);
-    else if (EMAIL_SOURCE_VALUES.has(v)) next.add(v);
-  }
-  return next;
-}
-
-function serializeEmailSourceParam(selected: Set<string>): string {
-  return Array.from(selected)
-    .map((v) => (v === UNKNOWN_SOURCE ? UNKNOWN_URL_VALUE : v))
-    .join(",");
-}
+import {
+  EmailSourceFilter,
+  EMAIL_SOURCE_VALUES,
+  parseEmailSourceParam,
+  serializeEmailSourceParam,
+  matchesEmailSourceFilter,
+} from "@/components/email-source-filter";
 
 const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
   "Imported CSV": {
@@ -75,6 +43,7 @@ export default function CandidatesPage() {
   const { data: candidates, isLoading, refetch } = useListCandidates();
   const search = useSearch();
   const [, navigate] = useLocation();
+  const [importOpen, setImportOpen] = useState(false);
 
   const selectedSources: Set<string> = useMemo(() => parseEmailSourceParam(search), [search]);
 
@@ -120,13 +89,8 @@ export default function CandidatesPage() {
     return { set, hasUnknown };
   }, [candidates]);
 
-  const matchesSourceFilter = (emailSource: string | null | undefined) => {
-    if (selectedSources.size === 0) return true;
-    if (emailSource && EMAIL_SOURCE_VALUES.has(emailSource)) {
-      return selectedSources.has(emailSource);
-    }
-    return selectedSources.has(UNKNOWN_SOURCE);
-  };
+  const matchesSourceFilter = (emailSource: string | null | undefined) =>
+    matchesEmailSourceFilter(emailSource, selectedSources);
 
   const counts = useMemo(() => {
     const c: Partial<Record<EmailStatusFilterValue, number>> = {
@@ -159,13 +123,6 @@ export default function CandidatesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candidates, selectedSources, emailFilter]);
 
-  const toggleSource = (value: string) => {
-    const next = new Set(selectedSources);
-    if (next.has(value)) next.delete(value);
-    else next.add(value);
-    setSelectedSources(next);
-  };
-
   const totalCount = candidates?.length ?? 0;
   const filteredCount = filteredCandidates?.length ?? 0;
   const isSourceFiltered = selectedSources.size > 0;
@@ -185,55 +142,11 @@ export default function CandidatesPage() {
           <p className="text-muted-foreground mt-1">Everyone in your talent pool, in one place.</p>
         </div>
         <div className="flex gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <Filter className="mr-2 h-4 w-4" />
-                Email source
-                {isSourceFiltered && (
-                  <Badge variant="secondary" className="ml-2 h-5 px-1.5">
-                    {selectedSources.size}
-                  </Badge>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Filter by email source</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {EMAIL_SOURCE_OPTIONS.map((opt) => (
-                <DropdownMenuCheckboxItem
-                  key={opt.value}
-                  checked={selectedSources.has(opt.value)}
-                  onCheckedChange={() => toggleSource(opt.value)}
-                  onSelect={(e) => e.preventDefault()}
-                  disabled={!availableSources.set.has(opt.value) && !selectedSources.has(opt.value)}
-                >
-                  {opt.label}
-                </DropdownMenuCheckboxItem>
-              ))}
-              {(availableSources.hasUnknown || selectedSources.has(UNKNOWN_SOURCE)) && (
-                <DropdownMenuCheckboxItem
-                  checked={selectedSources.has(UNKNOWN_SOURCE)}
-                  onCheckedChange={() => toggleSource(UNKNOWN_SOURCE)}
-                  onSelect={(e) => e.preventDefault()}
-                >
-                  Unknown
-                </DropdownMenuCheckboxItem>
-              )}
-              {isSourceFiltered && (
-                <>
-                  <DropdownMenuSeparator />
-                  <button
-                    type="button"
-                    className="w-full text-left px-2 py-1.5 text-sm rounded-sm hover:bg-accent"
-                    onClick={() => setSelectedSources(new Set())}
-                  >
-                    Clear filter
-                  </button>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <EmailSourceFilter
+            selected={selectedSources}
+            onChange={setSelectedSources}
+            availableSources={availableSources}
+          />
           <Button variant="outline" onClick={() => setImportOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
             Import Candidates
