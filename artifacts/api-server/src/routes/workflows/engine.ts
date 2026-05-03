@@ -175,6 +175,7 @@ async function runCandidateMatching(
           gaps: r.gaps,
           risks: r.risks,
           recommendation: r.recommendation,
+          scoreBreakdown: r.scoreBreakdown ?? null,
         }),
       ),
     );

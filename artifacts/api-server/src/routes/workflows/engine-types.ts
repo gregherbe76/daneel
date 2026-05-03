@@ -5,6 +5,19 @@ export type JobInsightResult = {
   idealCandidateProfile: string;
 };
 
+export type ScoreDimension = {
+  score: number;       // 0-100
+  weight: number;      // 0-1, sum of all dimensions = 1.0
+  reasoning: string;   // specific, concrete reasoning — never generic
+};
+
+export type ScoreBreakdown = {
+  skillsMatch: ScoreDimension;       // weight: 0.35
+  experienceDepth: ScoreDimension;   // weight: 0.30
+  autonomy: ScoreDimension;          // weight: 0.20
+  productMindset: ScoreDimension;    // weight: 0.15
+};
+
 export type CandidateMatchResult = {
   candidateId: number;
   candidateName: string;
@@ -13,6 +26,7 @@ export type CandidateMatchResult = {
   gaps: string[];
   risks: string[];
   recommendation: "Strong Yes" | "Yes" | "Maybe" | "No";
+  scoreBreakdown: ScoreBreakdown;
 };
 
 export type ShortlistResult = {

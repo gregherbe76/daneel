@@ -12,6 +12,8 @@ import {
   CheckCircle2, XCircle, MinusCircle, ChevronRight
 } from "lucide-react";
 import { HumanAIComparison } from "@/components/human-ai-comparison";
+import { ScoreBreakdownDisplay, ScoreBreakdownPills } from "@/components/score-breakdown";
+import type { ScoreBreakdown } from "@/components/score-breakdown";
 
 // ── types (derived from API response) ────────────────────────────────────────
 
@@ -34,6 +36,7 @@ type ReportEvaluation = {
   gaps: string[];
   risks: string[];
   recommendation: string;
+  scoreBreakdown?: ScoreBreakdown | null;
   candidate: ReportCandidate | null;
   summary: { candidateId: number; whyRelevant: string; keyRisks: string; finalRecommendation: string } | null;
 };
@@ -321,6 +324,14 @@ export default function JobReportPage() {
                         {e.summary.whyRelevant}
                       </p>
                     )}
+                    {e.scoreBreakdown && (
+                      <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                          Score Breakdown
+                        </p>
+                        <ScoreBreakdownDisplay breakdown={e.scoreBreakdown} defaultExpanded={false} showToggle />
+                      </div>
+                    )}
                     <div className="grid md:grid-cols-2 gap-3 text-sm">
                       {e.strengths.length > 0 && (
                         <div>
@@ -443,6 +454,7 @@ export default function JobReportPage() {
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Candidate</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground w-24">Score</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground w-32">Rec.</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Dimensions</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Top Strength</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Top Gap</th>
                     </tr>
@@ -471,6 +483,13 @@ export default function JobReportPage() {
                             <Badge variant="outline" className={`text-xs ${recBg(e.recommendation)}`}>
                               {e.recommendation}
                             </Badge>
+                          </td>
+                          <td className="px-4 py-3">
+                            {e.scoreBreakdown ? (
+                              <ScoreBreakdownPills breakdown={e.scoreBreakdown} />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-muted-foreground text-xs max-w-[180px]">
                             <span className="line-clamp-2">{e.strengths[0] ?? "—"}</span>

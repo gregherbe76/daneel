@@ -168,7 +168,9 @@ router.post("/candidates/import/csv/confirm", async (req, res) => {
 
 async function extractPDFText(buffer: Buffer): Promise<string> {
   try {
-    const pdfParse = (await import("pdf-parse")).default;
+    // pdf-parse is a CJS module externalized from the bundle; use require
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfParse: (buf: Buffer) => Promise<{ text: string }> = (globalThis as any).require("pdf-parse");
     const data = await pdfParse(buffer);
     return data.text;
   } catch {

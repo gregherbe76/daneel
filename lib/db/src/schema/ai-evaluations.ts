@@ -34,6 +34,7 @@ export const aiEvaluationsTable = pgTable("ai_evaluations", {
   gaps: jsonb("gaps").$type<string[]>().notNull().default([]),
   risks: jsonb("risks").$type<string[]>().notNull().default([]),
   recommendation: recommendationEnum("recommendation").notNull(),
+  scoreBreakdown: jsonb("score_breakdown").$type<ScoreBreakdown>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -64,6 +65,19 @@ export const shortlistsTable = pgTable("shortlists", {
   summaries: jsonb("summaries").$type<ShortlistEntry[]>().notNull().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export type ScoreDimension = {
+  score: number;
+  weight: number;
+  reasoning: string;
+};
+
+export type ScoreBreakdown = {
+  skillsMatch: ScoreDimension;
+  experienceDepth: ScoreDimension;
+  autonomy: ScoreDimension;
+  productMindset: ScoreDimension;
+};
 
 export type ShortlistEntry = {
   candidateId: number;

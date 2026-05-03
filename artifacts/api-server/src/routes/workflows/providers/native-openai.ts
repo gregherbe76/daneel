@@ -1,7 +1,7 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { batchProcess } from "@workspace/integrations-openai-ai-server/batch";
 import type { AgentProvider, AgentProviderRunInput, WorkflowStep } from "./interface";
-import type { JobInsightResult, CandidateMatchResult, ShortlistResult } from "../engine-types";
+import type { JobInsightResult, CandidateMatchResult, ShortlistResult, ScoreBreakdown } from "../engine-types";
 
 function json<T>(content: string): T {
   const match = content.match(/```json\s*([\s\S]*?)\s*```/);
@@ -68,36 +68,75 @@ Keep it concise and accurate. Return only valid JSON, no other text.`;
     const results = await batchProcess(
       candidates,
       async (candidate) => {
-        const prompt = `You are a technical recruiter. Score this candidate for the job.
+        const prompt = `You are a senior technical recruiter evaluating a candidate for a specific role. Be concrete and specific — never write generic statements. Every piece of reasoning must reference actual details from the candidate's profile or the job requirements.
 
 JOB: ${job.title} (${job.seniority})
 Must-Have Skills: ${job.mustHaveSkills.join(", ")}
-Evaluation Criteria: ${insight.evaluationCriteria.join(", ")}
+Evaluation Criteria: ${insight.evaluationCriteria.join("; ")}
 Ideal Profile: ${insight.idealCandidateProfile}
+Job Description: ${job.description}
 
 CANDIDATE: ${candidate.name}
-Skills: ${candidate.skills.join(", ")}
+Skills: ${candidate.skills.length > 0 ? candidate.skills.join(", ") : "none listed"}
 Summary: ${candidate.summary ?? "No summary provided"}
 
-Return JSON:
-{
-  "score": <integer 0-100>,
-  "strengths": ["strength1", "strength2"],
-  "gaps": ["gap1", "gap2"],
-  "risks": ["risk1"],
-  "recommendation": "Strong Yes" | "Yes" | "Maybe" | "No"
-}
+Score this candidate across 4 weighted dimensions. Each dimension score is 0-100.
+The final weighted score = (skillsMatch * 0.35) + (experienceDepth * 0.30) + (autonomy * 0.20) + (productMindset * 0.15).
 
-Score guidelines: 80-100=Strong Yes, 60-79=Yes, 40-59=Maybe, 0-39=No.
-Return only valid JSON.`;
+Dimension definitions:
+- skillsMatch (weight 0.35): How well do the candidate's listed skills cover the must-have skills and evaluation criteria? Cite specific skill matches or gaps.
+- experienceDepth (weight 0.30): Does the summary/background suggest deep, hands-on experience at the required seniority level? Be explicit about what is missing or present.
+- autonomy (weight 0.20): Is there evidence the candidate has owned projects end-to-end, worked without heavy direction, or led initiatives? If no evidence, say so explicitly.
+- productMindset (weight 0.15): Does the candidate think about users, product impact, or business outcomes — not just technical execution? Cite specific signals or flag absence.
+
+Rules:
+- reasoning must be 1-2 specific sentences referencing actual candidate details or role requirements
+- Never write "The candidate has strong skills" — always name the specific skill and how it maps to the role
+- If the candidate has no summary and few skills, say so explicitly in reasoning
+- strengths and gaps must be specific (e.g. "Owns React and TypeScript which are the primary must-haves" not "Good technical skills")
+- risks must be concrete (e.g. "No evidence of leading a team at Senior level" not "May lack leadership")
+
+Return only valid JSON matching this exact structure:
+{
+  "scoreBreakdown": {
+    "skillsMatch": { "score": <0-100>, "weight": 0.35, "reasoning": "<specific 1-2 sentences>" },
+    "experienceDepth": { "score": <0-100>, "weight": 0.30, "reasoning": "<specific 1-2 sentences>" },
+    "autonomy": { "score": <0-100>, "weight": 0.20, "reasoning": "<specific 1-2 sentences>" },
+    "productMindset": { "score": <0-100>, "weight": 0.15, "reasoning": "<specific 1-2 sentences>" }
+  },
+  "score": <integer 0-100, must equal round(skillsMatch*0.35 + experienceDepth*0.30 + autonomy*0.20 + productMindset*0.15)>,
+  "strengths": ["<specific strength citing candidate detail>", "<specific strength>"],
+  "gaps": ["<specific gap naming missing skill or evidence>"],
+  "risks": ["<concrete risk with specific evidence>"],
+  "recommendation": "<Strong Yes|Yes|Maybe|No based on score: 80-100=Strong Yes, 60-79=Yes, 40-59=Maybe, 0-39=No>"
+}`;
 
         const response = await openai.chat.completions.create({
           model: "gpt-5.1",
-          max_completion_tokens: 512,
+          max_completion_tokens: 900,
           messages: [{ role: "user", content: prompt }],
         });
-        const match = json<CandidateMatchResult>(response.choices[0]?.message?.content ?? "{}");
-        return { ...match, candidateId: candidate.id, candidateName: candidate.name };
+        const raw = json<Omit<CandidateMatchResult, "candidateId" | "candidateName"> & { scoreBreakdown: ScoreBreakdown }>(
+          response.choices[0]?.message?.content ?? "{}",
+        );
+
+        // Recompute weighted score server-side to ensure consistency
+        const bd = raw.scoreBreakdown;
+        const weightedScore = bd
+          ? Math.round(
+              bd.skillsMatch.score * 0.35 +
+              bd.experienceDepth.score * 0.30 +
+              bd.autonomy.score * 0.20 +
+              bd.productMindset.score * 0.15,
+            )
+          : raw.score;
+
+        return {
+          ...raw,
+          score: weightedScore,
+          candidateId: candidate.id,
+          candidateName: candidate.name,
+        };
       },
       { concurrency: 3, retries: 3 },
     );
