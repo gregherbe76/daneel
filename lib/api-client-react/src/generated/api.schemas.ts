@@ -188,6 +188,20 @@ export interface RunWorkflowBody {
   runSourcing?: boolean;
 }
 
+export interface VariantCriteria {
+  seniority?: string | null;
+  mustHaveSkills?: string[] | null;
+  focusNote?: string | null;
+}
+
+export interface RunVariantBody {
+  jobId: number;
+  baseRunId: number;
+  variantLabel?: string | null;
+  variantCriteria: VariantCriteria;
+  runSourcing?: boolean;
+}
+
 export type RunStatus = (typeof RunStatus)[keyof typeof RunStatus];
 
 export const RunStatus = {
@@ -196,6 +210,17 @@ export const RunStatus = {
   completed: "completed",
   failed: "failed",
 } as const;
+
+export interface JobRunSummary {
+  id: number;
+  jobId: number;
+  status: RunStatus;
+  runSourcing: boolean;
+  variantOf?: number | null;
+  variantLabel?: string | null;
+  variantCriteria?: VariantCriteria | null;
+  createdAt: string;
+}
 
 export type StepStatus = (typeof StepStatus)[keyof typeof StepStatus];
 
@@ -211,6 +236,9 @@ export interface AgentRun {
   jobId: number;
   status: RunStatus;
   runSourcing: boolean;
+  variantOf?: number | null;
+  variantLabel?: string | null;
+  variantCriteria?: VariantCriteria | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -314,6 +342,9 @@ export interface ReportRunMeta {
   runDate: string;
   status: RunStatus;
   runSourcing: boolean;
+  variantOf?: number | null;
+  variantLabel?: string | null;
+  variantCriteria?: VariantCriteria | null;
 }
 
 export type ReportEvaluationSummary = {

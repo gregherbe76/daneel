@@ -1,5 +1,6 @@
+import { useState, useMemo } from "react";
 import { useRoute, Link } from "wouter";
-import { useGetJob } from "@workspace/api-client-react";
+import { useGetJob, useListJobRuns, getListJobRunsQueryKey } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,15 +8,39 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowLeft, Download, FileText, FileDown, Loader2, MapPin,
   Star, AlertTriangle, MessageSquare, Users, Zap, TrendingUp,
-  CheckCircle2, XCircle, MinusCircle, ChevronRight
+  CheckCircle2, XCircle, MinusCircle, ChevronRight, GitBranch,
+  ArrowUp, ArrowDown, Minus, Info,
 } from "lucide-react";
 import { HumanAIComparison } from "@/components/human-ai-comparison";
 import { ScoreBreakdownDisplay, ScoreBreakdownPills } from "@/components/score-breakdown";
 import type { ScoreBreakdown } from "@/components/score-breakdown";
 
 // ── types (derived from API response) ────────────────────────────────────────
+
+type VariantCriteria = {
+  seniority?: string | null;
+  mustHaveSkills?: string[] | null;
+  focusNote?: string | null;
+};
+
+type ReportRunMeta = {
+  id: number;
+  runDate: string;
+  status: string;
+  runSourcing: boolean;
+  variantOf?: number | null;
+  variantLabel?: string | null;
+  variantCriteria?: VariantCriteria | null;
+};
 
 type ReportCandidate = {
   id: number;
@@ -50,7 +75,7 @@ type JobInsight = {
 
 type HiringReport = {
   generatedAt: string;
-  run: { id: number; runDate: string; status: string; runSourcing: boolean };
+  run: ReportRunMeta;
   job: { id: number; title: string; description: string; location: string; seniority: string; mustHaveSkills: string[] };
   insight: JobInsight | null;
   top5: ReportEvaluation[];
@@ -87,29 +112,103 @@ const RecIcon = ({ rec }: { rec: string }) => {
   return <XCircle className="h-4 w-4 text-red-600" />;
 };
 
+// ── Comparison diff helpers ────────────────────────────────────────────────────
+
+type CandidateDiff = ReportEvaluation & {
+  currentRank: number;
+  baseRank: number | null;
+  scoreDelta: number | null;
+  rankDelta: number | null;
+  recChanged: boolean;
+  baseRec: string | null;
+};
+
+function buildDiff(currentReport: HiringReport, baseReport: HiringReport): CandidateDiff[] {
+  const baseRankMap = new Map(
+    baseReport.evaluations.map((e, i) => [e.candidateId, { rank: i + 1, score: e.score, rec: e.recommendation }]),
+  );
+  return currentReport.evaluations.map((e, i) => {
+    const base = baseRankMap.get(e.candidateId);
+    return {
+      ...e,
+      currentRank: i + 1,
+      baseRank: base?.rank ?? null,
+      scoreDelta: base !== undefined ? e.score - base.score : null,
+      rankDelta: base !== undefined ? base.rank - (i + 1) : null,
+      recChanged: !!base && base.rec !== e.recommendation,
+      baseRec: base?.rec ?? null,
+    };
+  });
+}
+
+function DeltaBadge({ delta, type }: { delta: number | null; type: "rank" | "score" }) {
+  if (delta === null) return <span className="text-xs text-muted-foreground">new</span>;
+  if (delta === 0) return <Minus className="h-3 w-3 text-muted-foreground" />;
+  const isPositive = delta > 0;
+  const Icon = isPositive ? ArrowUp : ArrowDown;
+  const color = isPositive ? "text-green-600" : "text-red-600";
+  const label = type === "rank" ? `${Math.abs(delta)}` : `${isPositive ? "+" : ""}${delta}`;
+  return (
+    <span className={`flex items-center gap-0.5 text-xs font-medium ${color}`}>
+      <Icon className="h-3 w-3" />
+      {label}
+    </span>
+  );
+}
+
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function JobReportPage() {
   const [, params] = useRoute("/jobs/:id/report");
   const jobId = parseInt(params?.id || "0", 10);
+  const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
 
   const { data: job } = useGetJob(jobId, {
     query: { enabled: !!jobId, queryKey: [`/api/jobs/${jobId}`] },
   });
 
+  const { data: allRuns } = useListJobRuns(jobId, {
+    query: { enabled: !!jobId, queryKey: getListJobRunsQueryKey(jobId) },
+  });
+
   const { data: report, isLoading, error } = useQuery<HiringReport>({
-    queryKey: ["report", jobId],
+    queryKey: selectedRunId ? ["report", jobId, selectedRunId] : ["report", jobId, "latest"],
     queryFn: async () => {
-      const res = await fetch(`/api/reports/job/${jobId}/latest`);
+      const url = selectedRunId
+        ? `/api/reports/job/${jobId}/run/${selectedRunId}`
+        : `/api/reports/job/${jobId}/latest`;
+      const res = await fetch(url);
       if (!res.ok) throw new Error("No completed workflow run found");
       return res.json();
     },
     enabled: !!jobId,
   });
 
+  const baseRunId = report?.run?.variantOf ?? null;
+
+  const { data: baseReport } = useQuery<HiringReport>({
+    queryKey: ["report", jobId, baseRunId],
+    queryFn: async () => {
+      const res = await fetch(`/api/reports/job/${jobId}/run/${baseRunId}`);
+      if (!res.ok) throw new Error("Base run not found");
+      return res.json();
+    },
+    enabled: !!jobId && !!baseRunId,
+  });
+
+  const diff = useMemo(() => {
+    if (!report || !baseReport) return null;
+    return buildDiff(report, baseReport);
+  }, [report, baseReport]);
+
   const handleDownload = (type: "markdown" | "pdf") => {
     window.open(`/api/reports/job/${jobId}/latest/${type}`, "_blank");
   };
+
+  const isVariant = !!report?.run?.variantOf;
+  const vc = report?.run?.variantCriteria;
+
+  const completedRuns = (allRuns ?? []).filter((r) => r.status === "completed");
 
   // ── empty / loading states ────────────────────────────────────────────────
 
@@ -171,8 +270,50 @@ export default function JobReportPage() {
               <Zap className="h-3 w-3 mr-1" />Sourcing
             </Badge>
           )}
+          {isVariant && (
+            <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-500/5 text-xs shrink-0">
+              <GitBranch className="h-3 w-3 mr-1" />
+              {run.variantLabel ?? "Variant"}
+            </Badge>
+          )}
         </div>
+
         <div className="flex items-center gap-2 shrink-0">
+          {/* Run switcher */}
+          {completedRuns.length > 1 && (
+            <Select
+              value={selectedRunId !== null ? String(selectedRunId) : String(report.run.id)}
+              onValueChange={(v) => setSelectedRunId(Number(v))}
+            >
+              <SelectTrigger className="h-8 text-xs w-52">
+                <SelectValue placeholder="Select run" />
+              </SelectTrigger>
+              <SelectContent>
+                {completedRuns.map((r) => {
+                  const isVariantRun = !!r.variantOf;
+                  const label = r.variantLabel
+                    ? r.variantLabel
+                    : isVariantRun
+                    ? "Variant run"
+                    : "Baseline";
+                  const date = new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+                  return (
+                    <SelectItem key={r.id} value={String(r.id)}>
+                      <span className="flex items-center gap-1.5">
+                        {isVariantRun ? (
+                          <GitBranch className="h-3 w-3 text-indigo-500 shrink-0" />
+                        ) : (
+                          <Minus className="h-3 w-3 text-muted-foreground shrink-0" />
+                        )}
+                        <span>{label}</span>
+                        <span className="text-muted-foreground text-[10px]">· {date}</span>
+                      </span>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          )}
           <Button variant="outline" size="sm" onClick={() => handleDownload("markdown")}>
             <FileDown className="mr-1.5 h-4 w-4" />
             Export MD
@@ -186,6 +327,45 @@ export default function JobReportPage() {
 
       <div className="max-w-5xl mx-auto px-8 py-8 space-y-8">
 
+        {/* ── Variant Criteria Banner ── */}
+        {isVariant && vc && (
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-5 py-4">
+            <div className="flex items-start gap-3">
+              <GitBranch className="h-4 w-4 text-indigo-600 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-indigo-800 mb-1.5">
+                  Variant run — criteria overrides
+                  {run.variantLabel && <span className="ml-1.5 font-normal text-indigo-600">"{run.variantLabel}"</span>}
+                </p>
+                <div className="flex flex-wrap gap-3 text-xs text-indigo-700">
+                  {vc.seniority && (
+                    <span>
+                      <span className="font-medium">Seniority:</span> {vc.seniority}
+                    </span>
+                  )}
+                  {vc.mustHaveSkills && vc.mustHaveSkills.length > 0 && (
+                    <span>
+                      <span className="font-medium">Skills:</span> {vc.mustHaveSkills.join(", ")}
+                    </span>
+                  )}
+                  {vc.focusNote && (
+                    <span>
+                      <span className="font-medium">Focus:</span> {vc.focusNote}
+                    </span>
+                  )}
+                </div>
+                {baseReport && (
+                  <p className="text-xs text-indigo-600 mt-1.5 flex items-center gap-1">
+                    <Info className="h-3 w-3" />
+                    Comparing against baseline run from{" "}
+                    {new Date(baseReport.run.runDate).toLocaleDateString("en-US", { dateStyle: "medium" })}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Header Card ── */}
         <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
           <div className="bg-gradient-to-r from-slate-900 to-slate-700 px-8 py-6 text-white">
@@ -196,7 +376,7 @@ export default function JobReportPage() {
                 {report.job.location}
               </span>
               <span>·</span>
-              <span>{report.job.seniority}</span>
+              <span>{vc?.seniority ?? report.job.seniority}</span>
               <span>·</span>
               <span>Run {new Date(run.runDate).toLocaleDateString("en-US", { dateStyle: "medium" })}</span>
             </div>
@@ -212,10 +392,77 @@ export default function JobReportPage() {
             </div>
             <div>
               <span className="text-muted-foreground">Must-Have Skills</span>
-              <p className="font-medium">{report.job.mustHaveSkills.join(", ")}</p>
+              <p className="font-medium">{(vc?.mustHaveSkills ?? report.job.mustHaveSkills).join(", ")}</p>
             </div>
           </div>
         </div>
+
+        {/* ── Variant Comparison Table ── */}
+        {diff && (
+          <section>
+            <h2 className="text-base font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
+              <GitBranch className="h-4 w-4 text-indigo-500" />
+              Comparison vs Baseline
+            </h2>
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-indigo-50/40">
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground">Candidate</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground w-24">Rank</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground w-24">Score</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground w-32">Rec.</th>
+                        <th className="text-left px-4 py-3 font-medium text-muted-foreground w-28">Score Δ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {diff.map((d) => (
+                        <tr
+                          key={d.id}
+                          className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors"
+                        >
+                          <td className="px-4 py-3">
+                            <span className="font-medium">{d.candidate?.name ?? "Unknown"}</span>
+                            {d.candidate?.headline && (
+                              <p className="text-xs text-muted-foreground truncate max-w-xs">{d.candidate.headline}</p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">#{d.currentRank}</span>
+                              <DeltaBadge delta={d.rankDelta} type="rank" />
+                            </div>
+                            {d.baseRank && (
+                              <p className="text-[10px] text-muted-foreground">was #{d.baseRank}</p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`font-bold ${scoreColor(d.score)}`}>{d.score}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-0.5">
+                              <Badge variant="outline" className={`text-xs w-fit ${recBg(d.recommendation)}`}>
+                                {d.recommendation}
+                              </Badge>
+                              {d.recChanged && d.baseRec && (
+                                <span className="text-[10px] text-muted-foreground line-through">{d.baseRec}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <DeltaBadge delta={d.scoreDelta} type="score" />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
 
         {/* ── Recommendation Summary ── */}
         <section>
@@ -229,13 +476,22 @@ export default function JobReportPage() {
               { key: "Yes" as const, icon: <CheckCircle2 className="h-5 w-5 text-emerald-600" />, bg: "bg-emerald-500/5 border-emerald-200", text: "text-emerald-700" },
               { key: "Maybe" as const, icon: <MinusCircle className="h-5 w-5 text-amber-600" />, bg: "bg-amber-500/5 border-amber-200", text: "text-amber-700" },
               { key: "No" as const, icon: <XCircle className="h-5 w-5 text-red-600" />, bg: "bg-red-500/5 border-red-200", text: "text-red-700" },
-            ] as const).map(({ key, icon, bg, text }) => (
-              <div key={key} className={`rounded-lg border p-4 ${bg} text-center`}>
-                <div className="flex justify-center mb-1">{icon}</div>
-                <p className={`text-3xl font-bold ${text}`}>{recommendationSummary[key]}</p>
-                <p className={`text-xs font-medium mt-0.5 ${text}`}>{key}</p>
-              </div>
-            ))}
+            ] as const).map(({ key, icon, bg, text }) => {
+              const baseSummary = baseReport?.recommendationSummary;
+              const delta = baseSummary ? recommendationSummary[key] - baseSummary[key] : null;
+              return (
+                <div key={key} className={`rounded-lg border p-4 ${bg} text-center`}>
+                  <div className="flex justify-center mb-1">{icon}</div>
+                  <p className={`text-3xl font-bold ${text}`}>{recommendationSummary[key]}</p>
+                  {delta !== null && delta !== 0 && (
+                    <p className={`text-xs font-medium ${delta > 0 ? "text-green-600" : "text-red-600"}`}>
+                      {delta > 0 ? "+" : ""}{delta} vs baseline
+                    </p>
+                  )}
+                  <p className={`text-xs font-medium mt-0.5 ${text}`}>{key}</p>
+                </div>
+              );
+            })}
           </div>
         </section>
 
@@ -284,6 +540,8 @@ export default function JobReportPage() {
             {top5.map((e, i) => {
               const cand = e.candidate;
               const isSourced = cand?.source === "AI Generated / Mock Sourcing";
+              const baseCandEval = baseReport?.evaluations.find((be) => be.candidateId === e.candidateId);
+              const scoreDelta = baseCandEval ? e.score - baseCandEval.score : null;
               return (
                 <Card key={e.id} className="overflow-hidden">
                   <div className="h-1.5 w-full" style={{ background: e.score >= 80 ? "#16a34a" : e.score >= 60 ? "#f97316" : "#dc2626" }} />
@@ -306,6 +564,11 @@ export default function JobReportPage() {
                         <Badge variant="outline" className={`font-bold text-sm px-3 py-1 ${scoreBg(e.score)}`}>
                           {e.score}/100
                         </Badge>
+                        {scoreDelta !== null && scoreDelta !== 0 && (
+                          <Badge variant="outline" className={`text-xs font-medium ${scoreDelta > 0 ? "border-green-200 text-green-700 bg-green-50" : "border-red-200 text-red-700 bg-red-50"}`}>
+                            {scoreDelta > 0 ? "+" : ""}{scoreDelta}
+                          </Badge>
+                        )}
                         <Badge variant="outline" className={`${recBg(e.recommendation)}`}>
                           <RecIcon rec={e.recommendation} />
                           <span className="ml-1">{e.recommendation}</span>
@@ -453,6 +716,7 @@ export default function JobReportPage() {
                     <tr className="border-b border-border bg-muted/30">
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Candidate</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground w-24">Score</th>
+                      {diff && <th className="text-left px-4 py-3 font-medium text-muted-foreground w-20">Δ Score</th>}
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground w-32">Rec.</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Dimensions</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Top Strength</th>
@@ -460,9 +724,10 @@ export default function JobReportPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {evaluations.map((e, i) => {
+                    {(diff ?? evaluations).map((e, i) => {
                       const cand = e.candidate;
                       const isSourced = cand?.source === "AI Generated / Mock Sourcing";
+                      const diffRow = diff ? (e as CandidateDiff) : null;
                       return (
                         <tr key={e.id} className={`border-b border-border last:border-0 hover:bg-muted/20 transition-colors ${i % 2 === 0 ? "" : "bg-muted/10"}`}>
                           <td className="px-4 py-3">
@@ -479,6 +744,11 @@ export default function JobReportPage() {
                           <td className="px-4 py-3">
                             <span className={`font-bold ${scoreColor(e.score)}`}>{e.score}/100</span>
                           </td>
+                          {diff && (
+                            <td className="px-4 py-3">
+                              <DeltaBadge delta={diffRow?.scoreDelta ?? null} type="score" />
+                            </td>
+                          )}
                           <td className="px-4 py-3">
                             <Badge variant="outline" className={`text-xs ${recBg(e.recommendation)}`}>
                               {e.recommendation}

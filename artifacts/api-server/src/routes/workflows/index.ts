@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { eq, desc, inArray } from "drizzle-orm";
 import { RunWorkflowBody } from "@workspace/api-zod";
+import { z } from "zod";
 import { runWorkflowEngine } from "./engine";
 
 const router = Router();
@@ -23,8 +24,53 @@ router.post("/workflows/run", async (req, res) => {
     .values({ jobId, status: "pending", runSourcing: runSourcing ?? false })
     .returning();
 
-  // Fire-and-forget — respond immediately, engine runs in background
   setImmediate(() => runWorkflowEngine(run.id, jobId, { runSourcing: runSourcing ?? false }));
+
+  res.status(201).json(run);
+});
+
+// POST /workflows/run-variant — create variant run with modified criteria
+const RunVariantBody = z.object({
+  jobId: z.number().int(),
+  baseRunId: z.number().int(),
+  variantLabel: z.string().optional().nullable(),
+  variantCriteria: z.object({
+    seniority: z.string().optional().nullable(),
+    mustHaveSkills: z.array(z.string()).optional().nullable(),
+    focusNote: z.string().optional().nullable(),
+  }),
+  runSourcing: z.boolean().optional(),
+});
+
+router.post("/workflows/run-variant", async (req, res) => {
+  const { jobId, baseRunId, variantLabel, variantCriteria, runSourcing } = RunVariantBody.parse(req.body);
+
+  const [run] = await db
+    .insert(agentRunsTable)
+    .values({
+      jobId,
+      status: "pending",
+      runSourcing: runSourcing ?? false,
+      variantOf: baseRunId,
+      variantLabel: variantLabel ?? null,
+      variantCriteria: {
+        seniority: variantCriteria.seniority ?? undefined,
+        mustHaveSkills: variantCriteria.mustHaveSkills ?? undefined,
+        focusNote: variantCriteria.focusNote ?? undefined,
+      },
+    })
+    .returning();
+
+  setImmediate(() =>
+    runWorkflowEngine(run.id, jobId, {
+      runSourcing: runSourcing ?? false,
+      variantCriteria: {
+        seniority: variantCriteria.seniority ?? undefined,
+        mustHaveSkills: variantCriteria.mustHaveSkills ?? undefined,
+        focusNote: variantCriteria.focusNote ?? undefined,
+      },
+    }),
+  );
 
   res.status(201).json(run);
 });
@@ -34,6 +80,17 @@ router.get("/workflows/runs", async (_req, res) => {
   const runs = await db
     .select()
     .from(agentRunsTable)
+    .orderBy(desc(agentRunsTable.createdAt));
+  res.json(runs);
+});
+
+// GET /workflows/jobs/:jobId/runs — list all runs for a job
+router.get("/workflows/jobs/:jobId/runs", async (req, res) => {
+  const jobId = parseInt(req.params.jobId, 10);
+  const runs = await db
+    .select()
+    .from(agentRunsTable)
+    .where(eq(agentRunsTable.jobId, jobId))
     .orderBy(desc(agentRunsTable.createdAt));
   res.json(runs);
 });
@@ -86,15 +143,10 @@ router.get("/workflows/jobs/:jobId/latest", async (req, res) => {
     candidate: candidateMap.get(e.candidateId),
   }));
 
-  // Find sourced candidates: those created during this run's sourcing step
-  // We identify them from the sourcing log output
   const sourcingLog = logs.find(l => l.step === "sourcing" && l.status === "completed");
   let sourcedCandidates: typeof candidates = [];
   if (sourcingLog && run.runSourcing) {
-    // All candidates with source = "AI Generated / Mock Sourcing" that appear in applications for this job
-    // We use the agent_logs sourcing output to get created candidate IDs — but as a fallback, show all AI-sourced candidates for this job
     const sourcedRows = candidates.filter(c => c.source === "AI Generated / Mock Sourcing");
-    // Only include those that have applications for this job
     if (sourcedRows.length > 0) {
       const { applicationsTable } = await import("@workspace/db");
       const apps = await db

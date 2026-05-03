@@ -31,9 +31,11 @@ import type {
   HealthStatus,
   HiringReport,
   Job,
+  JobRunSummary,
   JobWorkflowResult,
   PipelineSummary,
   ProviderStepSettingWithProvider,
+  RunVariantBody,
   RunWorkflowBody,
   ToggleProviderBody,
   UpdateApplicationBody,
@@ -2633,6 +2635,271 @@ export const useUpsertProviderStepSetting = <
 > => {
   return useMutation(getUpsertProviderStepSettingMutationOptions(options));
 };
+
+/**
+ * @summary Create and run a variant workflow with modified job criteria
+ */
+export const getRunVariantWorkflowUrl = () => {
+  return `/api/workflows/run-variant`;
+};
+
+export const runVariantWorkflow = async (
+  runVariantBody: RunVariantBody,
+  options?: RequestInit,
+): Promise<AgentRun> => {
+  return customFetch<AgentRun>(getRunVariantWorkflowUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(runVariantBody),
+  });
+};
+
+export const getRunVariantWorkflowMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runVariantWorkflow>>,
+    TError,
+    { data: BodyType<RunVariantBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof runVariantWorkflow>>,
+  TError,
+  { data: BodyType<RunVariantBody> },
+  TContext
+> => {
+  const mutationKey = ["runVariantWorkflow"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof runVariantWorkflow>>,
+    { data: BodyType<RunVariantBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return runVariantWorkflow(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RunVariantWorkflowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof runVariantWorkflow>>
+>;
+export type RunVariantWorkflowMutationBody = BodyType<RunVariantBody>;
+export type RunVariantWorkflowMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create and run a variant workflow with modified job criteria
+ */
+export const useRunVariantWorkflow = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runVariantWorkflow>>,
+    TError,
+    { data: BodyType<RunVariantBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof runVariantWorkflow>>,
+  TError,
+  { data: BodyType<RunVariantBody> },
+  TContext
+> => {
+  return useMutation(getRunVariantWorkflowMutationOptions(options));
+};
+
+/**
+ * @summary List all runs for a job (baseline + variants)
+ */
+export const getListJobRunsUrl = (jobId: number) => {
+  return `/api/workflows/jobs/${jobId}/runs`;
+};
+
+export const listJobRuns = async (
+  jobId: number,
+  options?: RequestInit,
+): Promise<JobRunSummary[]> => {
+  return customFetch<JobRunSummary[]>(getListJobRunsUrl(jobId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListJobRunsQueryKey = (jobId: number) => {
+  return [`/api/workflows/jobs/${jobId}/runs`] as const;
+};
+
+export const getListJobRunsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listJobRuns>>,
+  TError = ErrorType<unknown>,
+>(
+  jobId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listJobRuns>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListJobRunsQueryKey(jobId);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listJobRuns>>> = ({
+    signal,
+  }) => listJobRuns(jobId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listJobRuns>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListJobRunsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listJobRuns>>
+>;
+export type ListJobRunsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all runs for a job (baseline + variants)
+ */
+
+export function useListJobRuns<
+  TData = Awaited<ReturnType<typeof listJobRuns>>,
+  TError = ErrorType<unknown>,
+>(
+  jobId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listJobRuns>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListJobRunsQueryOptions(jobId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get hiring manager report for a specific workflow run
+ */
+export const getGetJobReportForRunUrl = (jobId: number, runId: number) => {
+  return `/api/reports/job/${jobId}/run/${runId}`;
+};
+
+export const getJobReportForRun = async (
+  jobId: number,
+  runId: number,
+  options?: RequestInit,
+): Promise<HiringReport> => {
+  return customFetch<HiringReport>(getGetJobReportForRunUrl(jobId, runId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetJobReportForRunQueryKey = (jobId: number, runId: number) => {
+  return [`/api/reports/job/${jobId}/run/${runId}`] as const;
+};
+
+export const getGetJobReportForRunQueryOptions = <
+  TData = Awaited<ReturnType<typeof getJobReportForRun>>,
+  TError = ErrorType<void>,
+>(
+  jobId: number,
+  runId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getJobReportForRun>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetJobReportForRunQueryKey(jobId, runId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getJobReportForRun>>
+  > = ({ signal }) =>
+    getJobReportForRun(jobId, runId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(jobId && runId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getJobReportForRun>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetJobReportForRunQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getJobReportForRun>>
+>;
+export type GetJobReportForRunQueryError = ErrorType<void>;
+
+/**
+ * @summary Get hiring manager report for a specific workflow run
+ */
+
+export function useGetJobReportForRun<
+  TData = Awaited<ReturnType<typeof getJobReportForRun>>,
+  TError = ErrorType<void>,
+>(
+  jobId: number,
+  runId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getJobReportForRun>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetJobReportForRunQueryOptions(jobId, runId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get full hiring manager report for the latest completed workflow run

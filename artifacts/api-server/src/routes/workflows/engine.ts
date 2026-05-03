@@ -9,6 +9,7 @@ import {
   candidatesTable,
   applicationsTable,
 } from "@workspace/db";
+import type { VariantCriteria } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../../lib/logger";
 import { resolveProvider, resolveSourcingProvider } from "./providers";
@@ -239,16 +240,33 @@ async function runShortlist(
 
 // ── MAIN RUNNER ───────────────────────────────────────────────────────────────
 
-export async function runWorkflowEngine(runId: number, jobId: number, options: { runSourcing?: boolean } = {}) {
+export async function runWorkflowEngine(
+  runId: number,
+  jobId: number,
+  options: { runSourcing?: boolean; variantCriteria?: VariantCriteria } = {},
+) {
   try {
     await setRunStatus(runId, "running");
-    logger.info({ runId, jobId, runSourcing: options.runSourcing }, "Workflow started");
+    logger.info({ runId, jobId, runSourcing: options.runSourcing, isVariant: !!options.variantCriteria }, "Workflow started");
 
     const [job] = await db.select().from(jobsTable).where(eq(jobsTable.id, jobId));
     if (!job) throw new Error(`Job ${jobId} not found`);
 
+    // Apply variant criteria overrides if this is a variant run
+    const vc = options.variantCriteria;
+    const effectiveJob = vc
+      ? {
+          ...job,
+          seniority: vc.seniority ?? job.seniority,
+          mustHaveSkills: vc.mustHaveSkills ?? job.mustHaveSkills,
+          description: vc.focusNote
+            ? `${job.description}\n\n[Variant focus]: ${vc.focusNote}`
+            : job.description,
+        }
+      : job;
+
     // Step 1: Job Understanding (always runs first)
-    const insight = await runJobUnderstanding(runId, jobId, job);
+    const insight = await runJobUnderstanding(runId, jobId, effectiveJob);
     await db.insert(jobInsightsTable).values({
       runId,
       jobId,
@@ -261,7 +279,7 @@ export async function runWorkflowEngine(runId: number, jobId: number, options: {
     // Step 0: Sourcing (optional, runs after job understanding, before matching)
     if (options.runSourcing) {
       try {
-        await runSourcing(runId, jobId, job, insight);
+        await runSourcing(runId, jobId, effectiveJob, insight);
       } catch (err) {
         logger.error({ runId, jobId, err }, "Sourcing step failed — continuing with existing candidates");
         await logStep(runId, "sourcing", "failed", null, {
@@ -276,7 +294,7 @@ export async function runWorkflowEngine(runId: number, jobId: number, options: {
     if (candidates.length === 0) {
       logger.warn({ runId }, "No candidates found — skipping matching and shortlist");
     } else {
-      await runCandidateMatching(runId, jobId, job, insight, candidates);
+      await runCandidateMatching(runId, jobId, effectiveJob, insight, candidates);
 
       // Step 3: Shortlist (fetch fresh evaluations)
       const evaluations = await db
@@ -295,7 +313,7 @@ export async function runWorkflowEngine(runId: number, jobId: number, options: {
       }));
 
       if (evalWithNames.length > 0) {
-        await runShortlist(runId, jobId, job, insight, evalWithNames);
+        await runShortlist(runId, jobId, effectiveJob, insight, evalWithNames);
       }
     }
 

@@ -7,7 +7,9 @@ import {
   getGetJobApplicationsQueryKey,
   useRunWorkflow,
   useGetLatestJobWorkflow,
-  getGetLatestJobWorkflowQueryKey
+  getGetLatestJobWorkflowQueryKey,
+  useRunVariantWorkflow,
+  getListJobRunsQueryKey,
 } from "@workspace/api-client-react";
 import { useRoute, Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -17,10 +19,11 @@ import { Label } from "@/components/ui/label";
 import {
   Loader2, MapPin, Edit, User, Mail, ArrowRight, Play,
   Sparkles, ChevronDown, ChevronUp, BrainCircuit, Zap,
-  Building2, Github, Linkedin, AlertTriangle, FileText
+  Building2, Github, Linkedin, AlertTriangle, FileText, GitBranch
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { RunVariantModal } from "@/components/run-variant-modal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -154,6 +157,7 @@ export default function JobDetailPage() {
   });
 
   const runWorkflow = useRunWorkflow();
+  const runVariantWorkflow = useRunVariantWorkflow();
   const updateApp = useUpdateApplication();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -162,6 +166,7 @@ export default function JobDetailPage() {
   const [isAllEvalsOpen, setIsAllEvalsOpen] = useState(false);
   const [isSourcedOpen, setIsSourcedOpen] = useState(true);
   const [runSourcing, setRunSourcing] = useState(false);
+  const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
 
   const stages = Object.values(ApplicationStage);
 
@@ -189,9 +194,34 @@ export default function JobDetailPage() {
         setTimeout(() => {
           queryClient.invalidateQueries({ queryKey: getGetLatestJobWorkflowQueryKey(jobId) });
           queryClient.invalidateQueries({ queryKey: getGetJobApplicationsQueryKey(jobId) });
+          queryClient.invalidateQueries({ queryKey: getListJobRunsQueryKey(jobId) });
         }, 2000);
       }
     });
+  };
+
+  const handleRunVariant = (label: string, criteria: { seniority?: string | null; mustHaveSkills?: string[] | null; focusNote?: string | null }) => {
+    const baseRunId = workflowData?.run?.id;
+    if (!baseRunId) return;
+    runVariantWorkflow.mutate(
+      { data: { jobId, baseRunId, variantLabel: label, variantCriteria: criteria } },
+      {
+        onSuccess: () => {
+          setIsVariantModalOpen(false);
+          toast({
+            title: "Variant run started",
+            description: label ? `"${label}" is now running…` : "Variant workflow is running…",
+          });
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: getGetLatestJobWorkflowQueryKey(jobId) });
+            queryClient.invalidateQueries({ queryKey: getListJobRunsQueryKey(jobId) });
+          }, 2000);
+        },
+        onError: () => {
+          toast({ title: "Failed to start variant", variant: "destructive" });
+        },
+      }
+    );
   };
 
   if (isLoadingJob || isLoadingApps) {
@@ -248,12 +278,23 @@ export default function JobDetailPage() {
                 {workflowRunning ? 'Running Workflow...' : 'Run AI Workflow'}
               </Button>
               {workflowData?.run?.status === "completed" && (
-                <Link href={`/jobs/${job.id}/report`}>
-                  <Button variant="outline">
-                    <FileText className="mr-2 h-4 w-4" />
-                    View Report
+                <>
+                  <Link href={`/jobs/${job.id}/report`}>
+                    <Button variant="outline">
+                      <FileText className="mr-2 h-4 w-4" />
+                      View Report
+                    </Button>
+                  </Link>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsVariantModalOpen(true)}
+                    disabled={workflowRunning}
+                    className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                  >
+                    <GitBranch className="mr-2 h-4 w-4" />
+                    Run Variant
                   </Button>
-                </Link>
+                </>
               )}
               <Link href={`/jobs/${job.id}/edit`}>
                 <Button variant="outline">
@@ -665,6 +706,19 @@ export default function JobDetailPage() {
           </div>
         </div>
       </div>
+
+      {job && isVariantModalOpen && workflowData?.run && (
+        <RunVariantModal
+          open={isVariantModalOpen}
+          onOpenChange={setIsVariantModalOpen}
+          jobId={jobId}
+          baseRunId={workflowData.run.id}
+          defaultSeniority={job.seniority}
+          defaultSkills={job.mustHaveSkills ?? []}
+          onSubmit={handleRunVariant}
+          isSubmitting={runVariantWorkflow.isPending}
+        />
+      )}
     </div>
   );
 }

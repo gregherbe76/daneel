@@ -16,13 +16,23 @@ const router = Router();
 
 // ── Data Fetching ─────────────────────────────────────────────────────────────
 
-async function buildReport(jobId: number) {
-  const [run] = await db
-    .select()
-    .from(agentRunsTable)
-    .where(and(eq(agentRunsTable.jobId, jobId), eq(agentRunsTable.status, "completed")))
-    .orderBy(desc(agentRunsTable.createdAt))
-    .limit(1);
+async function buildReport(jobId: number, runId?: number) {
+  let run;
+  if (runId !== undefined) {
+    const [found] = await db
+      .select()
+      .from(agentRunsTable)
+      .where(and(eq(agentRunsTable.id, runId), eq(agentRunsTable.jobId, jobId)));
+    run = found;
+  } else {
+    const [found] = await db
+      .select()
+      .from(agentRunsTable)
+      .where(and(eq(agentRunsTable.jobId, jobId), eq(agentRunsTable.status, "completed")))
+      .orderBy(desc(agentRunsTable.createdAt))
+      .limit(1);
+    run = found;
+  }
 
   if (!run) return null;
 
@@ -98,6 +108,9 @@ async function buildReport(jobId: number) {
       runDate: run.createdAt,
       status: run.status,
       runSourcing: run.runSourcing,
+      variantOf: run.variantOf ?? null,
+      variantLabel: run.variantLabel ?? null,
+      variantCriteria: run.variantCriteria ?? null,
     },
     job: job[0],
     insight,
@@ -110,6 +123,17 @@ async function buildReport(jobId: number) {
 }
 
 // ── JSON Report ───────────────────────────────────────────────────────────────
+
+router.get("/reports/job/:jobId/run/:runId", async (req, res) => {
+  const jobId = parseInt(req.params.jobId, 10);
+  const runId = parseInt(req.params.runId, 10);
+  const report = await buildReport(jobId, runId);
+  if (!report) {
+    res.status(404).json({ error: "Run not found" });
+    return;
+  }
+  res.json(report);
+});
 
 router.get("/reports/job/:jobId/latest", async (req, res) => {
   const jobId = parseInt(req.params.jobId, 10);
