@@ -42,6 +42,8 @@ export interface Job {
   location: string;
   seniority: Seniority;
   mustHaveSkills: string[];
+  clientName?: string | null;
+  clientLogoUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -52,6 +54,8 @@ export interface CreateJobBody {
   location: string;
   seniority: Seniority;
   mustHaveSkills: string[];
+  clientName?: string | null;
+  clientLogoUrl?: string | null;
 }
 
 export type CandidateEnrichmentStatus =

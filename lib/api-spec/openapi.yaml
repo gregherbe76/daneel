@@ -795,6 +795,12 @@ components:
           type: array
           items:
             type: string
+        clientName:
+          type: string
+          nullable: true
+        clientLogoUrl:
+          type: string
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -818,6 +824,12 @@ components:
           type: array
           items:
             type: string
+        clientName:
+          type: string
+          nullable: true
+        clientLogoUrl:
+          type: string
+          nullable: true
       required: [title, description, location, seniority, mustHaveSkills]
 
     # ── CANDIDATE ──

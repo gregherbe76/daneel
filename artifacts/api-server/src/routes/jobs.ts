@@ -30,6 +30,8 @@ router.post("/jobs", async (req, res) => {
       location: body.location,
       seniority: body.seniority,
       mustHaveSkills: body.mustHaveSkills,
+      clientName: body.clientName ?? null,
+      clientLogoUrl: body.clientLogoUrl ?? null,
     })
     .returning();
   res.status(201).json(job);
@@ -61,6 +63,8 @@ router.put("/jobs/:id", async (req, res) => {
       location: body.location,
       seniority: body.seniority,
       mustHaveSkills: body.mustHaveSkills,
+      clientName: body.clientName ?? null,
+      clientLogoUrl: body.clientLogoUrl ?? null,
       updatedAt: new Date(),
     })
     .where(eq(jobsTable.id, id))

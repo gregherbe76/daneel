@@ -33,6 +33,8 @@ export const ListJobsResponseItem = zod.object({
     "VP",
   ]),
   mustHaveSkills: zod.array(zod.string()),
+  clientName: zod.string().nullish(),
+  clientLogoUrl: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -56,6 +58,8 @@ export const CreateJobBody = zod.object({
     "VP",
   ]),
   mustHaveSkills: zod.array(zod.string()),
+  clientName: zod.string().nullish(),
+  clientLogoUrl: zod.string().nullish(),
 });
 
 /**
@@ -81,6 +85,8 @@ export const GetJobResponse = zod.object({
     "VP",
   ]),
   mustHaveSkills: zod.array(zod.string()),
+  clientName: zod.string().nullish(),
+  clientLogoUrl: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -107,6 +113,8 @@ export const UpdateJobBody = zod.object({
     "VP",
   ]),
   mustHaveSkills: zod.array(zod.string()),
+  clientName: zod.string().nullish(),
+  clientLogoUrl: zod.string().nullish(),
 });
 
 export const UpdateJobResponse = zod.object({
@@ -125,6 +133,8 @@ export const UpdateJobResponse = zod.object({
     "VP",
   ]),
   mustHaveSkills: zod.array(zod.string()),
+  clientName: zod.string().nullish(),
+  clientLogoUrl: zod.string().nullish(),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
 });
@@ -175,6 +185,8 @@ export const GetJobApplicationsResponseItem = zod.object({
       "VP",
     ]),
     mustHaveSkills: zod.array(zod.string()),
+    clientName: zod.string().nullish(),
+    clientLogoUrl: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -345,6 +357,8 @@ export const GetCandidateApplicationsResponseItem = zod.object({
       "VP",
     ]),
     mustHaveSkills: zod.array(zod.string()),
+    clientName: zod.string().nullish(),
+    clientLogoUrl: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -407,6 +421,8 @@ export const ListApplicationsResponseItem = zod.object({
       "VP",
     ]),
     mustHaveSkills: zod.array(zod.string()),
+    clientName: zod.string().nullish(),
+    clientLogoUrl: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -489,6 +505,8 @@ export const GetApplicationResponse = zod.object({
       "VP",
     ]),
     mustHaveSkills: zod.array(zod.string()),
+    clientName: zod.string().nullish(),
+    clientLogoUrl: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -1071,6 +1089,8 @@ export const GetJobReportForRunResponse = zod.object({
       "VP",
     ]),
     mustHaveSkills: zod.array(zod.string()),
+    clientName: zod.string().nullish(),
+    clientLogoUrl: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),
@@ -1225,6 +1245,8 @@ export const GetJobReportResponse = zod.object({
       "VP",
     ]),
     mustHaveSkills: zod.array(zod.string()),
+    clientName: zod.string().nullish(),
+    clientLogoUrl: zod.string().nullish(),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
   }),

@@ -20,6 +20,8 @@ export const jobsTable = pgTable("jobs", {
   location: text("location").notNull(),
   seniority: seniorityEnum("seniority").notNull(),
   mustHaveSkills: text("must_have_skills").array().notNull().default([]),
+  clientName: text("client_name"),
+  clientLogoUrl: text("client_logo_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

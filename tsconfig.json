@@ -4,6 +4,9 @@
   "files": [],
   "references": [
     {
+      "path": "./lib/branding"
+    },
+    {
       "path": "./lib/db"
     },
     {

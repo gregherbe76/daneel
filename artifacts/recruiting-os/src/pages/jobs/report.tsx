@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useRoute, Link, useLocation, useSearch } from "wouter";
 import { useGetJob, useListJobRuns, useImproveAndRerun, getListJobRunsQueryKey } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
+import { branding } from "@workspace/branding";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,7 +96,7 @@ type JobInsight = {
 type HiringReport = {
   generatedAt: string;
   run: ReportRunMeta;
-  job: { id: number; title: string; description: string; location: string; seniority: string; mustHaveSkills: string[] };
+  job: { id: number; title: string; description: string; location: string; seniority: string; mustHaveSkills: string[]; clientName?: string | null; clientLogoUrl?: string | null };
   insight: JobInsight | null;
   top5: ReportEvaluation[];
   evaluations: ReportEvaluation[];
@@ -879,6 +880,18 @@ export default function JobReportPage() {
         {/* ── Header Card ── */}
         <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
           <div className="bg-gradient-to-r from-slate-900 to-slate-700 px-8 py-6 text-white">
+            <div className="flex items-center gap-3 mb-1">
+              {report.job.clientLogoUrl && (
+                <img
+                  src={report.job.clientLogoUrl}
+                  alt={report.job.clientName ?? branding.companyName}
+                  className="h-8 w-8 rounded object-contain bg-white/10 p-0.5"
+                />
+              )}
+              <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">
+                {report.job.clientName ?? branding.productName}
+              </span>
+            </div>
             <h1 className="text-2xl font-bold mb-1">{report.job.title}</h1>
             <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
               <span className="flex items-center gap-1">
