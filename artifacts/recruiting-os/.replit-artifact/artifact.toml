@@ -29,3 +29,4 @@ to = "/index.html"
 [services.env]
 PORT = "21439"
 BASE_PATH = "/"
+VITE_APP_TEMPLATE = "hiringai"
