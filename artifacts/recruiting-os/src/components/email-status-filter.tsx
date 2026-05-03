@@ -15,6 +15,31 @@ export function isEmailStatusFilterValue(v: string | null | undefined): v is Ema
   return !!v && (EMAIL_STATUS_FILTER_VALUES as string[]).includes(v);
 }
 
+const STORED_FILTER_KEY = "recruiting-os:email-status-filter";
+
+export function getStoredEmailStatusFilter(): EmailStatusFilterValue | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const v = window.localStorage.getItem(STORED_FILTER_KEY);
+    return isEmailStatusFilterValue(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredEmailStatusFilter(value: EmailStatusFilterValue): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (value === "all") {
+      window.localStorage.removeItem(STORED_FILTER_KEY);
+    } else {
+      window.localStorage.setItem(STORED_FILTER_KEY, value);
+    }
+  } catch {
+    // ignore storage errors (e.g. private mode)
+  }
+}
+
 export function matchesEmailStatusFilter(
   status: string | null | undefined,
   filter: EmailStatusFilterValue,

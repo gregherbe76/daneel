@@ -51,6 +51,8 @@ import {
   EmailStatusFilterValue,
   isEmailStatusFilterValue,
   matchesEmailStatusFilter,
+  getStoredEmailStatusFilter,
+  setStoredEmailStatusFilter,
 } from "@/components/email-status-filter";
 import {
   EmailSourceFilter,
@@ -339,11 +341,24 @@ export default function JobDetailPage() {
     navigate(`/jobs/${jobId}${qs ? `?${qs}` : ""}`, { replace: true });
   };
   const setEmailFilter = (value: EmailStatusFilterValue) => {
+    setStoredEmailStatusFilter(value);
     updateUrl((p) => {
       if (value === "all") p.delete("email");
       else p.set("email", value);
     });
   };
+  useEffect(() => {
+    const parsed = new URLSearchParams(search);
+    if (parsed.get("email")) return;
+    const stored = getStoredEmailStatusFilter();
+    if (stored && stored !== "all") {
+      parsed.set("email", stored);
+      const qs = parsed.toString();
+      navigate(`/jobs/${jobId}${qs ? `?${qs}` : ""}`, { replace: true });
+    }
+    // Restore saved preference once on mount when URL has no explicit value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const setSelectedSources = (next: Set<string>) => {
     const serialized = serializeEmailSourceParam(next);
     updateUrl((p) => {

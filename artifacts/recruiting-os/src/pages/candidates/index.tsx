@@ -1,6 +1,6 @@
 import { useListCandidates } from "@workspace/api-client-react";
 import { Link, useLocation, useSearch } from "wouter";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,8 @@ import {
   EmailStatusFilterValue,
   isEmailStatusFilterValue,
   matchesEmailStatusFilter,
+  getStoredEmailStatusFilter,
+  setStoredEmailStatusFilter,
 } from "@/components/email-status-filter";
 import {
   EmailSourceFilter,
@@ -69,11 +71,25 @@ export default function CandidatesPage() {
   };
 
   const setEmailFilter = (value: EmailStatusFilterValue) => {
+    setStoredEmailStatusFilter(value);
     updateUrl((p) => {
       if (value === "all") p.delete(EMAIL_FILTER_PARAM);
       else p.set(EMAIL_FILTER_PARAM, value);
     });
   };
+
+  useEffect(() => {
+    const parsed = new URLSearchParams(search);
+    if (parsed.get(EMAIL_FILTER_PARAM)) return;
+    const stored = getStoredEmailStatusFilter();
+    if (stored && stored !== "all") {
+      parsed.set(EMAIL_FILTER_PARAM, stored);
+      const qs = parsed.toString();
+      navigate(`/candidates${qs ? `?${qs}` : ""}`, { replace: true });
+    }
+    // Restore saved preference once on mount when URL has no explicit value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setSelectedSources = (next: Set<string>) => {
     const serialized = serializeEmailSourceParam(next);
