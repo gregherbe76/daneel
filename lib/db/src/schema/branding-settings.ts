@@ -11,6 +11,10 @@ export const brandingSettingsTable = pgTable("branding_settings", {
   productName: text("product_name"),
   companyName: text("company_name"),
   logoUrl: text("logo_url"),
+  // Hex colors (e.g. "#7C5CFF"). NULL means "use the active template default".
+  // Validated as `^#[0-9a-fA-F]{6}$` at the API boundary.
+  colorPrimary: text("color_primary"),
+  colorAccent: text("color_accent"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

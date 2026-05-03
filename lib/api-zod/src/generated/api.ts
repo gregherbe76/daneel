@@ -2916,6 +2916,16 @@ export const GetBrandingSettingsResponse = zod
     productName: zod.string(),
     companyName: zod.string(),
     logoUrl: zod.string(),
+    colorPrimary: zod
+      .string()
+      .describe(
+        'Brand primary color as a 6-digit hex (e.g. \"#0B0B12\"). Used for CTAs and report headings.',
+      ),
+    colorAccent: zod
+      .string()
+      .describe(
+        'Brand accent color as a 6-digit hex (e.g. \"#7C5CFF\"). Used for secondary highlights, sidebar active item, and PDF accents.',
+      ),
     updatedAt: zod.coerce.date().nullish(),
   })
   .describe(
@@ -2930,6 +2940,18 @@ export const UpdateBrandingSettingsBody = zod
     productName: zod.string().optional(),
     companyName: zod.string().optional(),
     logoUrl: zod.string().optional(),
+    colorPrimary: zod
+      .string()
+      .optional()
+      .describe(
+        '6-digit hex color (e.g. \"#7C5CFF\"), or empty string to reset to template default.',
+      ),
+    colorAccent: zod
+      .string()
+      .optional()
+      .describe(
+        '6-digit hex color (e.g. \"#7C5CFF\"), or empty string to reset to template default.',
+      ),
   })
   .describe(
     "Partial branding update. Pass empty string to clear back to template default.",
@@ -2940,6 +2962,16 @@ export const UpdateBrandingSettingsResponse = zod
     productName: zod.string(),
     companyName: zod.string(),
     logoUrl: zod.string(),
+    colorPrimary: zod
+      .string()
+      .describe(
+        'Brand primary color as a 6-digit hex (e.g. \"#0B0B12\"). Used for CTAs and report headings.',
+      ),
+    colorAccent: zod
+      .string()
+      .describe(
+        'Brand accent color as a 6-digit hex (e.g. \"#7C5CFF\"). Used for secondary highlights, sidebar active item, and PDF accents.',
+      ),
     updatedAt: zod.coerce.date().nullish(),
   })
   .describe(

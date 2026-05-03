@@ -2570,11 +2570,17 @@ components:
           type: string
         logoUrl:
           type: string
+        colorPrimary:
+          type: string
+          description: Brand primary color as a 6-digit hex (e.g. "#0B0B12"). Used for CTAs and report headings.
+        colorAccent:
+          type: string
+          description: Brand accent color as a 6-digit hex (e.g. "#7C5CFF"). Used for secondary highlights, sidebar active item, and PDF accents.
         updatedAt:
           type: string
           format: date-time
           nullable: true
-      required: [productName, companyName, logoUrl]
+      required: [productName, companyName, logoUrl, colorPrimary, colorAccent]
 
     UpdateBrandingSettingsBody:
       type: object
@@ -2586,3 +2592,9 @@ components:
           type: string
         logoUrl:
           type: string
+        colorPrimary:
+          type: string
+          description: 6-digit hex color (e.g. "#7C5CFF"), or empty string to reset to template default.
+        colorAccent:
+          type: string
+          description: 6-digit hex color (e.g. "#7C5CFF"), or empty string to reset to template default.

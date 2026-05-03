@@ -846,6 +846,10 @@ export interface BrandingSettings {
   productName: string;
   companyName: string;
   logoUrl: string;
+  /** Brand primary color as a 6-digit hex (e.g. "#0B0B12"). Used for CTAs and report headings. */
+  colorPrimary: string;
+  /** Brand accent color as a 6-digit hex (e.g. "#7C5CFF"). Used for secondary highlights, sidebar active item, and PDF accents. */
+  colorAccent: string;
   updatedAt?: string | null;
 }
 
@@ -856,6 +860,10 @@ export interface UpdateBrandingSettingsBody {
   productName?: string;
   companyName?: string;
   logoUrl?: string;
+  /** 6-digit hex color (e.g. "#7C5CFF"), or empty string to reset to template default. */
+  colorPrimary?: string;
+  /** 6-digit hex color (e.g. "#7C5CFF"), or empty string to reset to template default. */
+  colorAccent?: string;
 }
 
 export type ListCandidateNotesParams = {

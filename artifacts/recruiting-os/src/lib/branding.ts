@@ -22,6 +22,12 @@ export function useBranding() {
     productName: data?.productName ?? defaultBranding.productName,
     companyName: data?.companyName ?? defaultBranding.companyName,
     logoUrl: data?.logoUrl ?? defaultBranding.logoUrl,
-    colors: defaultBranding.colors,
+    // Primary + accent flow through from the runtime override, with the static
+    // template colors as the final fallback. Muted + divider aren't user-tunable.
+    colors: {
+      ...defaultBranding.colors,
+      primary: data?.colorPrimary ?? defaultBranding.colors.primary,
+      accent: data?.colorAccent ?? defaultBranding.colors.accent,
+    },
   };
 }

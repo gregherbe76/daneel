@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -5,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
 import { PendingRunsWatcher } from "@/lib/pending-runs";
+import { useBranding } from "@/lib/branding";
+import { applyBrandTheme } from "@/lib/apply-brand";
 
 // Pages
 import LandingPage from "./pages/landing";
@@ -48,11 +51,26 @@ function AppRoutes() {
   );
 }
 
+/**
+ * Pulls the resolved runtime brand colors and re-applies them to the live
+ * CSS custom properties. The first paint already shows the static template
+ * defaults (seeded from main.tsx), so this is purely an upgrade-in-place
+ * once the saved overrides arrive — no flash.
+ */
+function BrandThemeApplier() {
+  const branding = useBranding();
+  useEffect(() => {
+    applyBrandTheme({ primary: branding.colors.primary, accent: branding.colors.accent });
+  }, [branding.colors.primary, branding.colors.accent]);
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <BrandThemeApplier />
           <PendingRunsWatcher />
           <Switch>
             <Route path="/" component={LandingPage} />

@@ -12,6 +12,73 @@ import { useToast } from "@/hooks/use-toast";
 import { branding as defaultBranding } from "@workspace/branding";
 import { Loader2, Image as ImageIcon } from "lucide-react";
 
+/**
+ * Reusable color picker row: a native <input type="color"> swatch tied to
+ * a side-by-side hex text input so users can either pick visually or paste a
+ * known brand hex. Empty string means "fall back to the template default".
+ */
+function ColorField({
+  id,
+  label,
+  testId,
+  helper,
+  value,
+  onChange,
+  fallback,
+  onClear,
+}: {
+  id: string;
+  label: string;
+  testId: string;
+  helper: string;
+  value: string;
+  onChange: (v: string) => void;
+  fallback: string;
+  onClear: () => void;
+}) {
+  // Native <input type="color"> requires a 7-char "#rrggbb" value at all
+  // times — fall back to the template default while the text input is empty
+  // or partially typed, so the swatch never goes blank.
+  const HEX = /^#[0-9a-fA-F]{6}$/;
+  const swatchValue = HEX.test(value) ? value : fallback;
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          aria-label={`${label} swatch`}
+          data-testid={`${testId}-swatch`}
+          value={swatchValue}
+          onChange={(e) => onChange(e.target.value.toUpperCase())}
+          className="h-10 w-12 cursor-pointer rounded border border-border bg-background p-1"
+        />
+        <Input
+          id={id}
+          data-testid={testId}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={fallback}
+          className="font-mono uppercase"
+          maxLength={7}
+        />
+      </div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>{helper}</span>
+        {value && (
+          <button
+            type="button"
+            className="underline hover:text-foreground"
+            onClick={onClear}
+          >
+            Clear (use default)
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function BrandingSettingsPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -21,6 +88,8 @@ export default function BrandingSettingsPage() {
   const [productName, setProductName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [colorPrimary, setColorPrimary] = useState("");
+  const [colorAccent, setColorAccent] = useState("");
 
   // Hydrate the form once the saved values arrive — without clobbering
   // anything the user has already typed.
@@ -30,6 +99,21 @@ export default function BrandingSettingsPage() {
       setProductName(data.productName ?? "");
       setCompanyName(data.companyName ?? "");
       setLogoUrl(data.logoUrl ?? "");
+      // Resolved colors always come back populated (template defaults fill
+      // in for nulls). To preserve "null means template default" semantics in
+      // the DB, leave the input blank when the resolved value matches the
+      // template default — that way an unrelated save (e.g. just productName)
+      // doesn't accidentally persist the current default hex into the row.
+      setColorPrimary(
+        data.colorPrimary && data.colorPrimary.toLowerCase() !== defaultBranding.colors.primary.toLowerCase()
+          ? data.colorPrimary
+          : "",
+      );
+      setColorAccent(
+        data.colorAccent && data.colorAccent.toLowerCase() !== defaultBranding.colors.accent.toLowerCase()
+          ? data.colorAccent
+          : "",
+      );
       setHydrated(true);
     }
   }, [data, hydrated]);
@@ -42,6 +126,8 @@ export default function BrandingSettingsPage() {
           productName,
           companyName,
           logoUrl,
+          colorPrimary,
+          colorAccent,
         },
       });
       qc.invalidateQueries({ queryKey: getGetBrandingSettingsQueryKey() });
@@ -183,6 +269,29 @@ export default function BrandingSettingsPage() {
                 </p>
               </div>
             )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <ColorField
+              id="colorPrimary"
+              label="Primary color"
+              testId="input-color-primary"
+              helper="Used for primary CTAs, focus rings, and report headings."
+              value={colorPrimary}
+              onChange={setColorPrimary}
+              fallback={defaultBranding.colors.primary}
+              onClear={() => setColorPrimary("")}
+            />
+            <ColorField
+              id="colorAccent"
+              label="Accent color"
+              testId="input-color-accent"
+              helper="Used for the sidebar active item and secondary highlights."
+              value={colorAccent}
+              onChange={setColorAccent}
+              fallback={defaultBranding.colors.accent}
+              onClear={() => setColorAccent("")}
+            />
           </div>
 
           <div className="flex items-center gap-3 pt-2">

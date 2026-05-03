@@ -1,4 +1,4 @@
-import { branding } from "@workspace/branding";
+import { branding as defaultBranding } from "@workspace/branding";
 
 function hexToHsl(hex: string): string {
   const h = hex.replace("#", "");
@@ -29,11 +29,19 @@ function hexToHsl(hex: string): string {
   return `${Math.round(hue * 360)} ${Math.round(sat * 100)}% ${Math.round(l * 100)}%`;
 }
 
-export function applyBrandTheme(): void {
+/**
+ * Apply the brand color palette to the live CSS custom properties on
+ * <html>. Pass overrides (e.g. from the runtime branding settings hook) to
+ * re-skin the app without a reload; called with no args at boot to seed the
+ * static template defaults before the network has a chance to respond.
+ */
+export function applyBrandTheme(overrides?: { primary?: string; accent?: string }): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  const primaryHsl = hexToHsl(branding.colors.primary);
-  const accentHsl = hexToHsl(branding.colors.accent);
+  const primary = overrides?.primary || defaultBranding.colors.primary;
+  const accent = overrides?.accent || defaultBranding.colors.accent;
+  const primaryHsl = hexToHsl(primary);
+  const accentHsl = hexToHsl(accent);
 
   // Primary CTAs (Create Job, Start hiring, badges) adopt brand primary
   root.style.setProperty("--primary", primaryHsl);

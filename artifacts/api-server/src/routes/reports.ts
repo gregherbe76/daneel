@@ -371,10 +371,13 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
   const doc = new PDFDocument({ margin: 50, size: "A4" });
   doc.pipe(res);
 
-  // ── Color palette (template defaults — colors aren't user-tunable yet)
-  const PRIMARY: string = defaultBranding.colors.primary;
+  // ── Color palette
+  // Primary + accent are user-tunable from /settings/branding (persisted on
+  // the singleton branding_settings row). Muted + divider stay on the template
+  // defaults — they're neutral surface colors, not part of the brand.
+  const PRIMARY: string = branding.colorPrimary;
   const MUTED: string = defaultBranding.colors.muted;
-  const ACCENT: string = defaultBranding.colors.accent;
+  const ACCENT: string = branding.colorAccent;
   const DIVIDER: string = defaultBranding.colors.divider;
   const GREEN = "#16a34a";
   const AMBER = "#d97706";

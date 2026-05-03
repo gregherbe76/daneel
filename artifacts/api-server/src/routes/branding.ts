@@ -15,6 +15,8 @@ const SINGLETON_ID = 1;
  * compiled-in template value, so consumers (reports, layout, etc.) always get
  * a fully populated object.
  */
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
 export async function loadBrandingSettings() {
   const [row] = await db
     .select()
@@ -24,6 +26,8 @@ export async function loadBrandingSettings() {
     productName: row?.productName?.trim() || defaultBranding.productName,
     companyName: row?.companyName?.trim() || defaultBranding.companyName,
     logoUrl: row?.logoUrl?.trim() || defaultBranding.logoUrl,
+    colorPrimary: row?.colorPrimary?.trim() || defaultBranding.colors.primary,
+    colorAccent: row?.colorAccent?.trim() || defaultBranding.colors.accent,
     updatedAt: row?.updatedAt ?? null,
   };
 }
@@ -47,7 +51,21 @@ router.put("/branding", async (req, res) => {
     productName: norm(body.productName),
     companyName: norm(body.companyName),
     logoUrl: norm(body.logoUrl),
+    colorPrimary: norm(body.colorPrimary),
+    colorAccent: norm(body.colorAccent),
   };
+
+  // Validate hex colors. Empty/cleared values are normalized to null above
+  // and skip validation (they restore the template default).
+  for (const k of ["colorPrimary", "colorAccent"] as const) {
+    const v = values[k];
+    if (typeof v === "string" && !HEX_COLOR_RE.test(v)) {
+      res.status(400).json({
+        error: `${k} must be a 6-digit hex color like "#7C5CFF"`,
+      });
+      return;
+    }
+  }
 
   // SSRF guardrail: the server later fetches this URL to embed in PDF
   // reports, so refuse anything that doesn't shape up as a public https URL.
@@ -69,7 +87,13 @@ router.put("/branding", async (req, res) => {
 
   if (existing) {
     const update: Record<string, unknown> = { updatedAt: new Date() };
-    for (const k of ["productName", "companyName", "logoUrl"] as const) {
+    for (const k of [
+      "productName",
+      "companyName",
+      "logoUrl",
+      "colorPrimary",
+      "colorAccent",
+    ] as const) {
       if (values[k] !== undefined) update[k] = values[k];
     }
     await db
@@ -82,6 +106,8 @@ router.put("/branding", async (req, res) => {
       productName: values.productName ?? null,
       companyName: values.companyName ?? null,
       logoUrl: values.logoUrl ?? null,
+      colorPrimary: values.colorPrimary ?? null,
+      colorAccent: values.colorAccent ?? null,
     });
   }
 
