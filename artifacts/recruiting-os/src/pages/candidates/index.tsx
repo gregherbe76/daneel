@@ -127,6 +127,7 @@ export default function CandidatesPage() {
         onClose={() => setImportOpen(false)}
         onImported={() => refetch()}
       />
+
     </div>
   );
 }

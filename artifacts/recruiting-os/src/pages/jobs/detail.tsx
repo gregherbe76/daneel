@@ -20,11 +20,12 @@ import {
   Loader2, MapPin, Edit, User, Mail, ArrowRight, Play,
   Sparkles, ChevronDown, ChevronUp, BrainCircuit, Zap,
   Building2, Github, Linkedin, AlertTriangle, FileText, GitBranch,
-  FlaskConical, Database,
+  FlaskConical, Database, Upload,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { RunVariantModal } from "@/components/run-variant-modal";
+import { ImportCandidatesModal } from "@/components/import-candidates-modal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -170,6 +171,7 @@ export default function JobDetailPage() {
   const [runSourcing, setRunSourcing] = useState(false);
   const [runEnrichment, setRunEnrichment] = useState(false);
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const stages = Object.values(ApplicationStage);
 
@@ -275,6 +277,13 @@ export default function JobDetailPage() {
           </div>
           <div className="flex flex-col items-end gap-3 shrink-0">
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsImportOpen(true)}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Import Candidates
+              </Button>
               <Button 
                 onClick={handleRunWorkflow} 
                 disabled={runWorkflow.isPending || workflowRunning}
@@ -797,6 +806,24 @@ export default function JobDetailPage() {
           defaultSkills={job.mustHaveSkills ?? []}
           onSubmit={handleRunVariant}
           isSubmitting={runVariantWorkflow.isPending}
+        />
+      )}
+
+      {job && (
+        <ImportCandidatesModal
+          open={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          jobId={jobId}
+          jobTitle={job.title}
+          onImported={({ created }) => {
+            queryClient.invalidateQueries({ queryKey: getGetJobApplicationsQueryKey(jobId) });
+            if (created > 0) {
+              toast({
+                title: `${created} candidate${created !== 1 ? "s" : ""} imported`,
+                description: "They've been added to your pipeline. Run AI Workflow to score them.",
+              });
+            }
+          }}
         />
       )}
     </div>
