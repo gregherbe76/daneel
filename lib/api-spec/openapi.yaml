@@ -563,6 +563,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/ConnectionTestResult"
 
+  /providers/preview-github-query:
+    post:
+      operationId: previewGithubQuery
+      tags: [providers]
+      summary: Build the exact GitHub user-search query for a job + (optional) tuning config
+      description: >
+        Returns the assembled `q=` string the GitHub Agent would send for a given job,
+        applying recruiter-tunable knobs (extra keywords, exclude orgs, min followers,
+        min repos). Optionally hits the live GitHub Search API once to report
+        `total_count` so recruiters can gauge a query before kicking off a real run.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreviewGithubQueryBody"
+      responses:
+        "200":
+          description: Assembled query (and optional match count)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreviewGithubQueryResult"
+        "404":
+          description: Job not found
+
   /providers/steps:
     get:
       operationId: listProviderStepSettings
@@ -1414,6 +1440,48 @@ components:
         enabled:
           type: boolean
       required: [enabled]
+
+    PreviewGithubQueryBody:
+      type: object
+      description: >
+        Build the GitHub user-search query for a given job. When `config` is supplied
+        it's used verbatim (lets the provider edit dialog preview unsaved tuning).
+        Otherwise, if `providerId` points at a github-typed provider, its saved config
+        is used. If neither is supplied, the query is built with no extra tuning knobs.
+      properties:
+        jobId:
+          type: integer
+          description: Job whose title / location / seniority / must-have skills feed the query.
+        providerId:
+          type: integer
+          nullable: true
+          description: GitHub-typed provider id whose saved config should be used. Ignored when `config` is supplied.
+        config:
+          allOf:
+            - $ref: "#/components/schemas/GithubProviderConfig"
+          nullable: true
+          description: Inline tuning knobs (overrides any saved provider config).
+        runMatches:
+          type: boolean
+          nullable: true
+          description: When true, also hit GitHub /search/users once and report total_count.
+      required: [jobId]
+
+    PreviewGithubQueryResult:
+      type: object
+      properties:
+        query:
+          type: string
+          description: The exact `q=` value the GitHub Agent would send for this job + config.
+        totalCount:
+          type: integer
+          nullable: true
+          description: Number of matching GitHub users (only set when `runMatches=true` succeeded).
+        totalCountError:
+          type: string
+          nullable: true
+          description: Friendly error if the live preview lookup failed (rate-limit, network, etc.).
+      required: [query]
 
     ConnectionTestResult:
       type: object

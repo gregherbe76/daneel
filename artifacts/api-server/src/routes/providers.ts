@@ -1,12 +1,14 @@
 import { Router } from "express";
-import { db, agentProvidersTable, workflowProviderSettingsTable } from "@workspace/db";
+import { db, agentProvidersTable, workflowProviderSettingsTable, jobsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import {
   CreateProviderBody,
   ToggleProviderBody,
   UpsertProviderStepSettingBody,
+  PreviewGithubQueryBody,
 } from "@workspace/api-zod";
 import { providerFromRow } from "./workflows/providers";
+import { GithubSourcingProvider } from "./workflows/providers/github";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -49,6 +51,56 @@ router.get("/providers/steps", async (_req, res) => {
     provider: providerMap.get(s.providerId),
   }));
   res.json(result);
+});
+
+// POST /providers/preview-github-query  ← must be BEFORE /providers/:id
+//
+// Surfaces the exact `q=` string the GitHub Agent will send for a given job —
+// so recruiters can iterate on extra-keywords / exclude-orgs / min-followers
+// from the provider edit dialog without burning a real sourcing run.
+//
+// `config` (when supplied) is used verbatim, letting recruiters preview
+// unsaved tuning. Otherwise we look up the saved provider config by id.
+router.post("/providers/preview-github-query", async (req, res) => {
+  const body = PreviewGithubQueryBody.parse(req.body);
+
+  const [job] = await db.select().from(jobsTable).where(eq(jobsTable.id, body.jobId));
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  let config = body.config ?? null;
+  if (!config && body.providerId != null) {
+    const [row] = await db
+      .select()
+      .from(agentProvidersTable)
+      .where(eq(agentProvidersTable.id, body.providerId));
+    if (row && row.type === "github") {
+      config = row.config?.github ?? null;
+    }
+  }
+
+  // Use a sentinel id; this provider instance is never persisted or registered.
+  const provider = new GithubSourcingProvider(-1, "preview", config);
+  const payload = GithubSourcingProvider.buildPayloadFromJob(job);
+  const query = provider.buildQuery(payload);
+
+  let totalCount: number | null = null;
+  let totalCountError: string | null = null;
+  if (body.runMatches) {
+    try {
+      totalCount = await provider.previewMatchCount(query);
+    } catch (err) {
+      totalCountError = err instanceof Error ? err.message : String(err);
+      logger.warn(
+        { jobId: body.jobId, err: totalCountError },
+        "GitHub query preview: total_count lookup failed",
+      );
+    }
+  }
+
+  res.json({ query, totalCount, totalCountError });
 });
 
 // POST /providers/steps  ← must be BEFORE /providers/:id

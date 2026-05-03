@@ -295,6 +295,30 @@ export interface ToggleProviderBody {
   enabled: boolean;
 }
 
+/**
+ * Build the GitHub user-search query for a given job. When `config` is supplied it's used verbatim (lets the provider edit dialog preview unsaved tuning). Otherwise, if `providerId` points at a github-typed provider, its saved config is used. If neither is supplied, the query is built with no extra tuning knobs.
+
+ */
+export interface PreviewGithubQueryBody {
+  /** Job whose title / location / seniority / must-have skills feed the query. */
+  jobId: number;
+  /** GitHub-typed provider id whose saved config should be used. Ignored when `config` is supplied. */
+  providerId?: number | null;
+  /** Inline tuning knobs (overrides any saved provider config). */
+  config?: GithubProviderConfig | null;
+  /** When true, also hit GitHub /search/users once and report total_count. */
+  runMatches?: boolean | null;
+}
+
+export interface PreviewGithubQueryResult {
+  /** The exact `q=` value the GitHub Agent would send for this job + config. */
+  query: string;
+  /** Number of matching GitHub users (only set when `runMatches=true` succeeded). */
+  totalCount?: number | null;
+  /** Friendly error if the live preview lookup failed (rate-limit, network, etc.). */
+  totalCountError?: string | null;
+}
+
 export interface ConnectionTestResult {
   ok: boolean;
   error?: string | null;

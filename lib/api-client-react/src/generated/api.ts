@@ -44,6 +44,8 @@ import type {
   ListMentionsForMemberParams,
   MentionEntry,
   PipelineSummary,
+  PreviewGithubQueryBody,
+  PreviewGithubQueryResult,
   ProviderStepSettingWithProvider,
   RunVariantBody,
   RunWorkflowBody,
@@ -2476,6 +2478,94 @@ export const useTestProviderConnection = <
   TContext
 > => {
   return useMutation(getTestProviderConnectionMutationOptions(options));
+};
+
+/**
+ * Returns the assembled `q=` string the GitHub Agent would send for a given job, applying recruiter-tunable knobs (extra keywords, exclude orgs, min followers, min repos). Optionally hits the live GitHub Search API once to report `total_count` so recruiters can gauge a query before kicking off a real run.
+
+ * @summary Build the exact GitHub user-search query for a job + (optional) tuning config
+ */
+export const getPreviewGithubQueryUrl = () => {
+  return `/api/providers/preview-github-query`;
+};
+
+export const previewGithubQuery = async (
+  previewGithubQueryBody: PreviewGithubQueryBody,
+  options?: RequestInit,
+): Promise<PreviewGithubQueryResult> => {
+  return customFetch<PreviewGithubQueryResult>(getPreviewGithubQueryUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(previewGithubQueryBody),
+  });
+};
+
+export const getPreviewGithubQueryMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewGithubQuery>>,
+    TError,
+    { data: BodyType<PreviewGithubQueryBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof previewGithubQuery>>,
+  TError,
+  { data: BodyType<PreviewGithubQueryBody> },
+  TContext
+> => {
+  const mutationKey = ["previewGithubQuery"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof previewGithubQuery>>,
+    { data: BodyType<PreviewGithubQueryBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return previewGithubQuery(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PreviewGithubQueryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof previewGithubQuery>>
+>;
+export type PreviewGithubQueryMutationBody = BodyType<PreviewGithubQueryBody>;
+export type PreviewGithubQueryMutationError = ErrorType<void>;
+
+/**
+ * @summary Build the exact GitHub user-search query for a job + (optional) tuning config
+ */
+export const usePreviewGithubQuery = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof previewGithubQuery>>,
+    TError,
+    { data: BodyType<PreviewGithubQueryBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof previewGithubQuery>>,
+  TError,
+  { data: BodyType<PreviewGithubQueryBody> },
+  TContext
+> => {
+  return useMutation(getPreviewGithubQueryMutationOptions(options));
 };
 
 /**

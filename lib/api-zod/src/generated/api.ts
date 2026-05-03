@@ -1500,6 +1500,87 @@ export const TestProviderConnectionResponse = zod.object({
 });
 
 /**
+ * Returns the assembled `q=` string the GitHub Agent would send for a given job, applying recruiter-tunable knobs (extra keywords, exclude orgs, min followers, min repos). Optionally hits the live GitHub Search API once to report `total_count` so recruiters can gauge a query before kicking off a real run.
+
+ * @summary Build the exact GitHub user-search query for a job + (optional) tuning config
+ */
+export const PreviewGithubQueryBody = zod
+  .object({
+    jobId: zod
+      .number()
+      .describe(
+        "Job whose title \/ location \/ seniority \/ must-have skills feed the query.",
+      ),
+    providerId: zod
+      .number()
+      .nullish()
+      .describe(
+        "GitHub-typed provider id whose saved config should be used. Ignored when `config` is supplied.",
+      ),
+    config: zod
+      .object({
+        extraKeywords: zod
+          .string()
+          .nullish()
+          .describe(
+            'Free-text keywords appended verbatim to the search query (e.g. \"open source\", \"fintech\").',
+          ),
+        excludeOrgs: zod
+          .string()
+          .nullish()
+          .describe(
+            'Comma- or space-separated GitHub org\/user logins to exclude from results (e.g. \"google, microsoft\").',
+          ),
+        minFollowers: zod
+          .number()
+          .nullish()
+          .describe(
+            "Minimum follower count (adds `followers:>=N` to the query).",
+          ),
+        minRepos: zod
+          .number()
+          .nullish()
+          .describe(
+            "Minimum public repo count (adds `repos:>=N` to the query).",
+          ),
+      })
+      .describe(
+        "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+      )
+      .nullish()
+      .describe("Inline tuning knobs (overrides any saved provider config)."),
+    runMatches: zod
+      .boolean()
+      .nullish()
+      .describe(
+        "When true, also hit GitHub \/search\/users once and report total_count.",
+      ),
+  })
+  .describe(
+    "Build the GitHub user-search query for a given job. When `config` is supplied it's used verbatim (lets the provider edit dialog preview unsaved tuning). Otherwise, if `providerId` points at a github-typed provider, its saved config is used. If neither is supplied, the query is built with no extra tuning knobs.\n",
+  );
+
+export const PreviewGithubQueryResponse = zod.object({
+  query: zod
+    .string()
+    .describe(
+      "The exact `q=` value the GitHub Agent would send for this job + config.",
+    ),
+  totalCount: zod
+    .number()
+    .nullish()
+    .describe(
+      "Number of matching GitHub users (only set when `runMatches=true` succeeded).",
+    ),
+  totalCountError: zod
+    .string()
+    .nullish()
+    .describe(
+      "Friendly error if the live preview lookup failed (rate-limit, network, etc.).",
+    ),
+});
+
+/**
  * @summary List all workflow step → provider assignments
  */
 export const ListProviderStepSettingsResponseItem = zod.object({

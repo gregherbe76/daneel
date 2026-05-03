@@ -6,7 +6,7 @@ import { logger } from "../../../lib/logger";
 const GITHUB_API = "https://api.github.com";
 const REQUEST_TIMEOUT_MS = 15_000;
 
-type SourcingPayload = {
+export type SourcingPayload = {
   job: {
     title: string;
     description?: string;
@@ -117,8 +117,14 @@ export class GithubSourcingProvider implements AgentProvider {
     }
   }
 
-  /** Build the GitHub user-search query from job context. */
-  private buildQuery(payload: SourcingPayload): string {
+  /**
+   * Build the GitHub user-search query from job context.
+   *
+   * Public so route handlers (e.g. /providers/preview-github-query) can
+   * surface the exact query a recruiter is about to run before they kick
+   * off the workflow. Pure function over (config, payload) — no I/O.
+   */
+  buildQuery(payload: SourcingPayload): string {
     const job = payload.job;
     const rawLoc = payload.filters?.location?.trim() || job.location?.trim() || "";
     // Strip parentheticals like "(Hybrid)"/"(Remote)" and trailing country/state qualifiers
@@ -238,6 +244,37 @@ export class GithubSourcingProvider implements AgentProvider {
   /** Last-resort noreply address — never deliverable, but signals identity. */
   private noreplyEmail(login: string): string {
     return `${login}@users.noreply.github.com`;
+  }
+
+  /**
+   * Hit the GitHub user-search endpoint with the given query and return only
+   * the total_count. Uses per_page=1 so the response is tiny — recruiters can
+   * call this from the provider edit dialog to gauge a query before kicking
+   * off a full sourcing run. Throws on rate-limit / network errors so the
+   * caller can surface a friendly message.
+   */
+  async previewMatchCount(query: string): Promise<number> {
+    const res = await this.ghFetch<{ total_count: number }>(
+      `/search/users?q=${encodeURIComponent(query)}&per_page=1`,
+    );
+    return res.total_count ?? 0;
+  }
+
+  /** Build a SourcingPayload from a Job row and run-time filters. */
+  static buildPayloadFromJob(
+    job: { title: string; description?: string | null; location?: string | null; seniority?: string | null; mustHaveSkills?: string[] | null },
+    filters?: { location?: string; seniority?: string },
+  ): SourcingPayload {
+    return {
+      job: {
+        title: job.title,
+        description: job.description ?? undefined,
+        location: job.location ?? undefined,
+        seniority: job.seniority ?? undefined,
+        mustHaveSkills: job.mustHaveSkills ?? [],
+      },
+      filters,
+    };
   }
 
   async run(input: AgentProviderRunInput): Promise<SourcingCandidate[]> {
