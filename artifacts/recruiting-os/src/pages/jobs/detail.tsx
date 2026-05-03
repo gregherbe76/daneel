@@ -882,9 +882,13 @@ export default function JobDetailPage() {
                       type SourcingStats = {
                         searchTotalCount?: number;
                         consideredCount?: number;
+                        extractedCount?: number;
                         droppedNoBio?: number;
                         droppedStale?: number;
                         droppedFetchError?: number;
+                        droppedInvalid?: number;
+                        droppedNoProfile?: number;
+                        droppedFabricated?: number;
                         returnedCount?: number;
                       };
                       const output = sourcingLog.output as {
@@ -897,7 +901,10 @@ export default function JobDetailPage() {
                       const totalDropped =
                         (stats?.droppedNoBio ?? 0) +
                         (stats?.droppedStale ?? 0) +
-                        (stats?.droppedFetchError ?? 0);
+                        (stats?.droppedFetchError ?? 0) +
+                        (stats?.droppedInvalid ?? 0) +
+                        (stats?.droppedNoProfile ?? 0) +
+                        (stats?.droppedFabricated ?? 0);
                       return (
                         <div className={`rounded-md border p-4 flex items-start gap-3 ${
                           sourcingLog.status === "completed"
@@ -936,6 +943,12 @@ export default function JobDetailPage() {
                                       {stats.consideredCount} inspected
                                     </Badge>
                                   )}
+                                  {stats.extractedCount != null &&
+                                    stats.extractedCount !== stats.consideredCount && (
+                                      <Badge variant="outline" className="bg-background">
+                                        {stats.extractedCount} extracted
+                                      </Badge>
+                                    )}
                                   {stats.returnedCount != null && (
                                     <Badge variant="outline" className="bg-purple-500/10 text-purple-700 border-purple-200">
                                       {stats.returnedCount} returned
@@ -951,6 +964,21 @@ export default function JobDetailPage() {
                                       {stats.droppedStale} dropped: stale activity
                                     </Badge>
                                   )}
+                                  {(stats.droppedNoProfile ?? 0) > 0 && (
+                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-800 border-amber-200">
+                                      {stats.droppedNoProfile} dropped: no profile URL
+                                    </Badge>
+                                  )}
+                                  {(stats.droppedFabricated ?? 0) > 0 && (
+                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-800 border-amber-200">
+                                      {stats.droppedFabricated} dropped: fabricated
+                                    </Badge>
+                                  )}
+                                  {(stats.droppedInvalid ?? 0) > 0 && (
+                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-800 border-amber-200">
+                                      {stats.droppedInvalid} dropped: invalid row
+                                    </Badge>
+                                  )}
                                   {(stats.droppedFetchError ?? 0) > 0 && (
                                     <Badge variant="outline" className="bg-muted text-muted-foreground">
                                       {stats.droppedFetchError} dropped: fetch error
@@ -959,8 +987,9 @@ export default function JobDetailPage() {
                                 </div>
                                 {totalDropped > 0 && (output?.saved ?? 0) === 0 && (
                                   <p className="text-xs text-amber-800">
-                                    Quality filters dropped every candidate. Loosen the “require bio” or
-                                    “active within” settings on the GitHub provider to widen the pool.
+                                    Quality filters dropped every candidate. Loosen your provider's
+                                    quality settings (e.g. “require bio”, “active within”, target sites)
+                                    to widen the pool.
                                   </p>
                                 )}
                                 {totalDropped > 0 && (output?.saved ?? 0) > 0 && (

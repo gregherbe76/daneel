@@ -1,5 +1,10 @@
 import { CustomWebhookProvider } from "./custom-webhook";
 import type { AgentProviderRunInput } from "./interface";
+import type {
+  SourcingCandidate,
+  SourcingRunResult,
+  SourcingStats,
+} from "./native-openai-sourcing";
 import { logger } from "../../../lib/logger";
 
 /**
@@ -60,7 +65,15 @@ export class TwinWebhookProvider extends CustomWebhookProvider {
 
     // Temporarily swap the parent's webhook URL by creating a one-shot provider
     const oneShot = new CustomWebhookProvider(this.id, this.name, url, this.apiKeyForTwin);
-    return oneShot.run(augmented);
+    const result = await oneShot.run(augmented);
+
+    // For the sourcing step, normalise the response into { candidates, stats }
+    // so the UI can show drop counts (parity with GitHub / web search) even
+    // when the upstream Twin returned a bare candidate array or omitted stats.
+    if (input.step === "sourcing") {
+      return normaliseSourcingResponse(result);
+    }
+    return result;
   }
 
   override async validateConnection(): Promise<{ ok: boolean; error?: string }> {
@@ -85,4 +98,76 @@ export class TwinWebhookProvider extends CustomWebhookProvider {
       return super.validateConnection(); // Fall back to webhook ping
     }
   }
+}
+
+/**
+ * Coerce whatever shape the upstream Twin returned into the contract the
+ * engine + UI expect. The Twin is a third-party agent, so we treat its
+ * payload defensively: accept either a bare candidate array or
+ * { candidates, stats }, validate each row, and synthesise stats when the
+ * upstream omitted them so recruiters always see drop counts.
+ */
+function normaliseSourcingResponse(raw: unknown): SourcingRunResult {
+  let rawCandidates: unknown[] = [];
+  let upstreamStats: SourcingStats | undefined;
+
+  if (Array.isArray(raw)) {
+    rawCandidates = raw;
+  } else if (raw && typeof raw === "object") {
+    const obj = raw as { candidates?: unknown; stats?: unknown };
+    if (Array.isArray(obj.candidates)) rawCandidates = obj.candidates;
+    if (obj.stats && typeof obj.stats === "object") {
+      upstreamStats = obj.stats as SourcingStats;
+    }
+  }
+
+  // Drop rows missing a name AND any identity URL/email — we cannot dedupe or
+  // act on them, so they would otherwise vanish silently from the count.
+  const candidates: SourcingCandidate[] = [];
+  let droppedInvalid = 0;
+  for (const c of rawCandidates) {
+    if (!c || typeof c !== "object") {
+      droppedInvalid++;
+      continue;
+    }
+    const row = c as Partial<SourcingCandidate>;
+    const hasName = typeof row.name === "string" && row.name.trim().length > 0;
+    const hasIdentity =
+      (typeof row.email === "string" && row.email.trim().length > 0) ||
+      (typeof row.linkedinUrl === "string" && row.linkedinUrl.trim().length > 0) ||
+      (typeof row.githubUrl === "string" && row.githubUrl.trim().length > 0);
+    if (!hasName || !hasIdentity) {
+      droppedInvalid++;
+      continue;
+    }
+    candidates.push({
+      name: row.name!.trim(),
+      headline: row.headline ?? "",
+      location: row.location ?? "",
+      currentCompany: row.currentCompany ?? "",
+      email: row.email ?? null,
+      emailSource: row.emailSource ?? (row.email ? "profile" : null),
+      linkedinUrl: row.linkedinUrl ?? "",
+      githubUrl: row.githubUrl ?? "",
+      username: row.username ?? null,
+      confidence: row.confidence ?? null,
+      skills: Array.isArray(row.skills) ? row.skills : [],
+      summary: row.summary ?? "",
+      evidence: row.evidence ?? "",
+      potentialRisks: row.potentialRisks ?? "",
+      source: row.source ?? "Twin Agent",
+    });
+  }
+
+  // Merge: prefer upstream-provided counts, fall back to what we observed.
+  // returnedCount always reflects the post-validation count we actually pass
+  // to the engine, regardless of what the Twin claimed.
+  const stats: SourcingStats = {
+    ...(upstreamStats ?? {}),
+    extractedCount: upstreamStats?.extractedCount ?? rawCandidates.length,
+    droppedInvalid: (upstreamStats?.droppedInvalid ?? 0) + droppedInvalid,
+    returnedCount: candidates.length,
+  };
+
+  return { candidates, stats };
 }

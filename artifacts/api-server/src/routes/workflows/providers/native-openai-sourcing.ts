@@ -12,12 +12,20 @@ export type SourcingStats = {
   searchTotalCount?: number;
   /** Number of candidates the provider actually fetched and inspected. */
   consideredCount?: number;
+  /** Number of candidate rows the provider extracted before validation drops. */
+  extractedCount?: number;
   /** Dropped because the provider's "must have a bio" filter rejected them. */
   droppedNoBio?: number;
   /** Dropped because the provider's "active within N months" filter rejected them. */
   droppedStale?: number;
   /** Dropped because of a transient per-candidate fetch failure. */
   droppedFetchError?: number;
+  /** Dropped because the row was missing required identity fields (name, profile URL, etc). */
+  droppedInvalid?: number;
+  /** Dropped because the row was missing a profile URL. */
+  droppedNoProfile?: number;
+  /** Dropped because the row's URL or evidence didn't match a real upstream result. */
+  droppedFabricated?: number;
   /** Final count of candidates returned to the engine. */
   returnedCount?: number;
 };
@@ -87,8 +95,9 @@ export class NativeOpenAISourcingProvider implements AgentProvider {
     this.name = name;
   }
 
-  async run(input: AgentProviderRunInput): Promise<SourcingCandidate[]> {
+  async run(input: AgentProviderRunInput): Promise<SourcingRunResult> {
     const { job, insight } = input.payload as SourcingPayload;
+    const desiredCount = 7;
 
     const prompt = `You are a recruiting researcher. Generate 7 realistic but clearly mock candidate profiles for this role.
 
@@ -134,14 +143,35 @@ IMPORTANT:
     const raw = json<Array<Omit<SourcingCandidate, "username" | "confidence"> & { username?: string | null; confidence?: number | null }>>(
       response.choices[0]?.message?.content ?? "[]",
     );
-    return raw.map((c) => ({
-      ...c,
-      username: c.username ?? null,
-      confidence: c.confidence ?? null,
-      // Mock candidates use placeholder *.mock@example.com addresses — flag them
-      // so the UI can warn recruiters not to send real outreach.
-      emailSource: c.email ? "generated" : null,
-    }));
+
+    // Drop rows missing the bare-minimum identity field so the UI can explain
+    // why a "0 candidates" mock run was actually a malformed LLM response —
+    // matching how GitHub surfaces filter drop counts.
+    const candidates: SourcingCandidate[] = [];
+    let droppedInvalid = 0;
+    for (const c of raw) {
+      if (!c.name || !String(c.name).trim()) {
+        droppedInvalid++;
+        continue;
+      }
+      candidates.push({
+        ...c,
+        username: c.username ?? null,
+        confidence: c.confidence ?? null,
+        // Mock candidates use placeholder *.mock@example.com addresses — flag them
+        // so the UI can warn recruiters not to send real outreach.
+        emailSource: c.email ? "generated" : null,
+      });
+    }
+
+    const stats: SourcingStats = {
+      searchTotalCount: desiredCount,
+      consideredCount: raw.length,
+      extractedCount: raw.length,
+      droppedInvalid,
+      returnedCount: candidates.length,
+    };
+    return { candidates, stats };
   }
 
   async validateConnection(): Promise<{ ok: boolean; error?: string }> {
