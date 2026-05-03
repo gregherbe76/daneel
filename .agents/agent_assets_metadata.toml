@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "Gt0tsPE7btY3R3x2e8XmS"
+uri = "file://README.md"
+type = "text"
+title = "Agentic Recruiting OS — README.md"
