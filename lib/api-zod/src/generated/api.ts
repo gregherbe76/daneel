@@ -523,6 +523,42 @@ export const DeleteCandidateParams = zod.object({
 });
 
 /**
+ * Runs the same MX-record validation pipeline used at sourcing time and updates `emailValidationStatus`, `emailValidationReason`, and `emailValidatedAt`. Recruiters can use this to refresh a stale check from the candidate detail page.
+
+ * @summary Re-validate this candidate's email deliverability now
+ */
+export const RecheckCandidateEmailParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const RecheckCandidateEmailResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  email: zod.string().nullish(),
+  linkedIn: zod.string().nullish(),
+  summary: zod.string().nullish(),
+  skills: zod.array(zod.string()),
+  headline: zod.string().nullish(),
+  location: zod.string().nullish(),
+  currentCompany: zod.string().nullish(),
+  githubUrl: zod.string().nullish(),
+  githubUsername: zod.string().nullish(),
+  sourcingConfidence: zod.number().nullish(),
+  source: zod.string().nullish(),
+  enrichedAt: zod.coerce.date().nullish(),
+  enrichmentSource: zod.string().nullish(),
+  enrichmentConfidence: zod.number().nullish(),
+  enrichmentStatus: zod.enum(["enriched", "partial", "failed"]).nullish(),
+  emailValidationStatus: zod
+    .enum(["valid", "invalid", "risky", "unchecked"])
+    .nullish(),
+  emailValidationReason: zod.string().nullish(),
+  emailValidatedAt: zod.coerce.date().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary Get all applications for a candidate (with job info)
  */
 export const GetCandidateApplicationsParams = zod.object({

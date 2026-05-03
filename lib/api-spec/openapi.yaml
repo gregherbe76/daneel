@@ -241,6 +241,32 @@ paths:
         "204":
           description: Deleted
 
+  /candidates/{id}/recheck-email:
+    post:
+      operationId: recheckCandidateEmail
+      tags: [candidates]
+      summary: Re-validate this candidate's email deliverability now
+      description: >
+        Runs the same MX-record validation pipeline used at sourcing time and
+        updates `emailValidationStatus`, `emailValidationReason`, and
+        `emailValidatedAt`. Recruiters can use this to refresh a stale check
+        from the candidate detail page.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Candidate with refreshed email validation fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Candidate"
+        "404":
+          description: Not found
+
   /candidates/{id}/applications:
     get:
       operationId: getCandidateApplications

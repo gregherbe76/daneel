@@ -1043,6 +1043,92 @@ export const useDeleteCandidate = <
 };
 
 /**
+ * Runs the same MX-record validation pipeline used at sourcing time and updates `emailValidationStatus`, `emailValidationReason`, and `emailValidatedAt`. Recruiters can use this to refresh a stale check from the candidate detail page.
+
+ * @summary Re-validate this candidate's email deliverability now
+ */
+export const getRecheckCandidateEmailUrl = (id: number) => {
+  return `/api/candidates/${id}/recheck-email`;
+};
+
+export const recheckCandidateEmail = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Candidate> => {
+  return customFetch<Candidate>(getRecheckCandidateEmailUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRecheckCandidateEmailMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof recheckCandidateEmail>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof recheckCandidateEmail>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["recheckCandidateEmail"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof recheckCandidateEmail>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return recheckCandidateEmail(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RecheckCandidateEmailMutationResult = NonNullable<
+  Awaited<ReturnType<typeof recheckCandidateEmail>>
+>;
+
+export type RecheckCandidateEmailMutationError = ErrorType<void>;
+
+/**
+ * @summary Re-validate this candidate's email deliverability now
+ */
+export const useRecheckCandidateEmail = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof recheckCandidateEmail>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof recheckCandidateEmail>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getRecheckCandidateEmailMutationOptions(options));
+};
+
+/**
  * @summary Get all applications for a candidate (with job info)
  */
 export const getGetCandidateApplicationsUrl = (id: number) => {

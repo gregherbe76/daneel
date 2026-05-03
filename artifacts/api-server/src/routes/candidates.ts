@@ -8,7 +8,9 @@ import {
   UpdateCandidateParams,
   DeleteCandidateParams,
   GetCandidateApplicationsParams,
+  RecheckCandidateEmailParams,
 } from "@workspace/api-zod";
+import { revalidateCandidateEmail } from "../lib/email-revalidation";
 
 const router = Router();
 
@@ -86,6 +88,19 @@ router.delete("/candidates/:id", async (req, res) => {
   const { id } = DeleteCandidateParams.parse({ id: Number(req.params.id) });
   await db.delete(candidatesTable).where(eq(candidatesTable.id, id));
   res.status(204).send();
+});
+
+// Manually re-run the email deliverability check for a single candidate.
+// Useful when the recruiter sees a stale "valid" badge and wants to confirm
+// the address still resolves before reaching out.
+router.post("/candidates/:id/recheck-email", async (req, res) => {
+  const { id } = RecheckCandidateEmailParams.parse({ id: Number(req.params.id) });
+  const updated = await revalidateCandidateEmail(id);
+  if (!updated) {
+    res.status(404).json({ error: "Candidate not found" });
+    return;
+  }
+  res.json(updated);
 });
 
 // Get all applications for a candidate (with job details)

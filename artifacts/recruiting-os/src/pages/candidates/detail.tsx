@@ -1,9 +1,11 @@
 import { useRoute, Link } from "wouter";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useGetCandidate,
   useGetCandidateApplications,
   useListJobs,
+  useRecheckCandidateEmail,
   getGetCandidateQueryKey,
   getGetCandidateApplicationsQueryKey,
 } from "@workspace/api-client-react";
@@ -26,10 +28,28 @@ import {
   Building2,
   Loader2,
   User,
+  RefreshCw,
 } from "lucide-react";
 import { CandidateNotesPanel } from "@/components/candidate-notes-panel";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
 import { EmailSourceBadge } from "@/components/email-source-badge";
+
+function formatRelativeTime(input: string | Date): string {
+  const ts = typeof input === "string" ? new Date(input).getTime() : input.getTime();
+  const diffMs = Date.now() - ts;
+  if (Number.isNaN(diffMs)) return "";
+  const minutes = Math.round(diffMs / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.round(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.round(days / 365);
+  return `${years}y ago`;
+}
 
 export default function CandidateDetailPage() {
   const [, params] = useRoute("/candidates/:id");
@@ -48,6 +68,14 @@ export default function CandidateDetailPage() {
     },
   });
   const { data: jobs } = useListJobs();
+  const queryClient = useQueryClient();
+  const recheckEmail = useRecheckCandidateEmail({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetCandidateQueryKey(candidateId) });
+      },
+    },
+  });
 
   const appJobIds = new Set((applications ?? []).map((a) => a.jobId));
   const linkedJobs = (jobs ?? []).filter((j) => appJobIds.has(j.id));
@@ -99,6 +127,28 @@ export default function CandidateDetailPage() {
                     status={candidate.emailValidationStatus}
                     reason={candidate.emailValidationReason}
                   />
+                  {candidate.emailValidatedAt && (
+                    <span
+                      className="text-muted-foreground/80"
+                      title={new Date(candidate.emailValidatedAt).toLocaleString()}
+                    >
+                      checked {formatRelativeTime(candidate.emailValidatedAt)}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => recheckEmail.mutate({ id: candidateId })}
+                    disabled={recheckEmail.isPending}
+                    className="inline-flex items-center gap-1 hover:text-foreground disabled:opacity-50"
+                    title="Re-run the email deliverability check now"
+                  >
+                    {recheckEmail.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                    Re-check
+                  </button>
                 </span>
               )}
               {candidate.location && (
