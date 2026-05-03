@@ -39,6 +39,7 @@ type GhCommitAuthor = { name?: string; email?: string };
 type GhPushEventCommit = { sha: string; author: GhCommitAuthor };
 type GhEvent = {
   type: string;
+  created_at?: string;
   actor?: { login?: string };
   payload?: { commits?: GhPushEventCommit[] };
 };
@@ -174,28 +175,30 @@ export class GithubSourcingProvider implements AgentProvider {
   }
 
   /**
-   * Best-effort discovery of a contactable email from public commit metadata.
-   * GitHub exposes commit author emails in /users/{login}/events/public PushEvent
-   * payloads. We prefer commits authored by the user themselves (matched by
-   * actor login or display name) and skip noreply/bot addresses.
+   * Fetch the user's public events. Returns null on failure (rate limit,
+   * 5xx, etc) so callers can distinguish "no recent activity" from "we
+   * could not check" — the activity filter must not silently drop a
+   * candidate just because GitHub timed out.
    */
-  private async discoverEmailFromCommits(
-    login: string,
-    displayName: string | null,
-  ): Promise<string | null> {
-    let events: GhEvent[];
+  private async fetchPublicEvents(login: string): Promise<GhEvent[] | null> {
     try {
-      events = await this.ghFetch<GhEvent[]>(
+      return await this.ghFetch<GhEvent[]>(
         `/users/${encodeURIComponent(login)}/events/public?per_page=100`,
       );
     } catch (err) {
       logger.debug(
         { login, err: err instanceof Error ? err.message : String(err) },
-        "GitHub email discovery: events fetch failed",
+        "GitHub events fetch failed",
       );
       return null;
     }
+  }
 
+  private discoverEmailFromCommits(
+    login: string,
+    displayName: string | null,
+    events: GhEvent[],
+  ): string | null {
     const loginLc = login.toLowerCase();
     const nameLc = (displayName ?? "").toLowerCase().trim();
 
@@ -274,12 +277,64 @@ export class GithubSourcingProvider implements AgentProvider {
     const mustHaves = (payload.job.mustHaveSkills ?? []).map((s) => s.toLowerCase().trim()).filter(Boolean);
     const results: SourcingCandidate[] = [];
 
+    const requireBio = this.config.requireBio === true;
+    const activeWithinMonths =
+      typeof this.config.activeWithinMonths === "number" && this.config.activeWithinMonths > 0
+        ? Math.floor(this.config.activeWithinMonths)
+        : null;
+    const activityCutoffMs =
+      activeWithinMonths != null
+        ? Date.now() - activeWithinMonths * 30 * 24 * 60 * 60 * 1000
+        : null;
+    let droppedNoBio = 0;
+    let droppedStale = 0;
+
+    // Only fetch /events/public when we actually need it: either to enforce
+    // the activity filter or to discover an email when the public profile
+    // doesn't expose one. Skipping it otherwise saves a request per
+    // candidate against GitHub's tight rate limit.
+    const needEventsForActivity = activityCutoffMs != null;
+
     for (const item of search.items.slice(0, desired)) {
       try {
         const [user, repos] = await Promise.all([
           this.ghFetch<GhUser>(`/users/${encodeURIComponent(item.login)}`),
           this.ghFetch<GhRepo[]>(`/users/${encodeURIComponent(item.login)}/repos?sort=stars&per_page=10&type=owner`),
         ]);
+
+        if (requireBio && !(user.bio ?? "").trim()) {
+          droppedNoBio++;
+          logger.debug(
+            { providerId: this.id, login: item.login },
+            "GitHub sourcing: dropped (empty bio)",
+          );
+          continue;
+        }
+
+        const profileEmailUsable = isUsableEmail(user.email, user.login);
+        const needEvents = needEventsForActivity || !profileEmailUsable;
+        const events = needEvents ? await this.fetchPublicEvents(item.login) : null;
+
+        if (activityCutoffMs != null) {
+          // events === null means the events fetch failed (rate-limited,
+          // timeout, etc). Treat that as "unknown activity" and keep the
+          // candidate — better to surface a possibly-stale account than to
+          // silently drop everyone during a transient GitHub outage.
+          if (events != null) {
+            const latest = events.reduce<number>((max, ev) => {
+              const t = ev.created_at ? Date.parse(ev.created_at) : NaN;
+              return Number.isFinite(t) && t > max ? t : max;
+            }, 0);
+            if (latest === 0 || latest < activityCutoffMs) {
+              droppedStale++;
+              logger.debug(
+                { providerId: this.id, login: item.login, latest, cutoff: activityCutoffMs },
+                "GitHub sourcing: dropped (stale activity)",
+              );
+              continue;
+            }
+          }
+        }
 
         const ownRepos = repos.filter((r) => !r.fork).slice(0, 5);
         const topRepos = ownRepos.slice(0, 3);
@@ -319,10 +374,11 @@ export class GithubSourcingProvider implements AgentProvider {
           //   2. Real address discovered from the user's public commit metadata.
           //   3. Noreply fallback so the candidate row always carries a stable
           //      identifier — recruiters can tell at a glance it isn't deliverable.
-          email: isUsableEmail(user.email, user.login)
+          email: profileEmailUsable
             ? user.email!
-            : (await this.discoverEmailFromCommits(user.login, user.name)) ??
-              this.noreplyEmail(user.login),
+            : (events != null
+                ? this.discoverEmailFromCommits(user.login, user.name, events)
+                : null) ?? this.noreplyEmail(user.login),
           linkedinUrl: "",
           githubUrl: user.html_url,
           username: user.login,
@@ -342,7 +398,13 @@ export class GithubSourcingProvider implements AgentProvider {
     }
 
     logger.info(
-      { providerId: this.id, runId: input.runId, count: results.length },
+      {
+        providerId: this.id,
+        runId: input.runId,
+        count: results.length,
+        droppedNoBio,
+        droppedStale,
+      },
       "GitHub sourcing completed",
     );
     return results;

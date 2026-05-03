@@ -1079,6 +1079,18 @@ export const ListProvidersResponseItem = zod.object({
             .describe(
               "Minimum public repo count (adds `repos:>=N` to the query).",
             ),
+          requireBio: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "Drop candidates with empty profile bios (post-fetch filter).",
+            ),
+          activeWithinMonths: zod
+            .number()
+            .nullish()
+            .describe(
+              "Drop candidates whose latest public event is older than N months (post-fetch filter).",
+            ),
         })
         .optional()
         .describe(
@@ -1131,6 +1143,18 @@ export const CreateProviderBody = zod.object({
             .nullish()
             .describe(
               "Minimum public repo count (adds `repos:>=N` to the query).",
+            ),
+          requireBio: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "Drop candidates with empty profile bios (post-fetch filter).",
+            ),
+          activeWithinMonths: zod
+            .number()
+            .nullish()
+            .describe(
+              "Drop candidates whose latest public event is older than N months (post-fetch filter).",
             ),
         })
         .optional()
@@ -1186,6 +1210,18 @@ export const GetProviderResponse = zod.object({
             .nullish()
             .describe(
               "Minimum public repo count (adds `repos:>=N` to the query).",
+            ),
+          requireBio: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "Drop candidates with empty profile bios (post-fetch filter).",
+            ),
+          activeWithinMonths: zod
+            .number()
+            .nullish()
+            .describe(
+              "Drop candidates whose latest public event is older than N months (post-fetch filter).",
             ),
         })
         .optional()
@@ -1243,6 +1279,18 @@ export const UpdateProviderBody = zod.object({
             .describe(
               "Minimum public repo count (adds `repos:>=N` to the query).",
             ),
+          requireBio: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "Drop candidates with empty profile bios (post-fetch filter).",
+            ),
+          activeWithinMonths: zod
+            .number()
+            .nullish()
+            .describe(
+              "Drop candidates whose latest public event is older than N months (post-fetch filter).",
+            ),
         })
         .optional()
         .describe(
@@ -1290,6 +1338,18 @@ export const UpdateProviderResponse = zod.object({
             .nullish()
             .describe(
               "Minimum public repo count (adds `repos:>=N` to the query).",
+            ),
+          requireBio: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "Drop candidates with empty profile bios (post-fetch filter).",
+            ),
+          activeWithinMonths: zod
+            .number()
+            .nullish()
+            .describe(
+              "Drop candidates whose latest public event is older than N months (post-fetch filter).",
             ),
         })
         .optional()
@@ -1358,6 +1418,18 @@ export const ToggleProviderResponse = zod.object({
             .nullish()
             .describe(
               "Minimum public repo count (adds `repos:>=N` to the query).",
+            ),
+          requireBio: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "Drop candidates with empty profile bios (post-fetch filter).",
+            ),
+          activeWithinMonths: zod
+            .number()
+            .nullish()
+            .describe(
+              "Drop candidates whose latest public event is older than N months (post-fetch filter).",
             ),
         })
         .optional()
@@ -1441,6 +1513,18 @@ export const ListProviderStepSettingsResponseItem = zod.object({
               .nullish()
               .describe(
                 "Minimum public repo count (adds `repos:>=N` to the query).",
+              ),
+            requireBio: zod
+              .boolean()
+              .nullish()
+              .describe(
+                "Drop candidates with empty profile bios (post-fetch filter).",
+              ),
+            activeWithinMonths: zod
+              .number()
+              .nullish()
+              .describe(
+                "Drop candidates whose latest public event is older than N months (post-fetch filter).",
               ),
           })
           .optional()
@@ -1528,6 +1612,18 @@ export const UpsertProviderStepSettingResponse = zod.object({
               .nullish()
               .describe(
                 "Minimum public repo count (adds `repos:>=N` to the query).",
+              ),
+            requireBio: zod
+              .boolean()
+              .nullish()
+              .describe(
+                "Drop candidates with empty profile bios (post-fetch filter).",
+              ),
+            activeWithinMonths: zod
+              .number()
+              .nullish()
+              .describe(
+                "Drop candidates whose latest public event is older than N months (post-fetch filter).",
               ),
           })
           .optional()

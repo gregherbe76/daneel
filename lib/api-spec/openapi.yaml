@@ -1325,6 +1325,14 @@ components:
           type: integer
           nullable: true
           description: Minimum public repo count (adds `repos:>=N` to the query).
+        requireBio:
+          type: boolean
+          nullable: true
+          description: Drop candidates with empty profile bios (post-fetch filter).
+        activeWithinMonths:
+          type: integer
+          nullable: true
+          description: Drop candidates whose latest public event is older than N months (post-fetch filter).
 
     AgentProviderConfig:
       type: object

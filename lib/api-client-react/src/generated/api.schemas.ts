@@ -241,6 +241,10 @@ export interface GithubProviderConfig {
   minFollowers?: number | null;
   /** Minimum public repo count (adds `repos:>=N` to the query). */
   minRepos?: number | null;
+  /** Drop candidates with empty profile bios (post-fetch filter). */
+  requireBio?: boolean | null;
+  /** Drop candidates whose latest public event is older than N months (post-fetch filter). */
+  activeWithinMonths?: number | null;
 }
 
 /**

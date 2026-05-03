@@ -121,6 +121,8 @@ const providerSchema = z.object({
   githubExcludeOrgs: z.string().optional(),
   githubMinFollowers: z.string().optional(),
   githubMinRepos: z.string().optional(),
+  githubRequireBio: z.boolean().default(false),
+  githubActiveWithinMonths: z.string().optional(),
 });
 type ProviderFormValues = z.infer<typeof providerSchema>;
 
@@ -129,6 +131,8 @@ interface GithubProviderConfig {
   excludeOrgs?: string | null;
   minFollowers?: number | null;
   minRepos?: number | null;
+  requireBio?: boolean | null;
+  activeWithinMonths?: number | null;
 }
 
 // ── test connection badge ────────────────────────────────────────────────────
@@ -387,8 +391,13 @@ function ProviderDialog({
             editProvider.config?.github?.minRepos != null
               ? String(editProvider.config.github.minRepos)
               : "",
+          githubRequireBio: editProvider.config?.github?.requireBio === true,
+          githubActiveWithinMonths:
+            editProvider.config?.github?.activeWithinMonths != null
+              ? String(editProvider.config.github.activeWithinMonths)
+              : "",
         }
-      : { name: "", type: "native_openai", enabled: true },
+      : { name: "", type: "native_openai", enabled: true, githubRequireBio: false },
   });
 
   const providerType = watch("type");
@@ -405,8 +414,16 @@ function ProviderDialog({
         excludeOrgs: values.githubExcludeOrgs?.trim() || null,
         minFollowers: parseInt0(values.githubMinFollowers),
         minRepos: parseInt0(values.githubMinRepos),
+        requireBio: values.githubRequireBio ? true : null,
+        activeWithinMonths: parseInt0(values.githubActiveWithinMonths),
       };
-      const hasAny = gh.extraKeywords || gh.excludeOrgs || gh.minFollowers != null || gh.minRepos != null;
+      const hasAny =
+        gh.extraKeywords ||
+        gh.excludeOrgs ||
+        gh.minFollowers != null ||
+        gh.minRepos != null ||
+        gh.requireBio === true ||
+        gh.activeWithinMonths != null;
       if (hasAny) config = { github: gh };
     }
 
@@ -578,6 +595,43 @@ function ProviderDialog({
                       placeholder="e.g. 5"
                       {...register("githubMinRepos")}
                     />
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-border space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Quality filters</p>
+                    <p className="text-xs text-muted-foreground">
+                      Applied after fetching results from GitHub — drops candidates that look abandoned or anonymous.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <Label htmlFor="github-require-bio">Require non-empty bio</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Drop candidates whose GitHub profile bio is empty.
+                      </p>
+                    </div>
+                    <Switch
+                      id="github-require-bio"
+                      checked={watch("githubRequireBio") === true}
+                      onCheckedChange={(v) => setValue("githubRequireBio", v)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Active within (months)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      placeholder="e.g. 6"
+                      {...register("githubActiveWithinMonths")}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Drop candidates whose latest public GitHub event is older than this. Leave blank to skip.
+                    </p>
                   </div>
                 </div>
               </div>

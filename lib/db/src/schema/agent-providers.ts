@@ -14,6 +14,8 @@ export type GithubProviderConfig = {
   excludeOrgs?: string | null;
   minFollowers?: number | null;
   minRepos?: number | null;
+  requireBio?: boolean | null;
+  activeWithinMonths?: number | null;
 };
 
 export type AgentProviderConfig = {
