@@ -32,6 +32,8 @@ tags:
     description: Inbox of regressions in candidate email validation status
   - name: branding
     description: Runtime-editable global product branding (product name, company name, logo URL)
+  - name: storage
+    description: Object storage upload and serving endpoints.
 paths:
   /healthz:
     get:
@@ -1272,6 +1274,32 @@ paths:
                   updated:
                     type: integer
                 required: [updated]
+
+  /storage/uploads/request-url:
+    post:
+      tags: [storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      description: |
+        Returns a presigned GCS URL for direct upload. The client sends JSON
+        metadata here, then uploads the file directly to the returned URL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL generated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Missing or invalid required fields.
+        "500":
+          description: Failed to generate upload URL.
 
   /pipeline/summary:
     get:
@@ -2805,3 +2833,28 @@ components:
         colorAccent:
           type: string
           description: 6-digit hex color (e.g. "#7C5CFF"), or empty string to reset to template default.
+
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          minimum: 1
+        contentType:
+          type: string
+          minLength: 1
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+        objectPath:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/UploadUrlRequest"

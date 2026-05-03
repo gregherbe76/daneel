@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useGetBrandingSettings,
   useUpdateBrandingSettings,
+  useRequestUploadUrl,
   getGetBrandingSettingsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,7 +11,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { branding as defaultBranding } from "@workspace/branding";
-import { Loader2, Image as ImageIcon } from "lucide-react";
+import { Loader2, Image as ImageIcon, Upload } from "lucide-react";
+
+const ACCEPTED_LOGO_TYPES = ["image/png", "image/jpeg", "image/svg+xml"];
+const MAX_LOGO_BYTES = 5 * 1024 * 1024; // 5 MB
+
+/** Build the URL to render an object-storage path in an <img> tag. */
+function logoSrc(logoUrl: string): string {
+  return logoUrl.startsWith("/objects/") ? `/api/storage${logoUrl}` : logoUrl;
+}
 
 /**
  * Reusable color picker row: a native <input type="color"> swatch tied to
@@ -84,6 +93,9 @@ export default function BrandingSettingsPage() {
   const { toast } = useToast();
   const { data, isLoading } = useGetBrandingSettings();
   const update = useUpdateBrandingSettings();
+  const requestUploadUrl = useRequestUploadUrl();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const [productName, setProductName] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -146,6 +158,62 @@ export default function BrandingSettingsPage() {
 
   function onResetField(setter: (v: string) => void) {
     setter("");
+  }
+
+  async function onLogoFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset the input so the same file can be re-picked after an error.
+    e.target.value = "";
+    if (!file) return;
+
+    if (!ACCEPTED_LOGO_TYPES.includes(file.type)) {
+      toast({
+        title: "Unsupported file type",
+        description: "Logo must be a PNG, JPG, or SVG image.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      toast({
+        title: "File too large",
+        description: "Logo must be 5 MB or smaller.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const { uploadURL, objectPath } = await requestUploadUrl.mutateAsync({
+        data: { name: file.name, size: file.size, contentType: file.type },
+      });
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      if (!putRes.ok) {
+        throw new Error(`Upload failed (${putRes.status})`);
+      }
+      setLogoUrl(objectPath);
+      // Persist immediately so the upload is the save — users don't have to
+      // remember to also click "Save branding" for the logo to take effect.
+      await update.mutateAsync({ data: { logoUrl: objectPath } });
+      qc.invalidateQueries({ queryKey: getGetBrandingSettingsQueryKey() });
+      toast({
+        title: "Logo uploaded",
+        description: "Your new logo is live on reports and the app.",
+      });
+    } catch (err) {
+      toast({
+        title: "Upload failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
   }
 
   return (
@@ -217,18 +285,51 @@ export default function BrandingSettingsPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="logoUrl">Logo URL</Label>
-            <Input
-              id="logoUrl"
-              data-testid="input-logo-url"
-              type="url"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              placeholder="https://example.com/logo.png"
-            />
+            <Label htmlFor="logoUrl">Logo</Label>
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPTED_LOGO_TYPES.join(",")}
+                className="hidden"
+                data-testid="input-logo-file"
+                onChange={onLogoFileSelected}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                data-testid="button-upload-logo"
+                disabled={isUploading}
+                onClick={() => fileInputRef.current?.click()}
+                className="gap-1.5"
+              >
+                {isUploading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                {isUploading ? "Uploading…" : "Upload logo"}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                PNG, JPG, or SVG. Max 5&nbsp;MB.
+              </span>
+            </div>
+            <div className="space-y-1 pt-2">
+              <Label htmlFor="logoUrl" className="text-xs text-muted-foreground">
+                Or paste a logo URL
+              </Label>
+              <Input
+                id="logoUrl"
+                data-testid="input-logo-url"
+                type="text"
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                placeholder="https://example.com/logo.png"
+              />
+            </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                Embedded on the cover of generated PDF reports. PNG or JPG.
+                Embedded on the cover of generated PDF reports.
               </span>
               {logoUrl && (
                 <button
@@ -248,7 +349,7 @@ export default function BrandingSettingsPage() {
                 <div className="flex h-12 w-12 items-center justify-center rounded bg-background border border-border overflow-hidden">
                   {/* Native <img> intentionally — broken URL just falls back to the icon. */}
                   <img
-                    src={logoUrl}
+                    src={logoSrc(logoUrl)}
                     alt="Logo preview"
                     className="max-h-full max-w-full object-contain"
                     onError={(e) => {

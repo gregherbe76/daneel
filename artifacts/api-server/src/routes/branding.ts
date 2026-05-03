@@ -70,7 +70,9 @@ router.put("/branding", async (req, res) => {
   // SSRF guardrail: the server later fetches this URL to embed in PDF
   // reports, so refuse anything that doesn't shape up as a public https URL.
   // The deeper DNS-resolution check happens at fetch time.
-  if (typeof values.logoUrl === "string") {
+  // Exception: object storage paths (`/objects/...`) are produced by our own
+  // upload endpoint and are loaded directly from GCS, never fetched over HTTP.
+  if (typeof values.logoUrl === "string" && !values.logoUrl.startsWith("/objects/")) {
     try {
       assertSafeLogoUrlShape(values.logoUrl);
     } catch (err) {

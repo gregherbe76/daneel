@@ -11,6 +11,7 @@ import candidateNotesRouter from "./candidate-notes";
 import settingsRouter from "./settings";
 import emailStatusChangesRouter from "./email-status-changes";
 import brandingRouter from "./branding";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(candidateNotesRouter);
 router.use(settingsRouter);
 router.use(emailStatusChangesRouter);
 router.use(brandingRouter);
+router.use(storageRouter);
 
 export default router;

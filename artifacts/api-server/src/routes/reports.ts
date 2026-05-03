@@ -15,6 +15,33 @@ import { logger } from "../lib/logger";
 import { branding as defaultBranding } from "@workspace/branding";
 import { loadBrandingSettings } from "./branding";
 import { safeFetchLogoBytes } from "../lib/safe-fetch";
+import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+
+const objectStorageService = new ObjectStorageService();
+
+/**
+ * Resolves a configured logoUrl to image bytes. Supports both:
+ *   - Public https URLs (user-pasted) — fetched via SSRF-hardened safeFetch
+ *   - Object storage paths (`/objects/...`) — produced by our upload endpoint
+ *     and loaded directly from GCS, bypassing SSRF since we trust them.
+ * Returns null if the logo can't be loaded — the cover just renders blank.
+ */
+async function loadLogoBytes(logoUrl: string | null): Promise<Buffer | null> {
+  if (!logoUrl) return null;
+  if (logoUrl.startsWith("/objects/")) {
+    try {
+      const file = await objectStorageService.getObjectEntityFile(logoUrl);
+      const [bytes] = await file.download();
+      return bytes;
+    } catch (err) {
+      if (!(err instanceof ObjectNotFoundError)) {
+        logger.warn({ err }, "Failed to load logo from object storage");
+      }
+      return null;
+    }
+  }
+  return safeFetchLogoBytes(logoUrl);
+}
 
 const router = Router();
 
@@ -366,7 +393,7 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
   // services or cloud metadata endpoints.
   const branding = await loadBrandingSettings();
   const logoUrl = branding.logoUrl || null;
-  const logoBuffer: Buffer | null = logoUrl ? await safeFetchLogoBytes(logoUrl) : null;
+  const logoBuffer: Buffer | null = await loadLogoBytes(logoUrl);
 
   const doc = new PDFDocument({ margin: 50, size: "A4" });
   doc.pipe(res);
