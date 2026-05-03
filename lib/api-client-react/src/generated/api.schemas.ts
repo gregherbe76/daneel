@@ -258,6 +258,7 @@ export const ProviderType = {
   custom_webhook: "custom_webhook",
   twin_webhook: "twin_webhook",
   github: "github",
+  web_search: "web_search",
 } as const;
 
 export type WorkflowStepName =
@@ -291,10 +292,25 @@ export interface GithubProviderConfig {
 }
 
 /**
+ * Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.
+ */
+export interface WebSearchProviderConfig {
+  /** Free-text keywords appended verbatim to the Google query (e.g. "remote", "fintech"). */
+  extraKeywords?: string | null;
+  /** Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to
+`linkedin.com/in` and `github.com` when empty/omitted.
+ */
+  targetSites?: string[] | null;
+  /** Domains/paths excluded via `-site:` operators (e.g. "pinterest.com"). */
+  excludeSites?: string[] | null;
+}
+
+/**
  * Per-provider tuning knobs. Only the section matching the provider type is read.
  */
 export interface AgentProviderConfig {
   github?: GithubProviderConfig;
+  web_search?: WebSearchProviderConfig;
 }
 
 export interface AgentProviderRecord {

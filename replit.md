@@ -96,6 +96,7 @@ Results are fetched via `GET /api/workflows/jobs/:jobId/latest`.
 - `CustomWebhookProvider` — delegates to any external HTTP endpoint
 - `TwinWebhookProvider` — extends CustomWebhook with twinContext metadata
 - `GithubSourcingProvider` — sources real public GitHub users via the public REST API (`/search/users`, `/users/{login}`, `/users/{login}/repos`); validateConnection hits `/rate_limit`; never fabricates email/name (leaves them null/empty when GitHub does not expose them); populates first-class `githubUsername` and `sourcingConfidence` columns; tagged as `source="GitHub Agent"`. Uses optional `GITHUB_TOKEN` for higher rate limits.
+- `WebSearchSourcingProvider` — sources real candidates via SerpAPI Google Search; builds queries from job title/skills/location with optional `extraKeywords`, `targetSites` (default linkedin.com/in, github.com), and `excludeSites`; pipes raw results through the existing `extractCandidates` lib (strict no-fabrication: emails always null, name/headline/location only when visible); confidence 0.85 for linkedin/github profiles, 0.5 for other sites; tagged as `source="Web Search"`. Requires `SERPAPI_KEY` env secret.
 - `resolveProvider(step)` — looks up DB setting, falls back to native
 - `resolveSourcingProvider()` — same but defaults to NativeOpenAISourcingProvider
 

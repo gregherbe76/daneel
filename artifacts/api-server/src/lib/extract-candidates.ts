@@ -20,6 +20,19 @@ export type ExtractedCandidate = {
 
 export type ExtractCandidatesResult = {
   candidates: ExtractedCandidate[];
+  /** Stats so callers can report an honest sourcing funnel. */
+  stats: {
+    /** Total raw results received. */
+    inputCount: number;
+    /** Results that survived URL classification (the actual extractor input). */
+    classifiedCount: number;
+    /** Candidates the LLM emitted before fabrication post-validation. */
+    llmEmittedCount: number;
+    /** Dropped because the LLM returned a URL we never sent. */
+    droppedFabricatedUrl: number;
+    /** Dropped because the evidence snippet didn't match anything we sent. */
+    droppedFabricatedEvidence: number;
+  };
 };
 
 const LINKEDIN_PROFILE_RE = /^https?:\/\/([a-z]{2,3}\.)?linkedin\.com\/in\/[^/?#]+/i;
@@ -144,7 +157,16 @@ export async function extractCandidates(input: {
   }
 
   if (filtered.length === 0) {
-    return { candidates: [] };
+    return {
+      candidates: [],
+      stats: {
+        inputCount: results.length,
+        classifiedCount: 0,
+        llmEmittedCount: 0,
+        droppedFabricatedUrl: 0,
+        droppedFabricatedEvidence: 0,
+      },
+    };
   }
 
   // Step 2: LLM extraction with strict no-fabrication system prompt.
@@ -164,7 +186,16 @@ export async function extractCandidates(input: {
     parsed = LlmResponseSchema.parse(JSON.parse(content));
   } catch (err) {
     logger.warn({ err, content }, "extractCandidates: failed to parse LLM response");
-    return { candidates: [] };
+    return {
+      candidates: [],
+      stats: {
+        inputCount: results.length,
+        classifiedCount: filtered.length,
+        llmEmittedCount: 0,
+        droppedFabricatedUrl: 0,
+        droppedFabricatedEvidence: 0,
+      },
+    };
   }
 
   // Step 3: post-validate. Only keep candidates whose profileUrl matches a
@@ -174,15 +205,19 @@ export async function extractCandidates(input: {
   const allowedSnippets = new Set(filtered.map((r) => r.snippet));
 
   const candidates: ExtractedCandidate[] = [];
+  let droppedFabricatedUrl = 0;
+  let droppedFabricatedEvidence = 0;
   for (const c of parsed.candidates) {
     if (!c.name || !c.profileUrl || !c.evidence) continue;
     const sourceType = linkToSourceType.get(c.profileUrl);
     if (!sourceType) {
       logger.warn({ profileUrl: c.profileUrl }, "extractCandidates: dropped candidate with fabricated URL");
+      droppedFabricatedUrl++;
       continue;
     }
     if (!allowedSnippets.has(c.evidence)) {
       logger.warn({ profileUrl: c.profileUrl }, "extractCandidates: dropped candidate with fabricated evidence");
+      droppedFabricatedEvidence++;
       continue;
     }
     candidates.push({
@@ -196,5 +231,14 @@ export async function extractCandidates(input: {
     });
   }
 
-  return { candidates };
+  return {
+    candidates,
+    stats: {
+      inputCount: results.length,
+      classifiedCount: filtered.length,
+      llmEmittedCount: parsed.candidates.length,
+      droppedFabricatedUrl,
+      droppedFabricatedEvidence,
+    },
+  };
 }

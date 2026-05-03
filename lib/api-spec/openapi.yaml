@@ -1373,7 +1373,7 @@ components:
     # ── PROVIDERS ──
     ProviderType:
       type: string
-      enum: [native_openai, custom_webhook, twin_webhook, github]
+      enum: [native_openai, custom_webhook, twin_webhook, github, web_search]
 
     WorkflowStepName:
       type: string
@@ -1408,12 +1408,37 @@ components:
           nullable: true
           description: Drop candidates whose latest public event is older than N months (post-fetch filter).
 
+    WebSearchProviderConfig:
+      type: object
+      description: Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.
+      properties:
+        extraKeywords:
+          type: string
+          nullable: true
+          description: Free-text keywords appended verbatim to the Google query (e.g. "remote", "fintech").
+        targetSites:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: |
+            Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to
+            `linkedin.com/in` and `github.com` when empty/omitted.
+        excludeSites:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Domains/paths excluded via `-site:` operators (e.g. "pinterest.com").
+
     AgentProviderConfig:
       type: object
       description: Per-provider tuning knobs. Only the section matching the provider type is read.
       properties:
         github:
           $ref: "#/components/schemas/GithubProviderConfig"
+        web_search:
+          $ref: "#/components/schemas/WebSearchProviderConfig"
 
     AgentProviderRecord:
       type: object

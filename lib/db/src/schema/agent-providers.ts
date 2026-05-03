@@ -18,8 +18,21 @@ export type GithubProviderConfig = {
   activeWithinMonths?: number | null;
 };
 
+export type WebSearchProviderConfig = {
+  /** Free-text keywords appended to the constructed Boolean query. */
+  extraKeywords?: string | null;
+  /**
+   * Sites the search should focus on. Used as `(site:a OR site:b)` filter.
+   * Defaults applied at query-build time when omitted/empty.
+   */
+  targetSites?: string[] | null;
+  /** Domains/paths excluded via `-site:` operators. */
+  excludeSites?: string[] | null;
+};
+
 export type AgentProviderConfig = {
   github?: GithubProviderConfig;
+  web_search?: WebSearchProviderConfig;
 };
 
 export const providerTypeEnum = pgEnum("provider_type", [
@@ -27,6 +40,7 @@ export const providerTypeEnum = pgEnum("provider_type", [
   "custom_webhook",
   "twin_webhook",
   "github",
+  "web_search",
 ]);
 
 export const workflowStepEnum = pgEnum("workflow_step", [

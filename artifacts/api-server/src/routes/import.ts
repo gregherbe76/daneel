@@ -358,6 +358,8 @@ router.post("/candidates/source", async (req, res) => {
     sourceTag =
       row.type === "github"
         ? "GitHub Agent"
+        : row.type === "web_search"
+        ? "Web Search"
         : row.type === "twin_webhook" || row.type === "custom_webhook"
         ? "Twin"
         : "Mock";
@@ -367,6 +369,8 @@ router.post("/candidates/source", async (req, res) => {
     sourceTag =
       resolved.provider.type === "github"
         ? "GitHub Agent"
+        : resolved.provider.type === "web_search"
+        ? "Web Search"
         : resolved.isTwin
         ? "Twin"
         : "Mock";
@@ -391,15 +395,24 @@ router.post("/candidates/source", async (req, res) => {
     mustHaveSkillsAssessment: [] as string[],
   };
 
-  // Call provider — throw on error so the catch below returns a clean message
+  // Call provider — throw on error so the catch below returns a clean message.
+  // Sourcing providers may return either a bare array (legacy native shape) or
+  // `{ candidates, stats }` (github / web_search). Normalise to an array here.
   let raw: SourcingCandidate[];
   try {
-    raw = (await provider.run({
+    const out = await provider.run({
       step: "sourcing",
       runId: 0,
       jobId: Number(jobId),
       payload: { job: jobPayload, insight, count: clampedCount, filters: { location, seniority } },
-    })) as SourcingCandidate[];
+    });
+    if (Array.isArray(out)) {
+      raw = out as SourcingCandidate[];
+    } else if (out && typeof out === "object" && Array.isArray((out as { candidates?: unknown }).candidates)) {
+      raw = (out as { candidates: SourcingCandidate[] }).candidates;
+    } else {
+      throw new Error("Provider returned an unexpected response format");
+    }
   } catch (err) {
     logger.error({ jobId, provider: provider.name, err }, "Sourcing provider call failed");
     res.status(502).json({
@@ -408,22 +421,24 @@ router.post("/candidates/source", async (req, res) => {
     return;
   }
 
-  if (!Array.isArray(raw)) {
-    res.status(502).json({ error: `Provider "${provider.name}" returned an unexpected response format.` });
-    return;
-  }
-
   // Deduplicate against existing candidates by githubUrl OR email — either
   // signal alone is enough to identify the same person. GitHub-sourced rows
   // may have no email; legacy imports may have no github URL.
   const existingRows = await db
-    .select({ email: candidatesTable.email, githubUrl: candidatesTable.githubUrl })
+    .select({
+      email: candidatesTable.email,
+      githubUrl: candidatesTable.githubUrl,
+      linkedIn: candidatesTable.linkedIn,
+    })
     .from(candidatesTable);
   const existingEmails = new Set(
     existingRows.map((r) => r.email?.toLowerCase()).filter((v): v is string => !!v),
   );
   const existingGithub = new Set(
     existingRows.map((r) => r.githubUrl?.toLowerCase()).filter((v): v is string => !!v),
+  );
+  const existingLinkedIn = new Set(
+    existingRows.map((r) => r.linkedIn?.toLowerCase()).filter((v): v is string => !!v),
   );
 
   const created: {
@@ -437,12 +452,15 @@ router.post("/candidates/source", async (req, res) => {
   for (const c of raw) {
     const emailKey = c.email?.toLowerCase() ?? null;
     const githubKey = c.githubUrl?.toLowerCase() || null;
-    // Need at least one identity signal
-    if (!emailKey && !githubKey) { skipped++; continue; }
+    const linkedinKey = c.linkedinUrl?.toLowerCase() || null;
+    // Need at least one identity signal — email, github, or linkedin profile
+    if (!emailKey && !githubKey && !linkedinKey) { skipped++; continue; }
     if (githubKey && existingGithub.has(githubKey)) { skipped++; continue; }
     if (emailKey && existingEmails.has(emailKey)) { skipped++; continue; }
+    if (linkedinKey && existingLinkedIn.has(linkedinKey)) { skipped++; continue; }
     if (emailKey) existingEmails.add(emailKey);
     if (githubKey) existingGithub.add(githubKey);
+    if (linkedinKey) existingLinkedIn.add(linkedinKey);
 
     try {
       const [inserted] = await db

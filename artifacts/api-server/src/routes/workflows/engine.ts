@@ -93,11 +93,16 @@ async function runSourcing(
       ? null
       : rawSourcingResult.stats ?? null;
 
-    // Deduplicate by githubUrl OR email against existing candidates.
-    // Either signal is enough to identify the same person; GitHub-sourced rows
-    // may have no email, while imported rows may have no github URL.
+    // Deduplicate by githubUrl OR email OR linkedinUrl against existing
+    // candidates. Any one signal is enough to identify the same person:
+    // GitHub-sourced rows may have no email, Web Search (LinkedIn) results
+    // have only a profile URL, and imported rows may have only an email.
     const existing = await db
-      .select({ email: candidatesTable.email, githubUrl: candidatesTable.githubUrl })
+      .select({
+        email: candidatesTable.email,
+        githubUrl: candidatesTable.githubUrl,
+        linkedIn: candidatesTable.linkedIn,
+      })
       .from(candidatesTable);
     const existingEmails = new Set(
       existing.map((c) => c.email?.toLowerCase()).filter((v): v is string => !!v),
@@ -105,11 +110,24 @@ async function runSourcing(
     const existingGithub = new Set(
       existing.map((c) => c.githubUrl?.toLowerCase()).filter((v): v is string => !!v),
     );
+    const existingLinkedIn = new Set(
+      existing.map((c) => c.linkedIn?.toLowerCase()).filter((v): v is string => !!v),
+    );
 
     const newCandidateIds: number[] = [];
+    let skippedNoIdentity = 0;
     for (const c of candidates) {
       const emailKey = c.email?.toLowerCase() ?? null;
       const githubKey = c.githubUrl?.toLowerCase() || null;
+      const linkedinKey = c.linkedinUrl?.toLowerCase() || null;
+      // Require at least one durable identity signal — otherwise we cannot
+      // dedupe on reruns and would create infinite duplicates of the same
+      // generic-website hit.
+      if (!emailKey && !githubKey && !linkedinKey) {
+        logger.warn({ name: c.name }, "Sourcing skipped candidate with no identity signal");
+        skippedNoIdentity++;
+        continue;
+      }
       if (githubKey && existingGithub.has(githubKey)) {
         logger.warn({ githubUrl: c.githubUrl }, "Sourcing skipped duplicate github URL");
         continue;
@@ -118,8 +136,13 @@ async function runSourcing(
         logger.warn({ email: c.email }, "Sourcing skipped duplicate email");
         continue;
       }
+      if (linkedinKey && existingLinkedIn.has(linkedinKey)) {
+        logger.warn({ linkedinUrl: c.linkedinUrl }, "Sourcing skipped duplicate linkedin URL");
+        continue;
+      }
       if (emailKey) existingEmails.add(emailKey);
       if (githubKey) existingGithub.add(githubKey);
+      if (linkedinKey) existingLinkedIn.add(linkedinKey);
 
       // Validate the discovered email so recruiters don't waste outreach on
       // dead addresses. We use a lightweight MX-record lookup (no third-party
@@ -166,6 +189,7 @@ async function runSourcing(
     await logStep(runId, "sourcing", "completed", { jobTitle: job.title, provider: provider.name, sourceTag }, {
       generated: candidates.length,
       saved: newCandidateIds.length,
+      skippedNoIdentity,
       // Persisted so the run-detail UI can explain why a "0 candidates" run
       // was actually filtered (empty bios / stale activity) vs. a broken search.
       stats: sourcingStats,
@@ -711,7 +735,12 @@ export async function runWorkflowEngine(
           });
         } else {
           // Real mode with a real provider → tag with provider-specific source
-          const realSourceTag = sourcingProvider.type === "github" ? "GitHub Agent" : SOURCE_TWIN;
+          const realSourceTag =
+            sourcingProvider.type === "github"
+              ? "GitHub Agent"
+              : sourcingProvider.type === "web_search"
+              ? "Web Search"
+              : SOURCE_TWIN;
           try {
             await runSourcing(runId, jobId, effectiveJob, insight, realSourceTag, sourcingProvider);
           } catch (err) {

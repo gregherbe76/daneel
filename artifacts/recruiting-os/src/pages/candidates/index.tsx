@@ -35,6 +35,14 @@ const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
     label: "AI Sourced",
     className: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   },
+  "GitHub Agent": {
+    label: "GitHub",
+    className: "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400",
+  },
+  "Web Search": {
+    label: "Web",
+    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  },
 };
 
 const EMAIL_FILTER_PARAM = "email";

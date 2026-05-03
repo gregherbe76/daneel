@@ -28,6 +28,7 @@ import {
   Zap,
   Play,
   Github,
+  Globe,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -35,7 +36,7 @@ import {
 type Provider = {
   id: number;
   name: string;
-  type: "native_openai" | "custom_webhook" | "twin_webhook" | "github";
+  type: "native_openai" | "custom_webhook" | "twin_webhook" | "github" | "web_search";
   enabled: boolean;
 };
 
@@ -93,6 +94,14 @@ function SourceBadge({ source }: { source: string | null }) {
       <Badge variant="outline" className="text-[10px] bg-slate-500/10 text-slate-700 border-slate-200 shrink-0">
         <Github className="h-2.5 w-2.5 mr-1" />
         GitHub
+      </Badge>
+    );
+  }
+  if (source === "Web Search") {
+    return (
+      <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 border-emerald-200 shrink-0">
+        <Globe className="h-2.5 w-2.5 mr-1" />
+        Web
       </Badge>
     );
   }
@@ -159,7 +168,7 @@ function ProviderCard({
   description: string;
   selected: boolean;
   onClick: () => void;
-  tag?: "twin" | "mock" | "github";
+  tag?: "twin" | "mock" | "github" | "web_search";
 }) {
   return (
     <button
@@ -191,6 +200,11 @@ function ProviderCard({
           {tag === "github" && (
             <Badge variant="outline" className="text-[10px] bg-slate-500/10 text-slate-700 border-slate-200">
               <Github className="h-2.5 w-2.5 mr-1" />GitHub
+            </Badge>
+          )}
+          {tag === "web_search" && (
+            <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 border-emerald-200">
+              <Globe className="h-2.5 w-2.5 mr-1" />Web
             </Badge>
           )}
         </div>
@@ -241,7 +255,11 @@ export function FindCandidatesModal({
         setProviders(enabled);
         // auto-select: prefer external real providers (github/twin/webhook), fall back to native
         const real = enabled.find(
-          (p) => p.type === "github" || p.type === "twin_webhook" || p.type === "custom_webhook",
+          (p) =>
+            p.type === "github" ||
+            p.type === "web_search" ||
+            p.type === "twin_webhook" ||
+            p.type === "custom_webhook",
         );
         setSelectedProviderId(real ? real.id : null);
       })
@@ -283,17 +301,29 @@ export function FindCandidatesModal({
 
   const nativeOption = { id: null, label: "Native AI (demo)", description: "Generates realistic mock candidates using GPT. Not real people.", tag: "mock" as const };
   const externalOptions = providers
-    .filter((p) => p.type === "twin_webhook" || p.type === "custom_webhook" || p.type === "github")
+    .filter(
+      (p) =>
+        p.type === "twin_webhook" ||
+        p.type === "custom_webhook" ||
+        p.type === "github" ||
+        p.type === "web_search",
+    )
     .map((p) => ({
       id: p.id,
       label: p.name,
       description:
         p.type === "github"
           ? "GitHub Agent — real public GitHub users matching the role."
+          : p.type === "web_search"
+          ? "Web Search — real LinkedIn/GitHub profiles via Google (SerpAPI)."
           : p.type === "twin_webhook"
           ? "Twin webhook — real external candidates."
           : "Custom webhook provider.",
-      tag: (p.type === "github" ? "github" : "twin") as "github" | "twin",
+      tag: (p.type === "github"
+        ? "github"
+        : p.type === "web_search"
+        ? "web_search"
+        : "twin") as "github" | "twin" | "web_search",
     }));
 
   const canFind = status !== "loading";

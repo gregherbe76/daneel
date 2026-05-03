@@ -61,13 +61,14 @@ import {
   Webhook,
   Zap,
   Github,
+  Globe,
   Eye,
   Search,
 } from "lucide-react";
 
 // ── types ────────────────────────────────────────────────────────────────────
 
-type ProviderType = "native_openai" | "custom_webhook" | "twin_webhook" | "github";
+type ProviderType = "native_openai" | "custom_webhook" | "twin_webhook" | "github" | "web_search";
 type WorkflowStep =
   | "job_understanding"
   | "candidate_matching"
@@ -83,7 +84,10 @@ interface Provider {
   baseUrl?: string | null;
   webhookUrl?: string | null;
   apiKeyEncryptedPlaceholder?: string | null;
-  config?: { github?: GithubProviderConfig | null } | null;
+  config?: {
+    github?: GithubProviderConfig | null;
+    web_search?: WebSearchProviderConfig | null;
+  } | null;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -103,6 +107,7 @@ const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
   custom_webhook: "Custom Webhook",
   twin_webhook: "Twin Webhook",
   github: "GitHub Agent",
+  web_search: "Web Search",
 };
 
 const PROVIDER_TYPE_ICONS: Record<ProviderType, React.ComponentType<{ className?: string }>> = {
@@ -110,13 +115,14 @@ const PROVIDER_TYPE_ICONS: Record<ProviderType, React.ComponentType<{ className?
   custom_webhook: Webhook,
   twin_webhook: Zap,
   github: Github,
+  web_search: Globe,
 };
 
 // ── form schema ──────────────────────────────────────────────────────────────
 
 const providerSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  type: z.enum(["native_openai", "custom_webhook", "twin_webhook", "github"]),
+  type: z.enum(["native_openai", "custom_webhook", "twin_webhook", "github", "web_search"]),
   baseUrl: z.string().optional(),
   webhookUrl: z.string().optional(),
   apiKeyPlaceholder: z.string().optional(),
@@ -127,6 +133,11 @@ const providerSchema = z.object({
   githubMinRepos: z.string().optional(),
   githubRequireBio: z.boolean().default(false),
   githubActiveWithinMonths: z.string().optional(),
+  // Web Search (SerpAPI) tuning. Sites are entered as comma-separated strings
+  // and split into arrays at submit time so the UI stays simple.
+  webSearchExtraKeywords: z.string().optional(),
+  webSearchTargetSites: z.string().optional(),
+  webSearchExcludeSites: z.string().optional(),
 });
 type ProviderFormValues = z.infer<typeof providerSchema>;
 
@@ -137,6 +148,22 @@ interface GithubProviderConfig {
   minRepos?: number | null;
   requireBio?: boolean | null;
   activeWithinMonths?: number | null;
+}
+
+interface WebSearchProviderConfig {
+  extraKeywords?: string | null;
+  targetSites?: string[] | null;
+  excludeSites?: string[] | null;
+}
+
+/** Split a comma/space/newline-separated free-text field into a clean array. */
+function splitSites(input?: string): string[] | null {
+  if (!input) return null;
+  const parts = input
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.length > 0 ? parts : null;
 }
 
 // ── test connection badge ────────────────────────────────────────────────────
@@ -553,6 +580,11 @@ function ProviderDialog({
             editProvider.config?.github?.activeWithinMonths != null
               ? String(editProvider.config.github.activeWithinMonths)
               : "",
+          webSearchExtraKeywords: editProvider.config?.web_search?.extraKeywords ?? "",
+          webSearchTargetSites:
+            editProvider.config?.web_search?.targetSites?.join(", ") ?? "",
+          webSearchExcludeSites:
+            editProvider.config?.web_search?.excludeSites?.join(", ") ?? "",
         }
       : { name: "", type: "native_openai", enabled: true, githubRequireBio: false },
   });
@@ -560,7 +592,7 @@ function ProviderDialog({
   const providerType = watch("type");
 
   async function onSubmit(values: ProviderFormValues) {
-    let config: { github?: GithubProviderConfig } | null = null;
+    let config: { github?: GithubProviderConfig; web_search?: WebSearchProviderConfig } | null = null;
     if (values.type === "github") {
       const parseInt0 = (v?: string) => {
         const n = parseInt((v ?? "").trim(), 10);
@@ -582,6 +614,14 @@ function ProviderDialog({
         gh.requireBio === true ||
         gh.activeWithinMonths != null;
       if (hasAny) config = { github: gh };
+    } else if (values.type === "web_search") {
+      const ws: WebSearchProviderConfig = {
+        extraKeywords: values.webSearchExtraKeywords?.trim() || null,
+        targetSites: splitSites(values.webSearchTargetSites),
+        excludeSites: splitSites(values.webSearchExcludeSites),
+      };
+      const hasAny = ws.extraKeywords || (ws.targetSites && ws.targetSites.length > 0) || (ws.excludeSites && ws.excludeSites.length > 0);
+      if (hasAny) config = { web_search: ws };
     }
 
     const payload = {
@@ -655,6 +695,12 @@ function ProviderDialog({
                   <span className="flex flex-col">
                     <span className="font-medium">GitHub Agent</span>
                     <span className="text-xs text-muted-foreground">Source real public GitHub users via the GitHub REST API</span>
+                  </span>
+                </SelectItem>
+                <SelectItem value="web_search">
+                  <span className="flex flex-col">
+                    <span className="font-medium">Web Search (SerpAPI)</span>
+                    <span className="text-xs text-muted-foreground">Source real LinkedIn / GitHub / personal-site profiles via Google (SerpAPI)</span>
                   </span>
                 </SelectItem>
               </SelectContent>
@@ -808,6 +854,59 @@ function ProviderDialog({
                   })(),
                 }}
               />
+            </>
+          )}
+
+          {providerType === "web_search" && (
+            <>
+              <div className="rounded-md bg-muted/50 border border-border p-3 text-sm text-muted-foreground">
+                Sources real candidates by searching Google via SerpAPI. Requires the{" "}
+                <code className="text-xs">SERPAPI_KEY</code> secret. Profile URLs and headlines come straight from
+                Google&apos;s organic results — no fabricated emails, locations, or companies.
+              </div>
+
+              <div className="space-y-3 rounded-md border border-border p-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Search tuning</p>
+                  <p className="text-xs text-muted-foreground">
+                    Optional knobs added to the Google query. Leave blank to use sensible defaults derived from the job.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Extra keywords</Label>
+                  <Input
+                    {...register("webSearchExtraKeywords")}
+                    placeholder="e.g. remote fintech open-source"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Free-text terms appended verbatim to every query.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Target sites</Label>
+                  <Input
+                    {...register("webSearchTargetSites")}
+                    placeholder="e.g. linkedin.com/in, github.com"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated. Joined as <code className="text-xs">(site:a OR site:b ...)</code>. Defaults to{" "}
+                    <code className="text-xs">linkedin.com/in</code> and <code className="text-xs">github.com</code> when empty.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Exclude sites</Label>
+                  <Input
+                    {...register("webSearchExcludeSites")}
+                    placeholder="e.g. pinterest.com, slideshare.net"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated domains to drop from results via <code className="text-xs">-site:</code>.
+                  </p>
+                </div>
+              </div>
             </>
           )}
 

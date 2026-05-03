@@ -1177,7 +1177,13 @@ export const GetLatestJobWorkflowResponse = zod.object({
 export const ListProvidersResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
-  type: zod.enum(["native_openai", "custom_webhook", "twin_webhook", "github"]),
+  type: zod.enum([
+    "native_openai",
+    "custom_webhook",
+    "twin_webhook",
+    "github",
+    "web_search",
+  ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
   apiKeyEncryptedPlaceholder: zod.string().nullish(),
@@ -1226,6 +1232,31 @@ export const ListProvidersResponseItem = zod.object({
         .describe(
           "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
         ),
+      web_search: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the Google query (e.g. \"remote\", \"fintech\").',
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              'Domains\/paths excluded via `-site:` operators (e.g. \"pinterest.com\").',
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -1242,7 +1273,13 @@ export const ListProvidersResponse = zod.array(ListProvidersResponseItem);
  */
 export const CreateProviderBody = zod.object({
   name: zod.string(),
-  type: zod.enum(["native_openai", "custom_webhook", "twin_webhook", "github"]),
+  type: zod.enum([
+    "native_openai",
+    "custom_webhook",
+    "twin_webhook",
+    "github",
+    "web_search",
+  ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
   apiKeyPlaceholder: zod.string().nullish(),
@@ -1291,6 +1328,31 @@ export const CreateProviderBody = zod.object({
         .describe(
           "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
         ),
+      web_search: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the Google query (e.g. \"remote\", \"fintech\").',
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              'Domains\/paths excluded via `-site:` operators (e.g. \"pinterest.com\").',
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -1309,7 +1371,13 @@ export const GetProviderParams = zod.object({
 export const GetProviderResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
-  type: zod.enum(["native_openai", "custom_webhook", "twin_webhook", "github"]),
+  type: zod.enum([
+    "native_openai",
+    "custom_webhook",
+    "twin_webhook",
+    "github",
+    "web_search",
+  ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
   apiKeyEncryptedPlaceholder: zod.string().nullish(),
@@ -1357,6 +1425,31 @@ export const GetProviderResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+        ),
+      web_search: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the Google query (e.g. \"remote\", \"fintech\").',
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              'Domains\/paths excluded via `-site:` operators (e.g. \"pinterest.com\").',
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
         ),
     })
     .describe(
@@ -1377,7 +1470,13 @@ export const UpdateProviderParams = zod.object({
 
 export const UpdateProviderBody = zod.object({
   name: zod.string(),
-  type: zod.enum(["native_openai", "custom_webhook", "twin_webhook", "github"]),
+  type: zod.enum([
+    "native_openai",
+    "custom_webhook",
+    "twin_webhook",
+    "github",
+    "web_search",
+  ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
   apiKeyPlaceholder: zod.string().nullish(),
@@ -1426,6 +1525,31 @@ export const UpdateProviderBody = zod.object({
         .describe(
           "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
         ),
+      web_search: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the Google query (e.g. \"remote\", \"fintech\").',
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              'Domains\/paths excluded via `-site:` operators (e.g. \"pinterest.com\").',
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -1437,7 +1561,13 @@ export const UpdateProviderBody = zod.object({
 export const UpdateProviderResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
-  type: zod.enum(["native_openai", "custom_webhook", "twin_webhook", "github"]),
+  type: zod.enum([
+    "native_openai",
+    "custom_webhook",
+    "twin_webhook",
+    "github",
+    "web_search",
+  ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
   apiKeyEncryptedPlaceholder: zod.string().nullish(),
@@ -1485,6 +1615,31 @@ export const UpdateProviderResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+        ),
+      web_search: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the Google query (e.g. \"remote\", \"fintech\").',
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              'Domains\/paths excluded via `-site:` operators (e.g. \"pinterest.com\").',
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
         ),
     })
     .describe(
@@ -1517,7 +1672,13 @@ export const ToggleProviderBody = zod.object({
 export const ToggleProviderResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
-  type: zod.enum(["native_openai", "custom_webhook", "twin_webhook", "github"]),
+  type: zod.enum([
+    "native_openai",
+    "custom_webhook",
+    "twin_webhook",
+    "github",
+    "web_search",
+  ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
   apiKeyEncryptedPlaceholder: zod.string().nullish(),
@@ -1565,6 +1726,31 @@ export const ToggleProviderResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+        ),
+      web_search: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the Google query (e.g. \"remote\", \"fintech\").',
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              'Domains\/paths excluded via `-site:` operators (e.g. \"pinterest.com\").',
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
         ),
     })
     .describe(
@@ -1705,6 +1891,7 @@ export const ListProviderStepSettingsResponseItem = zod.object({
       "custom_webhook",
       "twin_webhook",
       "github",
+      "web_search",
     ]),
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
@@ -1753,6 +1940,31 @@ export const ListProviderStepSettingsResponseItem = zod.object({
           .optional()
           .describe(
             "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+          ),
+        web_search: zod
+          .object({
+            extraKeywords: zod
+              .string()
+              .nullish()
+              .describe(
+                'Free-text keywords appended verbatim to the Google query (e.g. \"remote\", \"fintech\").',
+              ),
+            targetSites: zod
+              .array(zod.string())
+              .nullish()
+              .describe(
+                "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+              ),
+            excludeSites: zod
+              .array(zod.string())
+              .nullish()
+              .describe(
+                'Domains\/paths excluded via `-site:` operators (e.g. \"pinterest.com\").',
+              ),
+          })
+          .optional()
+          .describe(
+            "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
           ),
       })
       .describe(
@@ -1804,6 +2016,7 @@ export const UpsertProviderStepSettingResponse = zod.object({
       "custom_webhook",
       "twin_webhook",
       "github",
+      "web_search",
     ]),
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
@@ -1852,6 +2065,31 @@ export const UpsertProviderStepSettingResponse = zod.object({
           .optional()
           .describe(
             "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+          ),
+        web_search: zod
+          .object({
+            extraKeywords: zod
+              .string()
+              .nullish()
+              .describe(
+                'Free-text keywords appended verbatim to the Google query (e.g. \"remote\", \"fintech\").',
+              ),
+            targetSites: zod
+              .array(zod.string())
+              .nullish()
+              .describe(
+                "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+              ),
+            excludeSites: zod
+              .array(zod.string())
+              .nullish()
+              .describe(
+                'Domains\/paths excluded via `-site:` operators (e.g. \"pinterest.com\").',
+              ),
+          })
+          .optional()
+          .describe(
+            "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
           ),
       })
       .describe(
