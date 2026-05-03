@@ -1,9 +1,10 @@
 import { Link, useLocation } from "wouter";
-import { Cpu, Mail } from "lucide-react";
+import { Cpu, Mail, Bell } from "lucide-react";
 
 const TABS = [
   { href: "/settings/providers", label: "Agent Providers", icon: Cpu },
   { href: "/settings/email-revalidation", label: "Email Re-checks", icon: Mail },
+  { href: "/settings/notifications", label: "Notifications", icon: Bell },
 ];
 
 export function SettingsTabs() {

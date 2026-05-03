@@ -1,11 +1,18 @@
 import { Router, type IRouter } from "express";
-import { UpdateEmailRevalidationSettingsBody } from "@workspace/api-zod";
+import {
+  UpdateEmailRevalidationSettingsBody,
+  UpdateNotificationSettingsBody,
+} from "@workspace/api-zod";
 import {
   getEmailRevalidationSettings,
   updateEmailRevalidationSettings,
   listRecentEmailRevalidationRuns,
   sweepStaleEmailValidations,
 } from "../lib/email-revalidation";
+import {
+  getNotificationSettings,
+  updateNotificationSettings,
+} from "../lib/notifications";
 
 const router: IRouter = Router();
 
@@ -52,5 +59,28 @@ router.post(
     res.json(run);
   },
 );
+
+router.get("/settings/notifications", async (_req, res): Promise<void> => {
+  const settings = await getNotificationSettings();
+  res.json(settings);
+});
+
+router.put("/settings/notifications", async (req, res): Promise<void> => {
+  const parsed = UpdateNotificationSettingsBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const updated = await updateNotificationSettings(parsed.data);
+  req.log.info(
+    {
+      emailEnabled: updated.emailEnabled,
+      emailRecipientCount: updated.emailRecipients.length,
+      slackEnabled: updated.slackEnabled,
+    },
+    "Notification settings updated",
+  );
+  res.json(updated);
+});
 
 export default router;

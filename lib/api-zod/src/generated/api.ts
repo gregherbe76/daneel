@@ -2339,6 +2339,61 @@ export const RunEmailRevalidationSweepNowResponse = zod.object({
 });
 
 /**
+ * @summary Get the current outbound notification preferences
+ */
+export const GetNotificationSettingsResponse = zod
+  .object({
+    emailEnabled: zod.boolean(),
+    emailRecipients: zod
+      .array(zod.string())
+      .describe(
+        "Recipient email addresses. Stored server-side as a comma-separated string.",
+      ),
+    slackEnabled: zod.boolean(),
+    slackWebhookUrl: zod.string().nullish(),
+    emailDeliveryConfigured: zod
+      .boolean()
+      .describe(
+        "True when the server has a SENDGRID_API_KEY configured. When false, email notifications cannot actually be delivered even if enabled.",
+      ),
+    updatedAt: zod.coerce.date(),
+  })
+  .describe(
+    "Outbound notification preferences for email validation regressions.",
+  );
+
+/**
+ * @summary Update the outbound notification preferences
+ */
+export const UpdateNotificationSettingsBody = zod.object({
+  emailEnabled: zod.boolean(),
+  emailRecipients: zod.array(zod.string()),
+  slackEnabled: zod.boolean(),
+  slackWebhookUrl: zod.string().nullish(),
+});
+
+export const UpdateNotificationSettingsResponse = zod
+  .object({
+    emailEnabled: zod.boolean(),
+    emailRecipients: zod
+      .array(zod.string())
+      .describe(
+        "Recipient email addresses. Stored server-side as a comma-separated string.",
+      ),
+    slackEnabled: zod.boolean(),
+    slackWebhookUrl: zod.string().nullish(),
+    emailDeliveryConfigured: zod
+      .boolean()
+      .describe(
+        "True when the server has a SENDGRID_API_KEY configured. When false, email notifications cannot actually be delivered even if enabled.",
+      ),
+    updatedAt: zod.coerce.date(),
+  })
+  .describe(
+    "Outbound notification preferences for email validation regressions.",
+  );
+
+/**
  * @summary Enrich low-confidence candidates from a completed run and re-score them
  */
 export const ImproveAndRerunBody = zod.object({

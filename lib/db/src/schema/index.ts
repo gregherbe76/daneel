@@ -9,3 +9,4 @@ export * from "./email-revalidation-settings";
 export * from "./email-status-changes";
 export * from "./branding-settings";
 export * from "./email-revalidation-runs";
+export * from "./notification-settings";

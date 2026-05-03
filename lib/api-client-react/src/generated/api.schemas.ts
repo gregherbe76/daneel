@@ -539,6 +539,27 @@ export interface EmailRevalidationRun {
 }
 
 /**
+ * Outbound notification preferences for email validation regressions.
+ */
+export interface NotificationSettings {
+  emailEnabled: boolean;
+  /** Recipient email addresses. Stored server-side as a comma-separated string. */
+  emailRecipients: string[];
+  slackEnabled: boolean;
+  slackWebhookUrl?: string | null;
+  /** True when the server has a SENDGRID_API_KEY configured. When false, email notifications cannot actually be delivered even if enabled. */
+  emailDeliveryConfigured: boolean;
+  updatedAt: string;
+}
+
+export interface UpdateNotificationSettingsBody {
+  emailEnabled: boolean;
+  emailRecipients: string[];
+  slackEnabled: boolean;
+  slackWebhookUrl?: string | null;
+}
+
+/**
  * Enforces strict data separation. "real" uses only Twin-sourced or imported candidates. "mock" uses only AI-generated mock candidates. "fallback" means a real run where the Twin provider failed and native was used instead.
 
  */

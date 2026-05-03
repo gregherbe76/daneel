@@ -1,0 +1,265 @@
+import { useEffect, useState } from "react";
+import {
+  useGetNotificationSettings,
+  useUpdateNotificationSettings,
+  getGetNotificationSettingsQueryKey,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2, Bell, RotateCcw, AlertTriangle } from "lucide-react";
+import { SettingsTabs } from "@/components/settings-tabs";
+
+function parseRecipients(raw: string): string[] {
+  return raw
+    .split(/[\s,;\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+export default function NotificationsSettingsPage() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const settingsQuery = useGetNotificationSettings();
+  const updateMutation = useUpdateNotificationSettings();
+
+  const [emailEnabled, setEmailEnabled] = useState(false);
+  const [emailRecipients, setEmailRecipients] = useState("");
+  const [slackEnabled, setSlackEnabled] = useState(false);
+  const [slackWebhookUrl, setSlackWebhookUrl] = useState("");
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (settingsQuery.data && !dirty) {
+      setEmailEnabled(settingsQuery.data.emailEnabled);
+      setEmailRecipients(settingsQuery.data.emailRecipients.join(", "));
+      setSlackEnabled(settingsQuery.data.slackEnabled);
+      setSlackWebhookUrl(settingsQuery.data.slackWebhookUrl ?? "");
+    }
+  }, [settingsQuery.data, dirty]);
+
+  const markDirty = () => setDirty(true);
+
+  const handleSave = async () => {
+    const recipients = parseRecipients(emailRecipients);
+    if (emailEnabled && recipients.length === 0) {
+      toast({
+        title: "Add at least one recipient",
+        description: "Email notifications need at least one recipient address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (slackEnabled && !slackWebhookUrl.trim()) {
+      toast({
+        title: "Slack webhook required",
+        description: "Add a Slack webhook URL or turn Slack notifications off.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await updateMutation.mutateAsync({
+        data: {
+          emailEnabled,
+          emailRecipients: recipients,
+          slackEnabled,
+          slackWebhookUrl: slackWebhookUrl.trim() || null,
+        },
+      });
+      await queryClient.invalidateQueries({
+        queryKey: getGetNotificationSettingsQueryKey(),
+      });
+      setDirty(false);
+      toast({
+        title: "Notification settings saved",
+        description: "New regressions will be delivered using these channels.",
+      });
+    } catch (err) {
+      toast({
+        title: "Failed to save",
+        description: err instanceof Error ? err.message : String(err),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReset = () => {
+    if (!settingsQuery.data) return;
+    setEmailEnabled(settingsQuery.data.emailEnabled);
+    setEmailRecipients(settingsQuery.data.emailRecipients.join(", "));
+    setSlackEnabled(settingsQuery.data.slackEnabled);
+    setSlackWebhookUrl(settingsQuery.data.slackWebhookUrl ?? "");
+    setDirty(false);
+  };
+
+  if (settingsQuery.isLoading) {
+    return (
+      <>
+        <SettingsTabs />
+        <div className="p-8 flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading settings…
+        </div>
+      </>
+    );
+  }
+
+  if (settingsQuery.error) {
+    return (
+      <>
+        <SettingsTabs />
+        <div className="p-8 text-destructive">
+          Failed to load settings: {String(settingsQuery.error)}
+        </div>
+      </>
+    );
+  }
+
+  const updatedAt = settingsQuery.data?.updatedAt
+    ? new Date(settingsQuery.data.updatedAt).toLocaleString()
+    : "—";
+  const emailDeliveryConfigured =
+    settingsQuery.data?.emailDeliveryConfigured ?? false;
+
+  return (
+    <>
+      <SettingsTabs />
+      <div className="p-8 max-w-3xl">
+        <div className="mb-8 flex items-start gap-3">
+          <div className="h-10 w-10 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <Bell className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              Email Regression Notifications
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Get pinged the moment a previously verified candidate email goes
+              bad, instead of waiting until you next open the inbox.
+              Notifications follow the same 24-hour dedupe window as the inbox.
+            </p>
+          </div>
+        </div>
+
+        <div className="border border-border rounded-lg bg-card p-6 space-y-6">
+          <div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-base font-semibold">Email</Label>
+                <p className="text-sm text-muted-foreground">
+                  Send a plain-text email when a regression is recorded.
+                </p>
+              </div>
+              <Switch
+                checked={emailEnabled}
+                onCheckedChange={(v) => {
+                  setEmailEnabled(v);
+                  markDirty();
+                }}
+                data-testid="switch-email-enabled"
+              />
+            </div>
+            {emailEnabled && !emailDeliveryConfigured ? (
+              <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>
+                  Email delivery isn't configured on the server (no
+                  SENDGRID_API_KEY). Notifications will be skipped until an
+                  admin sets it up.
+                </span>
+              </div>
+            ) : null}
+            <div className="mt-4 grid gap-2">
+              <Label htmlFor="email-recipients">Recipients</Label>
+              <Textarea
+                id="email-recipients"
+                placeholder="alice@example.com, bob@example.com"
+                value={emailRecipients}
+                onChange={(e) => {
+                  setEmailRecipients(e.target.value);
+                  markDirty();
+                }}
+                rows={3}
+                data-testid="input-email-recipients"
+              />
+              <p className="text-xs text-muted-foreground">
+                Comma-, space-, or newline-separated email addresses.
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t border-border pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label className="text-base font-semibold">Slack</Label>
+                <p className="text-sm text-muted-foreground">
+                  Post a message to a Slack channel via incoming webhook.
+                </p>
+              </div>
+              <Switch
+                checked={slackEnabled}
+                onCheckedChange={(v) => {
+                  setSlackEnabled(v);
+                  markDirty();
+                }}
+                data-testid="switch-slack-enabled"
+              />
+            </div>
+            <div className="mt-4 grid gap-2">
+              <Label htmlFor="slack-webhook">Webhook URL</Label>
+              <Input
+                id="slack-webhook"
+                type="url"
+                placeholder="https://hooks.slack.com/services/…"
+                value={slackWebhookUrl}
+                onChange={(e) => {
+                  setSlackWebhookUrl(e.target.value);
+                  markDirty();
+                }}
+                data-testid="input-slack-webhook"
+              />
+              <p className="text-xs text-muted-foreground">
+                Create one in Slack under Apps → Incoming Webhooks.
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center gap-3 border-t border-border">
+            <Button
+              onClick={handleSave}
+              disabled={!dirty || updateMutation.isPending}
+              data-testid="button-save-notifications"
+            >
+              {updateMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Saving…
+                </>
+              ) : (
+                "Save changes"
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleReset}
+              disabled={!dirty || updateMutation.isPending}
+              className="gap-2"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Reset
+            </Button>
+            <p className="text-xs text-muted-foreground ml-auto">
+              Last updated: {updatedAt}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

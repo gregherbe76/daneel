@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { validateEmail } from "./email-validation";
 import { logger } from "./logger";
+import { notifyRegression } from "./notifications";
 
 /**
  * Default values for the singleton settings row, seeded from env vars on first
@@ -165,8 +166,8 @@ export async function revalidateCandidateEmail(candidateId: number) {
   const previousStatus = candidate.emailValidationStatus;
   const previousReason = candidate.emailValidationReason;
 
-  return await db.transaction(async (tx) => {
-    const [updated] = await tx
+  const { updated, insertedChange } = await db.transaction(async (tx) => {
+    const [updatedRow] = await tx
       .update(candidatesTable)
       .set({
         emailValidationStatus: result.status,
@@ -176,6 +177,8 @@ export async function revalidateCandidateEmail(candidateId: number) {
       })
       .where(sql`${candidatesTable.id} = ${candidateId}`)
       .returning();
+
+    let insertedChange: typeof emailStatusChangesTable.$inferSelect | null = null;
 
     if (isRegression(previousStatus, result.status)) {
       // Collapse repeated regressions in the same 24h window — if the candidate
@@ -204,19 +207,47 @@ export async function revalidateCandidateEmail(candidateId: number) {
             changedAt: new Date(),
           })
           .where(eq(emailStatusChangesTable.id, recent.id));
+        // Intentionally no notification dispatch — the prior insert in the
+        // same 24h window already triggered one (or chose not to). This keeps
+        // notifications on the same dedupe window as the inbox.
       } else {
-        await tx.insert(emailStatusChangesTable).values({
-          candidateId,
-          previousStatus: previousStatus ?? "unchecked",
-          newStatus: result.status,
-          previousReason: previousReason ?? null,
-          newReason: result.reason,
-        });
+        const [created] = await tx
+          .insert(emailStatusChangesTable)
+          .values({
+            candidateId,
+            previousStatus: previousStatus ?? "unchecked",
+            newStatus: result.status,
+            previousReason: previousReason ?? null,
+            newReason: result.reason,
+          })
+          .returning();
+        insertedChange = created ?? null;
       }
     }
 
-    return updated ?? candidate;
+    return { updated: updatedRow ?? candidate, insertedChange };
   });
+
+  if (insertedChange) {
+    // Fire-and-await outside the transaction so a flaky outbound webhook
+    // never holds row locks or rolls back the candidate update.
+    try {
+      await notifyRegression(insertedChange, {
+        name: candidate.name,
+        email: candidate.email,
+      });
+    } catch (err) {
+      logger.warn(
+        {
+          err: err instanceof Error ? err.message : String(err),
+          candidateId,
+        },
+        "notifyRegression dispatcher threw",
+      );
+    }
+  }
+
+  return updated;
 }
 
 /**

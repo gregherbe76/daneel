@@ -21,6 +21,7 @@ import CandidateDetailPage from "./pages/candidates/detail";
 import AgentProvidersPage from "./pages/settings/providers";
 import EmailRevalidationSettingsPage from "./pages/settings/email-revalidation";
 import BrandingSettingsPage from "./pages/settings/branding";
+import NotificationsSettingsPage from "./pages/settings/notifications";
 import MentionsPage from "./pages/mentions";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ function AppRoutes() {
         <Route path="/settings/providers" component={AgentProvidersPage} />
         <Route path="/settings/email-revalidation" component={EmailRevalidationSettingsPage} />
         <Route path="/settings/branding" component={BrandingSettingsPage} />
+        <Route path="/settings/notifications" component={NotificationsSettingsPage} />
         
         <Route component={NotFound} />
       </Switch>

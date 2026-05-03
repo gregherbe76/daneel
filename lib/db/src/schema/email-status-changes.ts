@@ -15,6 +15,12 @@ export const emailStatusChangesTable = pgTable(
     newReason: text("new_reason"),
     changedAt: timestamp("changed_at").notNull().defaultNow(),
     notifiedAt: timestamp("notified_at"),
+    /**
+     * When an outbound notification (email and/or Slack) was successfully
+     * dispatched for this regression. Distinct from `notifiedAt`, which tracks
+     * when the recruiter marked the inbox row read.
+     */
+    notificationSentAt: timestamp("notification_sent_at"),
   },
   (t) => ({
     candidateChangedIdx: index("email_status_changes_candidate_changed_idx").on(

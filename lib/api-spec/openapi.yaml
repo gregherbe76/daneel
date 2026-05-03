@@ -736,6 +736,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/EmailRevalidationRun"
 
+  /settings/notifications:
+    get:
+      operationId: getNotificationSettings
+      tags: [settings]
+      summary: Get the current outbound notification preferences
+      responses:
+        "200":
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationSettings"
+    put:
+      operationId: updateNotificationSettings
+      tags: [settings]
+      summary: Update the outbound notification preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationSettingsBody"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationSettings"
+
   /workflows/improve-and-rerun:
     post:
       operationId: improveAndRerun
@@ -1978,6 +2008,46 @@ components:
           nullable: true
           description: Populated only when the sweep itself crashed before completing.
       required: [id, startedAt, rechecked, errors, trigger]
+
+    NotificationSettings:
+      type: object
+      description: Outbound notification preferences for email validation regressions.
+      properties:
+        emailEnabled:
+          type: boolean
+        emailRecipients:
+          type: array
+          items:
+            type: string
+          description: Recipient email addresses. Stored server-side as a comma-separated string.
+        slackEnabled:
+          type: boolean
+        slackWebhookUrl:
+          type: string
+          nullable: true
+        emailDeliveryConfigured:
+          type: boolean
+          description: True when the server has a SENDGRID_API_KEY configured. When false, email notifications cannot actually be delivered even if enabled.
+        updatedAt:
+          type: string
+          format: date-time
+      required: [emailEnabled, emailRecipients, slackEnabled, emailDeliveryConfigured, updatedAt]
+
+    UpdateNotificationSettingsBody:
+      type: object
+      properties:
+        emailEnabled:
+          type: boolean
+        emailRecipients:
+          type: array
+          items:
+            type: string
+        slackEnabled:
+          type: boolean
+        slackWebhookUrl:
+          type: string
+          nullable: true
+      required: [emailEnabled, emailRecipients, slackEnabled]
 
     # ── WORKFLOWS ──
     RunWorkflowBody:
