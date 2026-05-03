@@ -25,6 +25,7 @@ import type {
   BrandingSettings,
   BulkCandidateActionBody,
   BulkCandidateActionResult,
+  BulkCandidateJob,
   Candidate,
   CandidateComment,
   CandidateNote,
@@ -38,6 +39,7 @@ import type {
   EmailRevalidationRun,
   EmailRevalidationSettings,
   EmailStatusChange,
+  EnqueueBulkCandidateJobBody,
   HealthStatus,
   HiringReport,
   ImproveAndRerunBody,
@@ -1227,6 +1229,261 @@ export const useBulkCandidateAction = <
 > => {
   return useMutation(getBulkCandidateActionMutationOptions(options));
 };
+
+/**
+ * Backs the same recruiter "bulk action bar" as `/candidates/bulk`, but for selections that exceed the synchronous endpoint's per-request budget (recruiters routinely operate on thousands of candidates at once). Returns a job id immediately; clients poll `/candidates/bulk-jobs/{id}` to drive a progress UI and (for `export-csv`) collect the assembled file when the job finishes.
+
+ * @summary Enqueue a background bulk action over a large candidate selection
+ */
+export const getEnqueueBulkCandidateJobUrl = () => {
+  return `/api/candidates/bulk-jobs`;
+};
+
+export const enqueueBulkCandidateJob = async (
+  enqueueBulkCandidateJobBody: EnqueueBulkCandidateJobBody,
+  options?: RequestInit,
+): Promise<BulkCandidateJob> => {
+  return customFetch<BulkCandidateJob>(getEnqueueBulkCandidateJobUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(enqueueBulkCandidateJobBody),
+  });
+};
+
+export const getEnqueueBulkCandidateJobMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof enqueueBulkCandidateJob>>,
+    TError,
+    { data: BodyType<EnqueueBulkCandidateJobBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof enqueueBulkCandidateJob>>,
+  TError,
+  { data: BodyType<EnqueueBulkCandidateJobBody> },
+  TContext
+> => {
+  const mutationKey = ["enqueueBulkCandidateJob"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof enqueueBulkCandidateJob>>,
+    { data: BodyType<EnqueueBulkCandidateJobBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return enqueueBulkCandidateJob(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EnqueueBulkCandidateJobMutationResult = NonNullable<
+  Awaited<ReturnType<typeof enqueueBulkCandidateJob>>
+>;
+export type EnqueueBulkCandidateJobMutationBody =
+  BodyType<EnqueueBulkCandidateJobBody>;
+export type EnqueueBulkCandidateJobMutationError = ErrorType<void>;
+
+/**
+ * @summary Enqueue a background bulk action over a large candidate selection
+ */
+export const useEnqueueBulkCandidateJob = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof enqueueBulkCandidateJob>>,
+    TError,
+    { data: BodyType<EnqueueBulkCandidateJobBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof enqueueBulkCandidateJob>>,
+  TError,
+  { data: BodyType<EnqueueBulkCandidateJobBody> },
+  TContext
+> => {
+  return useMutation(getEnqueueBulkCandidateJobMutationOptions(options));
+};
+
+/**
+ * Used by the bulk-action UI on mount to resume any in-flight progress toasts the recruiter had open before refreshing the page.
+
+ * @summary List bulk-action jobs that are still pending or running
+ */
+export const getListActiveBulkCandidateJobsUrl = () => {
+  return `/api/candidates/bulk-jobs`;
+};
+
+export const listActiveBulkCandidateJobs = async (
+  options?: RequestInit,
+): Promise<BulkCandidateJob[]> => {
+  return customFetch<BulkCandidateJob[]>(getListActiveBulkCandidateJobsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListActiveBulkCandidateJobsQueryKey = () => {
+  return [`/api/candidates/bulk-jobs`] as const;
+};
+
+export const getListActiveBulkCandidateJobsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listActiveBulkCandidateJobs>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listActiveBulkCandidateJobs>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListActiveBulkCandidateJobsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listActiveBulkCandidateJobs>>
+  > = ({ signal }) =>
+    listActiveBulkCandidateJobs({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listActiveBulkCandidateJobs>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListActiveBulkCandidateJobsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listActiveBulkCandidateJobs>>
+>;
+export type ListActiveBulkCandidateJobsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List bulk-action jobs that are still pending or running
+ */
+
+export function useListActiveBulkCandidateJobs<
+  TData = Awaited<ReturnType<typeof listActiveBulkCandidateJobs>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listActiveBulkCandidateJobs>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListActiveBulkCandidateJobsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get the current status of a background bulk-action job
+ */
+export const getGetBulkCandidateJobUrl = (id: number) => {
+  return `/api/candidates/bulk-jobs/${id}`;
+};
+
+export const getBulkCandidateJob = async (
+  id: number,
+  options?: RequestInit,
+): Promise<BulkCandidateJob> => {
+  return customFetch<BulkCandidateJob>(getGetBulkCandidateJobUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBulkCandidateJobQueryKey = (id: number) => {
+  return [`/api/candidates/bulk-jobs/${id}`] as const;
+};
+
+export const getGetBulkCandidateJobQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBulkCandidateJob>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBulkCandidateJob>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBulkCandidateJobQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBulkCandidateJob>>
+  > = ({ signal }) => getBulkCandidateJob(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBulkCandidateJob>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBulkCandidateJobQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBulkCandidateJob>>
+>;
+export type GetBulkCandidateJobQueryError = ErrorType<void>;
+
+/**
+ * @summary Get the current status of a background bulk-action job
+ */
+
+export function useGetBulkCandidateJob<
+  TData = Awaited<ReturnType<typeof getBulkCandidateJob>>,
+  TError = ErrorType<void>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getBulkCandidateJob>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBulkCandidateJobQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get all applications for a candidate (with job info)

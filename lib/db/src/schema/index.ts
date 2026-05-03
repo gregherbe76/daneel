@@ -10,3 +10,4 @@ export * from "./email-status-changes";
 export * from "./branding-settings";
 export * from "./email-revalidation-runs";
 export * from "./notification-settings";
+export * from "./bulk-jobs";

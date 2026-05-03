@@ -8,6 +8,7 @@ import { Layout } from "@/components/layout";
 import { PendingRunsWatcher } from "@/lib/pending-runs";
 import { useBranding } from "@/lib/branding";
 import { applyBrandTheme } from "@/lib/apply-brand";
+import { BulkJobsTracker } from "@/lib/bulk-jobs-tracker";
 
 // Pages
 import LandingPage from "./pages/landing";
@@ -74,6 +75,7 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <BrandThemeApplier />
           <PendingRunsWatcher />
+          <BulkJobsTracker />
           <Switch>
             <Route path="/" component={LandingPage} />
             <Route component={AppRoutes} />

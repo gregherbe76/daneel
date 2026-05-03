@@ -10,8 +10,17 @@ import {
   GetCandidateApplicationsParams,
   RecheckCandidateEmailParams,
   BulkCandidateActionBody,
+  EnqueueBulkCandidateJobBody,
+  GetBulkCandidateJobParams,
 } from "@workspace/api-zod";
 import { revalidateCandidateEmail } from "../lib/email-revalidation";
+import {
+  enqueueBulkJob,
+  getBulkJob,
+  listActiveBulkJobs,
+  type BulkJobAction,
+} from "../lib/bulk-jobs";
+import type { BulkJob } from "@workspace/db";
 
 const router = Router();
 
@@ -41,6 +50,63 @@ router.post("/candidates", async (req, res) => {
     })
     .returning();
   res.status(201).json(candidate);
+});
+
+// Background bulk-job endpoints. Registered ABOVE `/candidates/:id` so the
+// `/candidates/bulk-jobs[/:id]` paths aren't swallowed by the `:id` matcher.
+function serializeBulkJob(job: BulkJob) {
+  const result = (job.result ?? {}) as { csv?: string; results?: unknown[] };
+  return {
+    id: job.id,
+    action: job.action as BulkJobAction,
+    status: job.status as "pending" | "running" | "completed" | "failed",
+    total: job.total,
+    processed: job.processed,
+    skipped: job.skipped,
+    payload: job.payload ?? null,
+    csv: typeof result.csv === "string" ? result.csv : null,
+    results: Array.isArray(result.results) ? (result.results as never[]) : null,
+    errorMessage: job.errorMessage,
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+    startedAt: job.startedAt,
+    finishedAt: job.finishedAt,
+  };
+}
+
+router.post("/candidates/bulk-jobs", async (req, res) => {
+  const body = EnqueueBulkCandidateJobBody.parse(req.body);
+  if (body.action === "move-stage") {
+    const jobId = body.payload?.jobId;
+    const stage = body.payload?.stage;
+    if (!jobId || !stage) {
+      res.status(400).json({
+        error: "move-stage requires payload.jobId and payload.stage",
+      });
+      return;
+    }
+  }
+  const job = await enqueueBulkJob({
+    action: body.action,
+    ids: body.ids,
+    payload: body.payload ?? null,
+  });
+  res.status(201).json(serializeBulkJob(job));
+});
+
+router.get("/candidates/bulk-jobs", async (_req, res) => {
+  const jobs = await listActiveBulkJobs();
+  res.json(jobs.map(serializeBulkJob));
+});
+
+router.get("/candidates/bulk-jobs/:id", async (req, res) => {
+  const { id } = GetBulkCandidateJobParams.parse({ id: Number(req.params.id) });
+  const job = await getBulkJob(id);
+  if (!job) {
+    res.status(404).json({ error: "Bulk job not found" });
+    return;
+  }
+  res.json(serializeBulkJob(job));
 });
 
 // Get a candidate by ID

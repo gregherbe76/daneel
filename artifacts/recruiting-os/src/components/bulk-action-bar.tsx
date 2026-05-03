@@ -1,9 +1,13 @@
 import { useState } from "react";
 import {
   ApplicationStage,
+  BulkCandidateAction,
+  BulkCandidateActionPayload,
   BulkCandidateActionResult,
   useBulkCandidateAction,
+  useEnqueueBulkCandidateJob,
 } from "@workspace/api-client-react";
+import { trackBulkJob } from "@/lib/bulk-jobs-tracker";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,6 +37,13 @@ import {
 } from "lucide-react";
 
 const BULK_CHUNK_SIZE = 500;
+
+// Above this many ids we stop chunking client-side and instead enqueue a
+// background job — recruiters operating on the whole DB (thousands of rows)
+// would otherwise sit through many sequential round-trips and lose progress
+// on a refresh. The 500 threshold matches the per-request budget of the
+// synchronous /candidates/bulk endpoint.
+const BACKGROUND_JOB_THRESHOLD = 500;
 
 // Hard caps mirror the server-side budget so the chunking math stays
 // predictable: at 500 ids per request the recheck-email path takes a few
@@ -87,12 +98,33 @@ export function BulkActionBar({
 }: BulkActionBarProps) {
   const { toast } = useToast();
   const bulk = useBulkCandidateAction();
+  const enqueue = useEnqueueBulkCandidateJob();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmText, setConfirmText] = useState("");
 
   if (selectedIds.length === 0) return null;
   const count = selectedIds.length;
   const needsTypedConfirm = count > 50;
+  const useBackground = count > BACKGROUND_JOB_THRESHOLD;
+
+  // Hand a large selection off to the queue worker. The BulkJobsTracker
+  // surfaces progress and the final outcome (CSV download, completion toast,
+  // etc.) on top of every page, including across refreshes.
+  const enqueueBackground = async (
+    action: BulkCandidateAction,
+    payload?: BulkCandidateActionPayload,
+  ) => {
+    const job = await enqueue.mutateAsync({
+      data: { ids: selectedIds, action, payload },
+    });
+    trackBulkJob(job.id);
+    toast({
+      title: `Queued ${count} candidate${count === 1 ? "" : "s"} for processing`,
+      description: "Progress will keep running in the background.",
+    });
+    onAfterChange?.();
+    onClear();
+  };
 
   const finish = (msg: string) => {
     onAfterChange?.();
@@ -101,6 +133,18 @@ export function BulkActionBar({
   };
 
   const handleExportCsv = async () => {
+    if (useBackground) {
+      try {
+        await enqueueBackground("export-csv");
+      } catch (e) {
+        toast({
+          title: "Could not queue CSV export",
+          description: e instanceof Error ? e.message : "Please try again",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
     try {
       const results = await runChunked(selectedIds, (chunk) =>
         bulk.mutateAsync({
@@ -131,6 +175,18 @@ export function BulkActionBar({
   };
 
   const handleRecheck = async () => {
+    if (useBackground) {
+      try {
+        await enqueueBackground("recheck-email");
+      } catch (e) {
+        toast({
+          title: "Could not queue email re-check",
+          description: e instanceof Error ? e.message : "Please try again",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
     // Re-check can take a few seconds per chunk, so surface an in-progress
     // toast immediately and update it as each chunk completes — recruiters
     // running the action on hundreds of rows otherwise have no feedback.
@@ -178,6 +234,18 @@ export function BulkActionBar({
 
   const handleMoveStage = async (stage: ApplicationStage) => {
     if (!jobId) return;
+    if (useBackground) {
+      try {
+        await enqueueBackground("move-stage", { jobId, stage });
+      } catch (e) {
+        toast({
+          title: "Could not queue stage move",
+          description: e instanceof Error ? e.message : "Please try again",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
     try {
       const results = await runChunked(selectedIds, (chunk) =>
         bulk.mutateAsync({
@@ -205,6 +273,20 @@ export function BulkActionBar({
   };
 
   const handleDelete = async () => {
+    if (useBackground) {
+      try {
+        await enqueueBackground("delete");
+        setConfirmDelete(false);
+        setConfirmText("");
+      } catch (e) {
+        toast({
+          title: "Could not queue delete",
+          description: e instanceof Error ? e.message : "Please try again",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
     try {
       const results = await runChunked(selectedIds, (chunk) =>
         bulk.mutateAsync({
@@ -224,7 +306,7 @@ export function BulkActionBar({
     }
   };
 
-  const isPending = bulk.isPending;
+  const isPending = bulk.isPending || enqueue.isPending;
 
   return (
     <>

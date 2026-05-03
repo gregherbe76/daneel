@@ -298,6 +298,71 @@ paths:
         "400":
           description: Invalid action / payload combination
 
+  /candidates/bulk-jobs:
+    post:
+      operationId: enqueueBulkCandidateJob
+      tags: [candidates]
+      summary: Enqueue a background bulk action over a large candidate selection
+      description: >
+        Backs the same recruiter "bulk action bar" as `/candidates/bulk`, but for
+        selections that exceed the synchronous endpoint's per-request budget
+        (recruiters routinely operate on thousands of candidates at once).
+        Returns a job id immediately; clients poll
+        `/candidates/bulk-jobs/{id}` to drive a progress UI and (for
+        `export-csv`) collect the assembled file when the job finishes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnqueueBulkCandidateJobBody"
+      responses:
+        "201":
+          description: Job enqueued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkCandidateJob"
+        "400":
+          description: Invalid action / payload combination
+    get:
+      operationId: listActiveBulkCandidateJobs
+      tags: [candidates]
+      summary: List bulk-action jobs that are still pending or running
+      description: >
+        Used by the bulk-action UI on mount to resume any in-flight progress
+        toasts the recruiter had open before refreshing the page.
+      responses:
+        "200":
+          description: Active jobs (newest first)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BulkCandidateJob"
+
+  /candidates/bulk-jobs/{id}:
+    get:
+      operationId: getBulkCandidateJob
+      tags: [candidates]
+      summary: Get the current status of a background bulk-action job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkCandidateJob"
+        "404":
+          description: Not found
+
   /candidates/{id}/applications:
     get:
       operationId: getCandidateApplications
@@ -1478,6 +1543,78 @@ components:
             $ref: "#/components/schemas/BulkCandidateRecheckResult"
           description: Per-id outcomes for `recheck-email`.
       required: [ok, action, processed, skipped]
+
+    # ── BULK BACKGROUND JOBS ──
+    EnqueueBulkCandidateJobBody:
+      type: object
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          # Generous cap — the synchronous /candidates/bulk endpoint handles
+          # selections up to 500; this background path is what recruiters use
+          # to cover the whole DB in one go.
+          maxItems: 100000
+          items:
+            type: integer
+        action:
+          $ref: "#/components/schemas/BulkCandidateAction"
+        payload:
+          $ref: "#/components/schemas/BulkCandidateActionPayload"
+      required: [ids, action]
+
+    BulkCandidateJobStatus:
+      type: string
+      enum: [pending, running, completed, failed]
+
+    BulkCandidateJob:
+      type: object
+      properties:
+        id:
+          type: integer
+        action:
+          $ref: "#/components/schemas/BulkCandidateAction"
+        status:
+          $ref: "#/components/schemas/BulkCandidateJobStatus"
+        total:
+          type: integer
+        processed:
+          type: integer
+        skipped:
+          type: integer
+        payload:
+          type: object
+          nullable: true
+          additionalProperties: true
+        csv:
+          type: string
+          nullable: true
+          description: Populated once `action=export-csv` reaches `completed`.
+        results:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/BulkCandidateRecheckResult"
+          description: Populated once `action=recheck-email` reaches `completed`.
+        errorMessage:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        [id, action, status, total, processed, skipped, createdAt, updatedAt]
 
     # ── APPLICATION ──
     Application:

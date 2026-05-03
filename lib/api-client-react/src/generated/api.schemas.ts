@@ -216,6 +216,47 @@ export interface BulkCandidateActionResult {
   results?: BulkCandidateRecheckResult[] | null;
 }
 
+export interface EnqueueBulkCandidateJobBody {
+  /**
+   * @minItems 1
+   * @maxItems 100000
+   */
+  ids: number[];
+  action: BulkCandidateAction;
+  payload?: BulkCandidateActionPayload;
+}
+
+export type BulkCandidateJobStatus =
+  (typeof BulkCandidateJobStatus)[keyof typeof BulkCandidateJobStatus];
+
+export const BulkCandidateJobStatus = {
+  pending: "pending",
+  running: "running",
+  completed: "completed",
+  failed: "failed",
+} as const;
+
+export type BulkCandidateJobPayload = { [key: string]: unknown } | null;
+
+export interface BulkCandidateJob {
+  id: number;
+  action: BulkCandidateAction;
+  status: BulkCandidateJobStatus;
+  total: number;
+  processed: number;
+  skipped: number;
+  payload?: BulkCandidateJobPayload;
+  /** Populated once `action=export-csv` reaches `completed`. */
+  csv?: string | null;
+  /** Populated once `action=recheck-email` reaches `completed`. */
+  results?: BulkCandidateRecheckResult[] | null;
+  errorMessage?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+}
+
 export interface Application {
   id: number;
   jobId: number;

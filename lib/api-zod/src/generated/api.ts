@@ -631,6 +631,121 @@ export const BulkCandidateActionResponse = zod.object({
 });
 
 /**
+ * Backs the same recruiter "bulk action bar" as `/candidates/bulk`, but for selections that exceed the synchronous endpoint's per-request budget (recruiters routinely operate on thousands of candidates at once). Returns a job id immediately; clients poll `/candidates/bulk-jobs/{id}` to drive a progress UI and (for `export-csv`) collect the assembled file when the job finishes.
+
+ * @summary Enqueue a background bulk action over a large candidate selection
+ */
+export const enqueueBulkCandidateJobBodyIdsMax = 100000;
+
+export const EnqueueBulkCandidateJobBody = zod.object({
+  ids: zod.array(zod.number()).min(1).max(enqueueBulkCandidateJobBodyIdsMax),
+  action: zod.enum(["delete", "recheck-email", "move-stage", "export-csv"]),
+  payload: zod
+    .object({
+      stage: zod
+        .enum([
+          "Sourced",
+          "Contacted",
+          "Screened",
+          "Interview",
+          "Offer",
+          "Hired",
+          "Rejected",
+        ])
+        .optional(),
+      jobId: zod.number().optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Used by the bulk-action UI on mount to resume any in-flight progress toasts the recruiter had open before refreshing the page.
+
+ * @summary List bulk-action jobs that are still pending or running
+ */
+export const ListActiveBulkCandidateJobsResponseItem = zod.object({
+  id: zod.number(),
+  action: zod.enum(["delete", "recheck-email", "move-stage", "export-csv"]),
+  status: zod.enum(["pending", "running", "completed", "failed"]),
+  total: zod.number(),
+  processed: zod.number(),
+  skipped: zod.number(),
+  payload: zod.record(zod.string(), zod.unknown()).nullish(),
+  csv: zod
+    .string()
+    .nullish()
+    .describe("Populated once `action=export-csv` reaches `completed`."),
+  results: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        status: zod.enum([
+          "valid",
+          "invalid",
+          "risky",
+          "unchecked",
+          "skipped",
+          "error",
+        ]),
+        reason: zod.string().nullish(),
+      }),
+    )
+    .nullish()
+    .describe("Populated once `action=recheck-email` reaches `completed`."),
+  errorMessage: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+  startedAt: zod.coerce.date().nullish(),
+  finishedAt: zod.coerce.date().nullish(),
+});
+export const ListActiveBulkCandidateJobsResponse = zod.array(
+  ListActiveBulkCandidateJobsResponseItem,
+);
+
+/**
+ * @summary Get the current status of a background bulk-action job
+ */
+export const GetBulkCandidateJobParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetBulkCandidateJobResponse = zod.object({
+  id: zod.number(),
+  action: zod.enum(["delete", "recheck-email", "move-stage", "export-csv"]),
+  status: zod.enum(["pending", "running", "completed", "failed"]),
+  total: zod.number(),
+  processed: zod.number(),
+  skipped: zod.number(),
+  payload: zod.record(zod.string(), zod.unknown()).nullish(),
+  csv: zod
+    .string()
+    .nullish()
+    .describe("Populated once `action=export-csv` reaches `completed`."),
+  results: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        status: zod.enum([
+          "valid",
+          "invalid",
+          "risky",
+          "unchecked",
+          "skipped",
+          "error",
+        ]),
+        reason: zod.string().nullish(),
+      }),
+    )
+    .nullish()
+    .describe("Populated once `action=recheck-email` reaches `completed`."),
+  errorMessage: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+  startedAt: zod.coerce.date().nullish(),
+  finishedAt: zod.coerce.date().nullish(),
+});
+
+/**
  * @summary Get all applications for a candidate (with job info)
  */
 export const GetCandidateApplicationsParams = zod.object({
