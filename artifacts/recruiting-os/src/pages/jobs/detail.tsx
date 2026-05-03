@@ -18,9 +18,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
   Loader2, MapPin, Edit, User, Mail, ArrowRight, Play,
-  Sparkles, ChevronDown, ChevronUp, BrainCircuit, Zap,
+  Sparkles, ChevronDown, ChevronUp, ChevronRight, BrainCircuit, Zap,
   Building2, Github, Linkedin, AlertTriangle, FileText, GitBranch,
-  FlaskConical, Database, Upload, Bot,
+  FlaskConical, Database, Upload, Bot, Users,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -174,6 +174,7 @@ export default function JobDetailPage() {
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isFindOpen, setIsFindOpen] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const stages = Object.values(ApplicationStage);
 
@@ -277,156 +278,194 @@ export default function JobDetailPage() {
               ))}
             </div>
           </div>
-          <div className="flex flex-col items-end gap-3 shrink-0">
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setIsFindOpen(true)}
-              >
-                <Bot className="mr-2 h-4 w-4" />
-                Find with AI
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setIsImportOpen(true)}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Import Candidates
-              </Button>
-              <Button 
-                onClick={handleRunWorkflow} 
-                disabled={runWorkflow.isPending || workflowRunning}
-                variant="default"
-                className="bg-primary/90 hover:bg-primary"
-              >
-                {workflowRunning ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-2 h-4 w-4" />
-                )}
-                {workflowRunning ? 'Running Workflow...' : 'Run AI Workflow'}
-              </Button>
-              {workflowData?.run?.status === "completed" && (
-                <>
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            {/* ── 3-step action row ── */}
+            <div className="flex items-start gap-2">
+
+              {/* Step 1 */}
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Step 1</span>
+                <Button variant="outline" onClick={() => setIsImportOpen(true)} className="whitespace-nowrap">
+                  <Users className="mr-2 h-4 w-4" />
+                  Add Candidates
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setIsFindOpen(true)}
+                  className="text-[11px] text-primary hover:underline underline-offset-2"
+                >
+                  or find with AI
+                </button>
+              </div>
+
+              <ChevronRight className="h-4 w-4 text-muted-foreground mt-7 shrink-0" />
+
+              {/* Step 2 */}
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Step 2</span>
+                <Button
+                  onClick={handleRunWorkflow}
+                  disabled={runWorkflow.isPending || workflowRunning}
+                  className="bg-primary/90 hover:bg-primary whitespace-nowrap"
+                >
+                  {workflowRunning ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  {workflowRunning ? "Running…" : "Run AI Workflow"}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="text-[11px] text-muted-foreground hover:underline underline-offset-2"
+                >
+                  {showAdvanced ? "Hide" : "Advanced"} options
+                </button>
+              </div>
+
+              <ChevronRight className="h-4 w-4 text-muted-foreground mt-7 shrink-0" />
+
+              {/* Step 3 */}
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Step 3</span>
+                {workflowData?.run?.status === "completed" ? (
                   <Link href={`/jobs/${job.id}/report`}>
-                    <Button variant="outline">
+                    <Button variant="outline" className="whitespace-nowrap border-green-300 text-green-800 hover:bg-green-50">
                       <FileText className="mr-2 h-4 w-4" />
-                      View Report
+                      View Shortlist
                     </Button>
                   </Link>
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsVariantModalOpen(true)}
-                    disabled={workflowRunning}
-                    className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-                  >
-                    <GitBranch className="mr-2 h-4 w-4" />
-                    Run Variant
+                ) : (
+                  <Button variant="outline" disabled className="opacity-40 whitespace-nowrap">
+                    <FileText className="mr-2 h-4 w-4" />
+                    View Shortlist
                   </Button>
-                </>
-              )}
-              <Link href={`/jobs/${job.id}/edit`}>
-                <Button variant="outline">
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit Job
-                </Button>
-              </Link>
+                )}
+                {workflowData?.run?.status === "completed" && (
+                  <button
+                    type="button"
+                    onClick={() => setIsVariantModalOpen(true)}
+                    className="text-[11px] text-muted-foreground hover:underline underline-offset-2"
+                  >
+                    Run Variant
+                  </button>
+                )}
+              </div>
             </div>
-            {/* ── Data mode selector ── */}
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-0.5">Data Mode</p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  disabled={workflowRunning}
-                  onClick={() => setDataMode("mock")}
-                  className={`flex items-start gap-2 px-3 py-2.5 rounded-md border text-left transition-all ${
-                    dataMode === "mock"
-                      ? "border-amber-300 bg-amber-500/8 ring-1 ring-amber-300"
-                      : "border-border bg-muted/20 hover:bg-muted/40"
-                  }`}
-                >
-                  <FlaskConical className={`h-4 w-4 mt-0.5 shrink-0 ${dataMode === "mock" ? "text-amber-600" : "text-muted-foreground"}`} />
+
+            {/* ── Advanced options (collapsed by default) ── */}
+            {showAdvanced && (
+              <div className="mt-1 pt-3 border-t border-border w-full space-y-2 min-w-[420px]">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">Advanced Options</p>
+                {/* Data mode */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={workflowRunning}
+                    onClick={() => setDataMode("mock")}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md border text-left transition-all ${
+                      dataMode === "mock"
+                        ? "border-amber-300 bg-amber-500/8 ring-1 ring-amber-300"
+                        : "border-border bg-muted/20 hover:bg-muted/40"
+                    }`}
+                  >
+                    <FlaskConical className={`h-3.5 w-3.5 shrink-0 ${dataMode === "mock" ? "text-amber-600" : "text-muted-foreground"}`} />
+                    <div>
+                      <p className={`text-xs font-medium leading-tight ${dataMode === "mock" ? "text-amber-800" : ""}`}>Demo Run</p>
+                      <p className="text-[10px] text-muted-foreground">Simulated candidates</p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={workflowRunning}
+                    onClick={() => setDataMode("real")}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md border text-left transition-all ${
+                      dataMode === "real"
+                        ? "border-green-300 bg-green-500/8 ring-1 ring-green-300"
+                        : "border-border bg-muted/20 hover:bg-muted/40"
+                    }`}
+                  >
+                    <Database className={`h-3.5 w-3.5 shrink-0 ${dataMode === "real" ? "text-green-700" : "text-muted-foreground"}`} />
+                    <div>
+                      <p className={`text-xs font-medium leading-tight ${dataMode === "real" ? "text-green-800" : ""}`}>Real Data Run</p>
+                      <p className="text-[10px] text-muted-foreground">Imported + Twin only</p>
+                    </div>
+                  </button>
+                </div>
+                {dataMode === "real" && (
+                  <p className="text-[10px] text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1 flex items-start gap-1">
+                    <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                    Only imported and Twin-sourced candidates will be scored.
+                  </p>
+                )}
+                {/* Sourcing */}
+                <div className={`flex items-start gap-2 px-2.5 py-2 rounded-md border transition-colors ${
+                  runSourcing
+                    ? dataMode === "real" ? "border-green-200 bg-green-500/5" : "border-purple-200 bg-purple-500/5"
+                    : "border-border bg-muted/30"
+                }`}>
+                  <Checkbox id="run-sourcing" checked={runSourcing} onCheckedChange={(v) => setRunSourcing(!!v)} disabled={workflowRunning} className="mt-0.5" />
                   <div>
-                    <p className={`text-sm font-medium leading-tight ${dataMode === "mock" ? "text-amber-800" : ""}`}>Demo Run</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">Simulated candidates</p>
+                    <Label htmlFor="run-sourcing" className="text-xs font-medium cursor-pointer flex items-center gap-1.5">
+                      <Zap className={`h-3 w-3 ${dataMode === "real" ? "text-green-700" : "text-purple-600"}`} />
+                      {dataMode === "real" ? "Source via Twin provider" : "Generate mock candidates before matching"}
+                    </Label>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {dataMode === "real" ? "Requires Twin webhook in Advanced settings" : "7 mock candidates tailored to this role"}
+                    </p>
                   </div>
-                </button>
-                <button
-                  type="button"
-                  disabled={workflowRunning}
-                  onClick={() => setDataMode("real")}
-                  className={`flex items-start gap-2 px-3 py-2.5 rounded-md border text-left transition-all ${
-                    dataMode === "real"
-                      ? "border-green-300 bg-green-500/8 ring-1 ring-green-300"
-                      : "border-border bg-muted/20 hover:bg-muted/40"
-                  }`}
-                >
-                  <Database className={`h-4 w-4 mt-0.5 shrink-0 ${dataMode === "real" ? "text-green-700" : "text-muted-foreground"}`} />
+                </div>
+                {/* Enrichment */}
+                <div className={`flex items-start gap-2 px-2.5 py-2 rounded-md border transition-colors ${
+                  runEnrichment ? "border-blue-200 bg-blue-500/5" : "border-border bg-muted/30"
+                }`}>
+                  <Checkbox id="run-enrichment" checked={runEnrichment} onCheckedChange={(v) => setRunEnrichment(!!v)} disabled={workflowRunning} className="mt-0.5" />
                   <div>
-                    <p className={`text-sm font-medium leading-tight ${dataMode === "real" ? "text-green-800" : ""}`}>Real Data Run</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">Imported + Twin only</p>
+                    <Label htmlFor="run-enrichment" className="text-xs font-medium cursor-pointer flex items-center gap-1.5">
+                      <Sparkles className="h-3 w-3 text-blue-600" />
+                      Enrich profiles before matching
+                    </Label>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Additional signals and confidence scores</p>
                   </div>
-                </button>
+                </div>
+                {/* Edit job */}
+                <div className="pt-1">
+                  <Link href={`/jobs/${job.id}/edit`}>
+                    <button type="button" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                      <Edit className="h-3 w-3" />
+                      Edit job details
+                    </button>
+                  </Link>
+                </div>
               </div>
-              {dataMode === "real" && (
-                <p className="text-[11px] text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1.5 flex items-start gap-1.5">
-                  <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
-                  Only imported and Twin-sourced candidates will be scored. Mock data will never be used or mixed in.
-                </p>
-              )}
-            </div>
-            {/* Sourcing option */}
-            <div className={`flex items-start gap-2 px-3 py-2 rounded-md border transition-colors ${
-              runSourcing
-                ? dataMode === "real" ? "border-green-200 bg-green-500/5" : "border-purple-200 bg-purple-500/5"
-                : "border-border bg-muted/30"
-            }`}>
-              <Checkbox
-                id="run-sourcing"
-                checked={runSourcing}
-                onCheckedChange={(v) => setRunSourcing(!!v)}
-                disabled={workflowRunning}
-                className="mt-0.5"
-              />
-              <div>
-                <Label htmlFor="run-sourcing" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
-                  <Zap className={`h-3.5 w-3.5 ${dataMode === "real" ? "text-green-700" : "text-purple-600"}`} />
-                  {dataMode === "real" ? "Source new candidates via Twin provider" : "Generate new candidates before matching"}
-                </Label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {dataMode === "real"
-                    ? "Requires a Twin webhook provider assigned in Settings → Providers"
-                    : "AI will source 7 mock candidates tailored to this role"}
-                </p>
-              </div>
-            </div>
-            {/* Enrichment option */}
-            <div className={`flex items-start gap-2 px-3 py-2 rounded-md border transition-colors ${
-              runEnrichment
-                ? "border-blue-200 bg-blue-500/5"
-                : "border-border bg-muted/30"
-            }`}>
-              <Checkbox
-                id="run-enrichment"
-                checked={runEnrichment}
-                onCheckedChange={(v) => setRunEnrichment(!!v)}
-                disabled={workflowRunning}
-                className="mt-0.5"
-              />
-              <div>
-                <Label htmlFor="run-enrichment" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-blue-600" />
-                  Enrich candidate profiles before matching
-                </Label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  AI will enrich profiles with additional signals and confidence scores
-                </p>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* ── Onboarding banner — show only before first run ── */}
+      {!workflowData?.run && !isLoadingWorkflow && (
+        <div className="border-b border-border bg-primary/[0.03] px-8 py-3 flex-shrink-0">
+          <div className="max-w-7xl mx-auto flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Get started:</span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold shrink-0">1</span>
+              Add candidates
+            </span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+            <span className="flex items-center gap-1.5">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold shrink-0">2</span>
+              Run AI Workflow
+            </span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+            <span className="flex items-center gap-1.5">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold shrink-0">3</span>
+              View your shortlist
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-auto bg-background">
         <div className="p-8 max-w-7xl mx-auto space-y-8">
@@ -464,10 +503,21 @@ export default function JobDetailPage() {
             <CollapsibleContent>
               <div className="p-6">
                 {!workflowData?.run ? (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground mb-4">No AI workflow run yet. Click 'Run AI Workflow' to start.</p>
-                    <Button variant="outline" onClick={handleRunWorkflow} disabled={runWorkflow.isPending}>
-                      <Play className="mr-2 h-4 w-4" /> Start Workflow
+                  <div className="text-center py-12 space-y-3">
+                    <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                      <Sparkles className="h-7 w-7 text-primary" />
+                    </div>
+                    <h3 className="font-semibold text-lg">Ready to find your best candidates?</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                      Run the AI workflow to score and rank everyone in your pipeline against this role.
+                    </p>
+                    <Button
+                      onClick={handleRunWorkflow}
+                      disabled={runWorkflow.isPending || workflowRunning}
+                      className="mt-2 bg-primary/90 hover:bg-primary"
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Run AI Workflow
                     </Button>
                   </div>
                 ) : workflowRunning ? (
@@ -715,6 +765,27 @@ export default function JobDetailPage() {
           {/* ── PIPELINE BOARD ── */}
           <div className="flex-1 overflow-x-auto pb-4">
             <h2 className="text-lg font-semibold mb-4">Pipeline</h2>
+            {applications?.length === 0 && (
+              <div className="border-2 border-dashed border-border rounded-xl p-12 flex flex-col items-center justify-center text-center mb-4">
+                <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <Users className="h-7 w-7 text-muted-foreground/60" />
+                </div>
+                <h3 className="text-lg font-semibold mb-1">No candidates yet</h3>
+                <p className="text-sm text-muted-foreground mb-5 max-w-sm">
+                  Add candidates to start building your pipeline. The AI workflow will score and rank them automatically.
+                </p>
+                <div className="flex gap-3">
+                  <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Add Candidates
+                  </Button>
+                  <Button variant="outline" onClick={() => setIsFindOpen(true)}>
+                    <Bot className="mr-2 h-4 w-4" />
+                    Find with AI
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="h-full min-w-max flex gap-4">
               {stages.map((stage) => {
                 const appsInStage = applications?.filter((app) => app.stage === stage) || [];

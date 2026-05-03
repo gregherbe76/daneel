@@ -7,11 +7,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navigation = [
     { name: "Jobs", href: "/jobs", icon: Briefcase },
     { name: "Candidates", href: "/candidates", icon: Users },
-    { name: "Pipeline", href: "/pipeline", icon: LayoutDashboard },
   ];
 
   const settingsNavigation = [
-    { name: "Settings", href: "/settings/providers", icon: Settings },
+    { name: "Advanced", href: "/settings/providers", icon: Settings },
   ];
 
   return (
