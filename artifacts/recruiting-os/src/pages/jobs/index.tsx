@@ -20,7 +20,7 @@ export default function JobsPage() {
         <Link href="/jobs/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
-            Create Client Mission
+            Create Job
           </Button>
         </Link>
       </div>
@@ -37,7 +37,7 @@ export default function JobsPage() {
           <h3 className="text-lg font-semibold mb-1">Let's open your first role</h3>
           <p className="text-muted-foreground mb-4">Add a job and HiringAI will guide you all the way to a shortlist.</p>
           <Link href="/jobs/new">
-            <Button variant="outline">Create Client Mission</Button>
+            <Button variant="outline">Create Job</Button>
           </Link>
         </Card>
       ) : (

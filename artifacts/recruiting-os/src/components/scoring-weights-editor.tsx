@@ -8,13 +8,9 @@ import {
 } from "@/components/score-breakdown";
 
 const DIMENSIONS: { key: keyof ScoringWeights; label: string; hint: string }[] = [
-  { key: "skillsMatch", label: "Skills Match", hint: "Coverage of must-have skills" },
-  { key: "experienceDepth", label: "Experience Depth", hint: "Hands-on seniority depth" },
-  { key: "softSkills", label: "Soft Skills", hint: "Communication, empathy, adaptability" },
-  { key: "autonomy", label: "Autonomy & Ownership", hint: "End-to-end ownership" },
-  { key: "cultureFit", label: "Culture Fit", hint: "Alignment with team values" },
-  { key: "longTermPotential", label: "Long-Term Potential", hint: "Growth & learning agility" },
-  { key: "productMindset", label: "Product Mindset", hint: "User & business impact" },
+  { key: "autonomy", label: "Autonomy & Ownership", hint: "End-to-end ownership, self-direction" },
+  { key: "productMindset", label: "Product Mindset", hint: "User & business impact awareness" },
+  { key: "impact", label: "Impact", hint: "Concrete shipped outcomes & measurable results" },
 ];
 
 export function sumWeights(w: ScoringWeights): number {

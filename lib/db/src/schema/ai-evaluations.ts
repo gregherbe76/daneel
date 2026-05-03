@@ -82,13 +82,9 @@ export type ScoreDimension = {
 };
 
 export type ScoreBreakdown = {
-  skillsMatch: ScoreDimension;
-  experienceDepth: ScoreDimension;
   autonomy: ScoreDimension;
   productMindset: ScoreDimension;
-  softSkills: ScoreDimension;
-  cultureFit: ScoreDimension;
-  longTermPotential: ScoreDimension;
+  impact: ScoreDimension;
 };
 
 export type ShortlistEntry = {

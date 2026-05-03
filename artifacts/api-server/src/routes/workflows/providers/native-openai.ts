@@ -23,13 +23,9 @@ import type { JobInsightResult, CandidateMatchResult, ShortlistResult, ScoreBrea
 /** Convert integer percent weights (0-100) into 0-1 fractions used by the scoring math. */
 function toFractions(w: ScoringWeights): Record<keyof ScoringWeights, number> {
   return {
-    skillsMatch: w.skillsMatch / 100,
-    experienceDepth: w.experienceDepth / 100,
-    softSkills: w.softSkills / 100,
     autonomy: w.autonomy / 100,
-    cultureFit: w.cultureFit / 100,
-    longTermPotential: w.longTermPotential / 100,
     productMindset: w.productMindset / 100,
+    impact: w.impact / 100,
   };
 }
 
@@ -70,9 +66,6 @@ export class NativeOpenAIProvider implements AgentProvider {
    *
    * Converts a raw job description into structured evaluation criteria.
    * Output is stored in job_insights and used by the matching step.
-   *
-   * To add new fields to the insight (e.g. preferredBackground, teamContext),
-   * add them to the prompt and to the JobInsightResult type in engine-types.ts.
    */
   private async runJobUnderstanding(payload: JobUnderstandingPayload): Promise<JobInsightResult> {
     const { job } = payload;
@@ -106,23 +99,19 @@ Keep it concise and accurate. Return only valid JSON, no other text.`;
   /**
    * Step 2: Candidate Matching — the core scoring logic.
    *
-   * Each candidate is scored independently (concurrency: 3) across 7 weighted
+   * Each candidate is scored independently (concurrency: 3) across 3 weighted
    * dimensions. The weighted score is ALWAYS recomputed server-side after the
    * model responds — this prevents the model from drifting on arithmetic.
    *
-   * ── SCORING RUBRIC (7 dimensions, sum to 1.00) ───────────────────────────
+   * ── HIRINGAI SCORING RUBRIC (3 dimensions, sum to 1.00) ───────────────────
    *
    * Dimension          Weight   What it measures
    * ─────────────────────────────────────────────────────────────────────────
-   * skillsMatch         0.23    Coverage of required skills from the job description
-   * experienceDepth     0.20    Evidence of seniority-appropriate, hands-on depth
-   * softSkills          0.15    Communication, empathy, adaptability
-   * autonomy            0.13    End-to-end ownership, self-direction, led initiatives
-   * cultureFit          0.10    Alignment with stated team values and ways of working
-   * longTermPotential   0.10    Growth trajectory, learning agility
-   * productMindset      0.09    User/business impact awareness beyond pure execution
+   * autonomy            0.35    End-to-end ownership, self-direction, led initiatives
+   * productMindset      0.30    User/business impact awareness beyond pure execution
+   * impact              0.35    Concrete shipped outcomes, measurable results, scope
    *
-   * Recommendation thresholds (also in the prompt):
+   * Recommendation thresholds:
    *   80–100 → Strong Yes
    *   60–79  → Yes
    *   40–59  → Maybe
@@ -147,10 +136,9 @@ CANDIDATE: ${candidate.name}
 Skills: ${candidate.skills.length > 0 ? candidate.skills.join(", ") : "none listed"}
 Summary: ${candidate.summary ?? "No summary provided"}
 
-Score this candidate's FIT for the role across 7 weighted dimensions. Each dimension score is 0-100.
+Score this candidate's FIT for the role across 3 weighted dimensions. Each dimension score is 0-100.
 The fitScore = round(
-  skillsMatch*${fmt(weights.skillsMatch)} + experienceDepth*${fmt(weights.experienceDepth)} + autonomy*${fmt(weights.autonomy)} + productMindset*${fmt(weights.productMindset)} +
-  softSkills*${fmt(weights.softSkills)} + cultureFit*${fmt(weights.cultureFit)} + longTermPotential*${fmt(weights.longTermPotential)}
+  autonomy*${fmt(weights.autonomy)} + productMindset*${fmt(weights.productMindset)} + impact*${fmt(weights.impact)}
 ).
 
 IMPORTANT — Scoring rules:
@@ -160,14 +148,10 @@ IMPORTANT — Scoring rules:
 - Never fabricate experience or skills that are not explicitly listed.
 - Treat must-have skills as a baseline expectation: weave skill coverage into Impact reasoning rather than as a standalone dimension.
 
-Dimension definitions (the weights below are tuned per-job by the hiring manager):
-- skillsMatch (${fmt(weights.skillsMatch)}): Coverage of must-have skills from the job. Cite specific skill matches or gaps.
-- experienceDepth (${fmt(weights.experienceDepth)}): Evidence of seniority-appropriate, hands-on depth.
-- softSkills (${fmt(weights.softSkills)}): Communication, empathy, adaptability — written tone, collaboration signals, customer/team contact in their summary.
-- autonomy (${fmt(weights.autonomy)}): End-to-end ownership, led initiatives, worked without heavy direction.
-- cultureFit (${fmt(weights.cultureFit)}): Alignment with the team values and working style implied by the job description and ideal profile.
-- longTermPotential (${fmt(weights.longTermPotential)}): Growth trajectory and learning agility — promotions, breadth of new skills picked up, scope expansion.
-- productMindset (${fmt(weights.productMindset)}): Evidence the candidate thinks about users, product impact, or business outcomes.
+Dimension definitions:
+- autonomy (${fmt(weights.autonomy)}): End-to-end ownership, led initiatives, worked without heavy direction. Cite specific evidence of self-direction.
+- productMindset (${fmt(weights.productMindset)}): Evidence the candidate thinks about users, product impact, or business outcomes — not just code or tasks.
+- impact (${fmt(weights.impact)}): Concrete shipped outcomes, measurable results, scope of work, and how their must-have skill coverage translates into tangible impact for this role.
 
 Additional rules:
 - reasoning must be 1-2 specific sentences referencing actual candidate details
@@ -178,13 +162,9 @@ Additional rules:
 Return only valid JSON matching this exact structure:
 {
   "scoreBreakdown": {
-    "skillsMatch":       { "score": <0-100>, "weight": ${fmt(weights.skillsMatch)}, "reasoning": "<specific 1-2 sentences>" },
-    "experienceDepth":   { "score": <0-100>, "weight": ${fmt(weights.experienceDepth)}, "reasoning": "<specific 1-2 sentences>" },
-    "autonomy":          { "score": <0-100>, "weight": ${fmt(weights.autonomy)}, "reasoning": "<specific 1-2 sentences>" },
-    "productMindset":    { "score": <0-100>, "weight": ${fmt(weights.productMindset)}, "reasoning": "<specific 1-2 sentences>" },
-    "softSkills":        { "score": <0-100>, "weight": ${fmt(weights.softSkills)}, "reasoning": "<specific 1-2 sentences>" },
-    "cultureFit":        { "score": <0-100>, "weight": ${fmt(weights.cultureFit)}, "reasoning": "<specific 1-2 sentences>" },
-    "longTermPotential": { "score": <0-100>, "weight": ${fmt(weights.longTermPotential)}, "reasoning": "<specific 1-2 sentences>" }
+    "autonomy":       { "score": <0-100>, "weight": ${fmt(weights.autonomy)}, "reasoning": "<specific 1-2 sentences>" },
+    "productMindset": { "score": <0-100>, "weight": ${fmt(weights.productMindset)}, "reasoning": "<specific 1-2 sentences>" },
+    "impact":         { "score": <0-100>, "weight": ${fmt(weights.impact)}, "reasoning": "<specific 1-2 sentences>" }
   },
   "fitScore": <integer 0-100, must equal round(weighted sum above)>,
   "strengths": ["<specific strength citing candidate detail>", "<specific strength>"],
@@ -213,17 +193,12 @@ Return only valid JSON matching this exact structure:
         }>(response.choices[0]?.message?.content ?? "{}");
 
         // Recompute fit score server-side to ensure arithmetic consistency.
-        // If you change dimension weights in the prompt, update these multipliers too.
         const bd = raw.scoreBreakdown;
         const fitScore = bd
           ? Math.round(
-              (bd.skillsMatch?.score ?? 0) * weights.skillsMatch +
-              (bd.experienceDepth?.score ?? 0) * weights.experienceDepth +
               (bd.autonomy?.score ?? 0) * weights.autonomy +
               (bd.productMindset?.score ?? 0) * weights.productMindset +
-              (bd.softSkills?.score ?? 0) * weights.softSkills +
-              (bd.cultureFit?.score ?? 0) * weights.cultureFit +
-              (bd.longTermPotential?.score ?? 0) * weights.longTermPotential,
+              (bd.impact?.score ?? 0) * weights.impact,
             )
           : (raw.fitScore ?? raw.score ?? 0);
 
@@ -251,9 +226,6 @@ Return only valid JSON matching this exact structure:
    *
    * Takes the top-5 evaluated candidates and generates a hiring summary for
    * each. This is the final output shown to the hiring manager in the report.
-   *
-   * To change the shortlist format, edit the prompt below.
-   * To change how many candidates are shortlisted, change the .slice(0, 5) limit.
    */
   private async runShortlistGeneration(payload: ShortlistPayload): Promise<ShortlistResult[]> {
     const { job, insight, evaluations } = payload;
@@ -309,8 +281,6 @@ Return only a valid JSON array:
 }
 
 // ── Payload types ────────────────────────────────────────────────────────────
-// These define the shape of input.payload for each step handled by this provider.
-// Keep in sync with the payload shapes sent by engine.ts.
 
 export type JobUnderstandingPayload = {
   job: {

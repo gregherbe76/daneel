@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,13 +19,9 @@ import { ScoringWeightsEditor, sumWeights } from "@/components/scoring-weights-e
 import { DEFAULT_SCORING_WEIGHTS } from "@/components/score-breakdown";
 
 const weightsSchema = z.object({
-  skillsMatch: z.number().int().min(0).max(100),
-  experienceDepth: z.number().int().min(0).max(100),
-  softSkills: z.number().int().min(0).max(100),
   autonomy: z.number().int().min(0).max(100),
-  cultureFit: z.number().int().min(0).max(100),
-  longTermPotential: z.number().int().min(0).max(100),
   productMindset: z.number().int().min(0).max(100),
+  impact: z.number().int().min(0).max(100),
 });
 
 const formSchema = z.object({
@@ -43,8 +39,6 @@ const formSchema = z.object({
     Seniority.VP,
   ]),
   mustHaveSkills: z.array(z.string()).min(1, "At least one skill is required"),
-  clientName: z.string().optional(),
-  clientLogoUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   scoringWeights: weightsSchema.refine((w) => sumWeights(w) === 100, {
     message: "Scoring weights must add up to 100%",
   }),
@@ -65,29 +59,21 @@ export default function CreateJobPage() {
       location: "",
       seniority: Seniority.Mid,
       mustHaveSkills: [],
-      clientName: "",
-      clientLogoUrl: "",
       scoringWeights: { ...DEFAULT_SCORING_WEIGHTS },
     },
   });
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     createJob.mutate(
-      {
-        data: {
-          ...values,
-          clientName: values.clientName || null,
-          clientLogoUrl: values.clientLogoUrl || null,
-        },
-      },
+      { data: values },
       {
         onSuccess: (data) => {
           queryClient.invalidateQueries({ queryKey: getListJobsQueryKey() });
-          toast({ title: "Client Mission created successfully" });
+          toast({ title: "Job created successfully" });
           setLocation(`/jobs/${data.id}`);
         },
         onError: () => {
-          toast({ title: "Failed to create client mission", variant: "destructive" });
+          toast({ title: "Failed to create job", variant: "destructive" });
         },
       }
     );
@@ -106,8 +92,8 @@ export default function CreateJobPage() {
   return (
     <div className="p-8 max-w-3xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Create Client Mission</h1>
-        <p className="text-muted-foreground mt-1">Add a new client mission to your pipeline.</p>
+        <h1 className="text-3xl font-bold tracking-tight">Create Job</h1>
+        <p className="text-muted-foreground mt-1">Add a new role to your hiring pipeline.</p>
       </div>
 
       <Card>
@@ -119,7 +105,7 @@ export default function CreateJobPage() {
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mission Title</FormLabel>
+                    <FormLabel>Job Title</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. Senior Frontend Engineer" {...field} />
                     </FormControl>
@@ -221,7 +207,7 @@ export default function CreateJobPage() {
                   <FormItem>
                     <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Client mission brief..." className="h-32" {...field} />
+                      <Textarea placeholder="Job description..." className="h-32" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -242,38 +228,6 @@ export default function CreateJobPage() {
                   )}
                 />
               </div>
-
-              <div className="border-t pt-4">
-                <p className="text-sm font-medium text-muted-foreground mb-3">Client Branding (optional)</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="clientName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Client Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. Acme Corp" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="clientLogoUrl"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Client Logo URL</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://example.com/logo.png" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-2 border-t pt-6">
               <Button type="button" variant="outline" onClick={() => setLocation("/jobs")}>
@@ -281,7 +235,7 @@ export default function CreateJobPage() {
               </Button>
               <Button type="submit" disabled={createJob.isPending}>
                 {createJob.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Client Mission
+                Create Job
               </Button>
             </CardFooter>
           </form>

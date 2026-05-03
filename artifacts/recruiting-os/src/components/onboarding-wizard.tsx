@@ -3,7 +3,7 @@ import { Check, ChevronRight, Sparkles, Users, FileText, X, Settings2 } from "lu
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
-const STORAGE_KEY = "hireflow.onboarding.dismissed";
+const STORAGE_KEY = "hiringai.onboarding.dismissed";
 
 type StepKey = "providers" | "candidates" | "screening" | "picks";
 
@@ -58,15 +58,15 @@ export function OnboardingWizard({
     },
     {
       key: "screening",
-      title: "Run Smart Screening",
-      helper: "We'll score everyone against your role using a 7-dimension HR rubric — usually under a minute.",
+      title: "Run AI Workflow",
+      helper: "We'll score everyone against your role using the HiringAI 3-dimension rubric — usually under a minute.",
       icon: Sparkles,
       done: hasCompletedRun,
-      cta: hasCandidates && !hasCompletedRun ? { label: "Run screening", onClick: onRunScreening } : undefined,
+      cta: hasCandidates && !hasCompletedRun ? { label: "Run AI workflow", onClick: onRunScreening } : undefined,
     },
     {
       key: "picks",
-      title: "Review your Top Picks",
+      title: "Review your shortlist",
       helper: "Open the shareable hiring report — strengths, gaps, and a clear recommendation per person.",
       icon: FileText,
       done: hasCompletedRun,

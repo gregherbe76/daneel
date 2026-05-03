@@ -14,23 +14,15 @@ export const seniorityEnum = pgEnum("seniority", [
 ]);
 
 export type ScoringWeights = {
-  skillsMatch: number;
-  experienceDepth: number;
-  softSkills: number;
   autonomy: number;
-  cultureFit: number;
-  longTermPotential: number;
   productMindset: number;
+  impact: number;
 };
 
 export const DEFAULT_SCORING_WEIGHTS: ScoringWeights = {
-  skillsMatch: 23,
-  experienceDepth: 20,
-  softSkills: 15,
-  autonomy: 13,
-  cultureFit: 10,
-  longTermPotential: 10,
-  productMindset: 9,
+  autonomy: 35,
+  productMindset: 30,
+  impact: 35,
 };
 
 export const jobsTable = pgTable("jobs", {
@@ -40,8 +32,6 @@ export const jobsTable = pgTable("jobs", {
   location: text("location").notNull(),
   seniority: seniorityEnum("seniority").notNull(),
   mustHaveSkills: text("must_have_skills").array().notNull().default([]),
-  clientName: text("client_name"),
-  clientLogoUrl: text("client_logo_url"),
   scoringWeights: jsonb("scoring_weights")
     .$type<ScoringWeights>()
     .notNull()

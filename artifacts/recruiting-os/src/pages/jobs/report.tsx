@@ -98,7 +98,7 @@ type JobInsight = {
 type HiringReport = {
   generatedAt: string;
   run: ReportRunMeta;
-  job: { id: number; title: string; description: string; location: string; seniority: string; mustHaveSkills: string[]; clientName?: string | null; clientLogoUrl?: string | null };
+  job: { id: number; title: string; description: string; location: string; seniority: string; mustHaveSkills: string[] };
   insight: JobInsight | null;
   top5: ReportEvaluation[];
   evaluations: ReportEvaluation[];
@@ -373,7 +373,7 @@ function ClientFitNarrativeEditor({
     <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/60 px-4 py-3">
       <div className="flex items-center justify-between gap-2 mb-1.5">
         <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide">
-          Why this candidate fits your client
+          Why this candidate fits the role
           {hasOverride && !editing && (
             <Badge variant="outline" className="ml-2 text-[10px] py-0 h-4 border-blue-300 text-blue-700 bg-white/60">
               Edited
@@ -671,10 +671,10 @@ export default function JobReportPage() {
           <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-40" />
           <h2 className="text-xl font-semibold mb-2">No Report Available</h2>
           <p className="text-muted-foreground mb-6">
-            Run the AI workflow on this client mission to generate a client shortlist report.
+            Run the AI workflow on this job to generate a shortlist report.
           </p>
           <Link href={`/jobs/${jobId}`}>
-            <Button>Go to Client Mission & Run Workflow</Button>
+            <Button>Go to Job & Run Workflow</Button>
           </Link>
         </div>
       </div>
@@ -699,7 +699,7 @@ export default function JobReportPage() {
           </Link>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium truncate">{report.job.title}</span>
-          <Badge variant="outline" className="text-xs shrink-0">Client Shortlist Report</Badge>
+          <Badge variant="outline" className="text-xs shrink-0">Hiring Report</Badge>
           {run.dataMode === "real" && (
             <Badge variant="outline" className="border-green-300 text-green-700 bg-green-500/8 text-xs shrink-0">
               <Database className="h-3 w-3 mr-1" />Real Data Run
@@ -887,15 +887,8 @@ export default function JobReportPage() {
         <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
           <div className="bg-gradient-to-r from-slate-900 to-slate-700 px-8 py-6 text-white">
             <div className="flex items-center gap-3 mb-1">
-              {report.job.clientLogoUrl && (
-                <img
-                  src={report.job.clientLogoUrl}
-                  alt={report.job.clientName ?? branding.companyName}
-                  className="h-8 w-8 rounded object-contain bg-white/10 p-0.5"
-                />
-              )}
               <span className="text-xs font-medium text-slate-400 uppercase tracking-wide">
-                {report.job.clientName ?? branding.productName}
+                {branding.productName}
               </span>
             </div>
             <h1 className="text-2xl font-bold mb-1">{report.job.title}</h1>
@@ -1006,7 +999,7 @@ export default function JobReportPage() {
                         <CandidateActionButton key={e.candidateId} evaluation={e} jobId={jobId} state={actionState[e.candidateId] ?? "idle"} onExecute={executeAction} compact dark />
                       ))}
                     </div>
-                    <p className="text-xs text-slate-500 mt-1.5">— verify experience depth and fit</p>
+                    <p className="text-xs text-slate-500 mt-1.5">— verify autonomy & impact</p>
                   </div>
                 </div>
               )}
@@ -1236,12 +1229,12 @@ export default function JobReportPage() {
           </section>
         )}
 
-        {/* ── Client Mission Understanding ── */}
+        {/* ── Job Understanding ── */}
         {insight && (
           <section>
             <h2 className="text-base font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
               <Star className="h-4 w-4" />
-              Client Mission Understanding
+              Job Understanding
             </h2>
             <div className="grid md:grid-cols-2 gap-4">
               <Card>

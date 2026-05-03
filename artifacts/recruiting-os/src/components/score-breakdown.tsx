@@ -8,34 +8,22 @@ export type ScoreDimension = {
 };
 
 export type ScoreBreakdown = {
-  skillsMatch: ScoreDimension;
-  experienceDepth: ScoreDimension;
   autonomy: ScoreDimension;
   productMindset: ScoreDimension;
-  softSkills: ScoreDimension;
-  cultureFit: ScoreDimension;
-  longTermPotential: ScoreDimension;
+  impact: ScoreDimension;
 };
 
 /** Per-job scoring weights as integer percentages (0-100). Must sum to 100. */
 export type ScoringWeights = {
-  skillsMatch: number;
-  experienceDepth: number;
-  softSkills: number;
   autonomy: number;
-  cultureFit: number;
-  longTermPotential: number;
   productMindset: number;
+  impact: number;
 };
 
 export const DEFAULT_SCORING_WEIGHTS: ScoringWeights = {
-  skillsMatch: 23,
-  experienceDepth: 20,
-  softSkills: 15,
-  autonomy: 13,
-  cultureFit: 10,
-  longTermPotential: 10,
-  productMindset: 9,
+  autonomy: 35,
+  productMindset: 30,
+  impact: 35,
 };
 
 type DimensionMeta = {
@@ -47,46 +35,22 @@ type DimensionMeta = {
 
 const DIMENSION_META: DimensionMeta[] = [
   {
-    key: "skillsMatch",
-    label: "Skills Match",
-    abbr: "Skills",
-    description: "How well the candidate's skills line up with the must-haves you listed for this role.",
-  },
-  {
-    key: "experienceDepth",
-    label: "Experience Depth",
-    abbr: "Experience",
-    description: "Whether their past hands-on experience matches the seniority you need.",
-  },
-  {
-    key: "softSkills",
-    label: "Soft Skills",
-    abbr: "Soft",
-    description: "Communication, empathy and adaptability shown in their profile.",
-  },
-  {
     key: "autonomy",
     label: "Autonomy & Ownership",
     abbr: "Autonomy",
-    description: "Evidence they can run with projects and make decisions on their own.",
-  },
-  {
-    key: "cultureFit",
-    label: "Culture Fit",
-    abbr: "Culture",
-    description: "How aligned they look with your team's stated values and ways of working.",
-  },
-  {
-    key: "longTermPotential",
-    label: "Long-Term Potential",
-    abbr: "Growth",
-    description: "Their growth trajectory and learning agility — how far they could go on your team.",
+    description: "Evidence they can run with projects end-to-end and make decisions without heavy direction.",
   },
   {
     key: "productMindset",
     label: "Product Mindset",
     abbr: "Product",
-    description: "Whether they think about users and business impact, not just execution.",
+    description: "Whether they think about users and business outcomes, not just shipping tasks.",
+  },
+  {
+    key: "impact",
+    label: "Impact",
+    abbr: "Impact",
+    description: "Concrete shipped outcomes, measurable results, and the scope of work they've actually delivered.",
   },
 ];
 
@@ -125,7 +89,6 @@ export function ScoreBreakdownDisplay({
 
   return (
     <div className={className}>
-      {/* dimension bars row */}
       <div className="space-y-2">
         {DIMENSION_META.map((dim) => {
           const d = breakdown[dim.key];
@@ -174,7 +137,6 @@ export function ScoreBreakdownDisplay({
         })}
       </div>
 
-      {/* toggle */}
       {showToggle && (
         <button
           className="mt-2.5 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"

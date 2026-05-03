@@ -225,7 +225,7 @@ router.get("/reports/job/:jobId/latest/markdown", async (req, res) => {
     .map(([k, v]) => `${k}: ${v}`)
     .join(" | ");
 
-  const clientDisplayName = job.clientName ?? branding.companyName;
+  const clientDisplayName = branding.companyName;
   const md: string[] = [];
 
   md.push(`# HiringAI Shortlist Report — ${job.title}`);
@@ -266,7 +266,7 @@ router.get("/reports/job/:jobId/latest/markdown", async (req, res) => {
     md.push(`- **→ Schedule interviews:** ${actionGroupsNamed["Interview now"].join(", ")}`);
   }
   if (actionGroupsNamed["Review manually"].length > 0) {
-    md.push(`- **→ Review before advancing:** ${actionGroupsNamed["Review manually"].join(", ")} — verify experience depth and cultural fit`);
+    md.push(`- **→ Review before advancing:** ${actionGroupsNamed["Review manually"].join(", ")} — verify autonomy, product mindset, and concrete impact`);
   }
   if (actionGroupsNamed["Enrich before deciding"].length > 0) {
     md.push(`- **→ Enrich profiles first:** ${actionGroupsNamed["Enrich before deciding"].join(", ")} — insufficient data for a reliable decision`);
@@ -311,7 +311,7 @@ router.get("/reports/job/:jobId/latest/markdown", async (req, res) => {
     }
     if (e.clientFitNarrative) {
       md.push("");
-      md.push("**Why this candidate fits your client:**");
+      md.push("**Why this candidate fits the role:**");
       md.push(`> ${e.clientFitNarrative}`);
     }
     md.push("");
@@ -357,8 +357,8 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
 
-  // ── Fetch logo image (client logo URL takes priority over global branding logo)
-  const logoUrl = job.clientLogoUrl ?? (branding.logoUrl || null);
+  // ── Fetch logo image from central HiringAI branding
+  const logoUrl = branding.logoUrl || null;
   let logoBuffer: Buffer | null = null;
   if (logoUrl) {
     try {
@@ -382,7 +382,7 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
   const GREEN = "#16a34a";
   const AMBER = "#d97706";
   const RED = "#dc2626";
-  const clientDisplayName = job.clientName ?? branding.companyName;
+  const clientDisplayName = branding.companyName;
   const reportTitle = `${branding.productName} Report`;
 
   const scoreColor = (score: number) => score >= 80 ? GREEN : score >= 60 ? ACCENT : score >= 40 ? AMBER : RED;
@@ -473,7 +473,7 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
   if (pdfActionGroups["Interview now"].length > 0)
     nextActions.push({ arrow: "→", color: GREEN, text: `Schedule interviews: ${pdfActionGroups["Interview now"].map((c) => c.name).join(", ")}` });
   if (pdfActionGroups["Review manually"].length > 0)
-    nextActions.push({ arrow: "→", color: "#3b82f6", text: `Review before advancing: ${pdfActionGroups["Review manually"].map((c) => c.name).join(", ")} — verify experience depth` });
+    nextActions.push({ arrow: "→", color: "#3b82f6", text: `Review before advancing: ${pdfActionGroups["Review manually"].map((c) => c.name).join(", ")} — verify autonomy & impact` });
   if (pdfActionGroups["Enrich before deciding"].length > 0)
     nextActions.push({ arrow: "→", color: AMBER, text: `Enrich profiles first: ${pdfActionGroups["Enrich before deciding"].map((c) => c.name).join(", ")} — too sparse to decide` });
   if (pdfActionGroups["Reject / low priority"].length > 0)
@@ -502,7 +502,7 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
 
   // ── CLIENT MISSION UNDERSTANDING
   if (insight) {
-    sectionHeading("Client Mission Understanding");
+    sectionHeading("Job Understanding");
     bodyText(insight.idealCandidateProfile as string);
     doc.moveDown(0.4);
     if (((insight.mustHaveSkills ?? []) as string[]).length > 0) {

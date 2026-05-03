@@ -394,7 +394,7 @@ export default function JobDetailPage() {
                   ) : (
                     <Sparkles className="mr-2 h-4 w-4" />
                   )}
-                  {workflowRunning ? "Screening…" : "Run Smart Screening"}
+                  {workflowRunning ? "Running…" : "Run AI Workflow"}
                 </Button>
                 <button
                   type="button"
@@ -414,13 +414,13 @@ export default function JobDetailPage() {
                   <Link href={`/jobs/${job.id}/report`}>
                     <Button variant="outline" className="whitespace-nowrap border-green-300 text-green-800 hover:bg-green-50">
                       <FileText className="mr-2 h-4 w-4" />
-                      View Top Picks
+                      View Shortlist
                     </Button>
                   </Link>
                 ) : (
                   <Button variant="outline" disabled className="opacity-40 whitespace-nowrap">
                     <FileText className="mr-2 h-4 w-4" />
-                    View Top Picks
+                    View Shortlist
                   </Button>
                 )}
                 {workflowData?.run?.status === "completed" && (
@@ -505,9 +505,9 @@ export default function JobDetailPage() {
                   <div>
                     <Label htmlFor="run-enrichment" className="text-xs font-medium cursor-pointer flex items-center gap-1.5">
                       <Sparkles className="h-3 w-3 text-blue-600" />
-                      Profile Lookup before scoring
+                      Enrichment before scoring
                     </Label>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Pulls richer details on each candidate (skills, headline, summary). Needs a Profile Lookup provider configured in Settings.</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Pulls richer details on each candidate (skills, headline, summary). Needs an Enrichment provider configured in Settings.</p>
                   </div>
                 </div>
                 {/* Edit job */}
@@ -546,7 +546,7 @@ export default function JobDetailPage() {
             <div className="p-4 border-b border-border flex items-center justify-between bg-muted/20">
               <div className="flex items-center gap-2 flex-wrap">
                 <BrainCircuit className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold">Smart Screening Insights</h2>
+                <h2 className="text-lg font-semibold">AI Workflow Insights</h2>
                 {workflowData?.run && (
                   <Badge variant="outline" className={`ml-2 capitalize ${
                     workflowData.run.status === 'completed' ? 'border-green-500 text-green-600' :
@@ -598,7 +598,7 @@ export default function JobDetailPage() {
                     </div>
                     <h3 className="font-semibold text-lg">Ready to find your best candidates?</h3>
                     <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                      Run Smart Screening — we'll read every profile and rank them against this role across 7 hiring dimensions.
+                      Run the AI workflow — we'll read every profile and rank them against this role across 3 HiringAI dimensions: autonomy, product mindset and impact.
                     </p>
                     <Button
                       onClick={handleRunWorkflow}
@@ -606,7 +606,7 @@ export default function JobDetailPage() {
                       className="mt-2 bg-primary/90 hover:bg-primary"
                     >
                       <Sparkles className="mr-2 h-4 w-4" />
-                      Run Smart Screening
+                      Run AI Workflow
                     </Button>
                   </div>
                 ) : workflowRunning ? (
@@ -666,7 +666,7 @@ export default function JobDetailPage() {
                     {/* Job Understanding */}
                     {workflowData.insight && (
                       <div>
-                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Client Mission Understanding</h3>
+                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Job Understanding</h3>
                         <div className="grid md:grid-cols-2 gap-6">
                           <Card>
                             <CardHeader className="pb-2">
@@ -1076,7 +1076,7 @@ export default function JobDetailPage() {
               setTimeout(() => setHighlightStep2(false), 3000);
               toast({
                 title: `${created} candidate${created !== 1 ? "s" : ""} added`,
-                description: "Pipeline refreshed. Run Smart Screening to score them.",
+                description: "Pipeline refreshed. Run the AI workflow to score them.",
               });
             }
           }}
@@ -1109,7 +1109,7 @@ export default function JobDetailPage() {
             if (created > 0) {
               toast({
                 title: `${created} candidate${created !== 1 ? "s" : ""} sourced`,
-                description: "They've been added to your pipeline. Run Smart Screening to score them.",
+                description: "They've been added to your pipeline. Run the AI workflow to score them.",
               });
             }
           }}

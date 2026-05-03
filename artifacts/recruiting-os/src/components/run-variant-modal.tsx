@@ -103,7 +103,7 @@ export function RunVariantModal({
             Run Variant
           </DialogTitle>
           <DialogDescription>
-            Adjust the client mission criteria and re-run the AI workflow. The results will
+            Adjust the job criteria and re-run the AI workflow. The results will
             be shown side-by-side with the original run.
           </DialogDescription>
         </DialogHeader>
@@ -187,7 +187,7 @@ export function RunVariantModal({
               className="text-sm resize-none"
             />
             <p className="text-xs text-muted-foreground">
-              This note is appended to the client mission brief before the AI evaluates candidates.
+              This note is appended to the job brief before the AI evaluates candidates.
             </p>
           </div>
 

@@ -287,7 +287,7 @@ export function FindCandidatesModal({
             Find Candidates with AI
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Source candidates for <span className="font-medium text-foreground">{jobTitle}</span> — your client mission — via an external provider.
+            Source candidates for <span className="font-medium text-foreground">{jobTitle}</span> via an external provider.
             Results are saved to your pipeline automatically.
           </DialogDescription>
         </DialogHeader>
@@ -326,7 +326,7 @@ export function FindCandidatesModal({
               </Button>
               <Button className="flex-1 bg-primary/90 hover:bg-primary" onClick={() => onOpenChange(false)}>
                 <Play className="mr-2 h-3.5 w-3.5" />
-                Run Smart Screening
+                Run AI Workflow
               </Button>
             </div>
           </div>

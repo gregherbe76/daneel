@@ -27,16 +27,16 @@ Think Vercel ↔ Next.js: agencies use ShortlistPro, builders extend Daneel.
 A guided HR app for small teams, powered by an agentic workflow engine.
 
 ```
-Job Brief → Smart Screening → Top Picks → Hiring Report
+Job Brief → AI Workflow → Shortlist → Hiring Report
 ```
 
 The system:
 - **Understands the job** — pulls structured criteria from your description
-- **Smart Screening** — scores every candidate across 7 hiring dimensions
-  (skills, experience, soft skills, autonomy, culture fit, long-term potential, product mindset)
-- **Sourcing** — brings new candidates into the pipeline before screening
-- **Profile Lookup** — fills in missing details (skills, headline, summary) before scoring
-- **Top Picks** — produces a ranked shortlist and a shareable hiring report
+- **Candidate Matching** — scores every candidate across 3 hiring dimensions
+  (autonomy, product mindset, impact)
+- **Sourcing** — brings new candidates into the pipeline before scoring
+- **Enrichment** — fills in missing details (skills, headline, summary) before scoring
+- **Shortlist** — produces a ranked shortlist and a shareable hiring report
 - **Notes & team discussion** — leave private notes and threaded comments per candidate, scoped per role
 
 You define the criteria. The engine does the work. Every step is logged.

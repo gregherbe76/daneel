@@ -1,0 +1,193 @@
+🎯 OBJECTIF IMMÉDIAT
+
+Restaurer 1 produit clair + garder 3 templates propres
+
+⚖️ DÉCISION À PRENDRE (MAINTENANT)
+
+Tu dois choisir :
+
+❌ Option 1 (à éviter maintenant)
+
+3 apps distinctes
+→ trop lourd
+→ ralentit tout
+
+✅ Option 2 (la bonne)
+
+1 app runtime + template loader
+
+🧠 ARCHITECTURE CIBLE
+Daneel Engine (stable)
+        ↓
+Template Loader (runtime)
+        ↓
+UI / Branding / Scoring / Prompts
+🔥 PLAN D’ACTION (TRÈS CONCRET)
+1. 🔴 FIGER L’APP ACTUELLE
+
+👉 décision :
+
+L’app live devient HiringAI
+
+Pourquoi ?
+simple
+minimal
+cohérent avec ton UX actuel
+le moins “cassé”
+2. 🔧 CLEAN IMMÉDIAT (OBLIGATOIRE)
+
+Tu dois supprimer les incohérences.
+
+PROMPT
+Clean the current app to a single product: HiringAI.
+
+Remove or fix:
+
+1. Replace all references:
+- "Client Mission" → "Job"
+- "Why this candidate fits your client" → "Why this candidate fits the role"
+
+2. Remove ShortlistPro-specific elements:
+- clientLogo
+- clientName overrides
+- agency language
+
+3. Remove HireFlow remnants:
+- "Run Smart Screening"
+- "Top Picks" wording
+
+4. Align scoring:
+- keep only 3 dimensions:
+  - autonomy
+  - productMindset
+  - impact
+- remove unused sliders (7 → 3)
+
+5. Ensure consistency:
+- branding
+- language
+- reports
+- UI labels
+
+Goal:
+Make HiringAI coherent and clean.
+3. 🧩 TEMPLATE LOADER (CLÉ)
+
+👉 tu actives enfin tes templates
+
+CONFIG
+// config/template.ts
+export const template = process.env.APP_TEMPLATE || "hiringai"
+LOAD
+import { templates } from "@/templates"
+
+const activeTemplate = templates[template]
+PROMPT
+Implement template loader system.
+
+Goal:
+Allow switching product behavior via templates.
+
+1. Create:
+config/template.ts
+
+2. Load template:
+- from env APP_TEMPLATE
+- default: hiringai
+
+3. Template must control:
+- branding
+- labels
+- scoring dimensions
+- report wording
+
+4. Replace hardcoded values with template values
+
+5. Do NOT duplicate logic:
+- keep one engine
+- inject config only
+
+Goal:
+Switch product without changing code.
+4. 🔌 CONNECT PROMPTS.md (TRÈS IMPORTANT)
+
+👉 aujourd’hui : prompts hardcodés
+👉 demain : prompts par template
+
+PROMPT
+Externalize prompts to templates.
+
+Goal:
+Make AI behavior customizable per template.
+
+1. Move prompts from:
+native-openai.ts
+
+To:
+templates/<template>/prompts.ts
+
+2. Load prompts dynamically:
+based on active template
+
+3. Each template defines:
+- job understanding prompt
+- matching prompt
+- report prompt
+
+4. Fallback:
+use default if missing
+
+Goal:
+Templates control AI behavior.
+5. 📦 STRUCTURE FINALE
+/lib
+  /daneel-engine
+
+/templates
+  /hiringai
+  /hireflow
+  /shortlistpro
+
+/config
+  template.ts
+
+/app
+  (single UI)
+💣 CE QUE ÇA CHANGE
+
+Avant :
+
+👉 mélange incohérent
+👉 perception confuse
+
+Après :
+
+👉 1 produit clair + 3 déclinaisons propres
+
+🧠 POSITIONNEMENT FINAL
+Runtime
+
+HiringAI — internal AI hiring assistant
+
+Templates
+
+Build your own product:
+
+agency → ShortlistPro
+SaaS → HireFlow
+internal → HiringAI
+Engine
+
+Powered by Daneel
+
+⚠️ ERREUR À ÉVITER
+
+👉 ne pas faire :
+
+3 apps
+3 codebases
+3 frontends
+
+👉 tu dois :
+
+garder 1 engine + 1 UI + config dynamique

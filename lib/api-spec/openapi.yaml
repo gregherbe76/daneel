@@ -3,7 +3,7 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: HireFlow API
+  description: HiringAI API
 servers:
   - url: /api
     description: Base API path
@@ -969,27 +969,7 @@ components:
       type: object
       description: Per-job scoring weights (integer percentages 0-100, must sum to 100).
       properties:
-        skillsMatch:
-          type: integer
-          minimum: 0
-          maximum: 100
-        experienceDepth:
-          type: integer
-          minimum: 0
-          maximum: 100
-        softSkills:
-          type: integer
-          minimum: 0
-          maximum: 100
         autonomy:
-          type: integer
-          minimum: 0
-          maximum: 100
-        cultureFit:
-          type: integer
-          minimum: 0
-          maximum: 100
-        longTermPotential:
           type: integer
           minimum: 0
           maximum: 100
@@ -997,7 +977,11 @@ components:
           type: integer
           minimum: 0
           maximum: 100
-      required: [skillsMatch, experienceDepth, softSkills, autonomy, cultureFit, longTermPotential, productMindset]
+        impact:
+          type: integer
+          minimum: 0
+          maximum: 100
+      required: [autonomy, productMindset, impact]
 
     Job:
       type: object
@@ -1016,12 +1000,6 @@ components:
           type: array
           items:
             type: string
-        clientName:
-          type: string
-          nullable: true
-        clientLogoUrl:
-          type: string
-          nullable: true
         scoringWeights:
           $ref: "#/components/schemas/ScoringWeights"
         createdAt:
@@ -1047,12 +1025,6 @@ components:
           type: array
           items:
             type: string
-        clientName:
-          type: string
-          nullable: true
-        clientLogoUrl:
-          type: string
-          nullable: true
         scoringWeights:
           $ref: "#/components/schemas/ScoringWeights"
       required: [title, description, location, seniority, mustHaveSkills]

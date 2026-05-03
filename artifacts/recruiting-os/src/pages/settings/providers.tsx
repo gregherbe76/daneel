@@ -85,10 +85,10 @@ interface Provider {
 
 const WORKFLOW_STEPS: { key: WorkflowStep; label: string; description: string; comingSoon?: boolean }[] = [
   { key: "job_understanding", label: "Job Understanding", description: "Reads the job posting and pulls out what really matters" },
-  { key: "candidate_matching", label: "Smart Screening", description: "Scores every candidate against the role across 7 hiring dimensions" },
-  { key: "shortlist_generation", label: "Top Picks", description: "Ranks the strongest candidates and writes a hiring summary you can share" },
+  { key: "candidate_matching", label: "Candidate Matching", description: "Scores every candidate against the role across the HiringAI 3-dimension rubric (autonomy, product mindset, impact)" },
+  { key: "shortlist_generation", label: "Shortlist", description: "Ranks the strongest candidates and writes a hiring summary you can share" },
   { key: "sourcing", label: "Sourcing", description: "Brings new candidates into the pipeline before screening. Twin uses POST /workflow/sourcing" },
-  { key: "enrichment", label: "Profile Lookup", description: "Fills in missing details on each candidate (skills, headline, summary) before screening. Twin uses POST /workflow/enrichment" },
+  { key: "enrichment", label: "Enrichment", description: "Fills in missing details on each candidate (skills, headline, summary) before scoring. Twin uses POST /workflow/enrichment" },
   { key: "sourcing_later", label: "Sourcing (future)", description: "Proactive outreach and external sourcing (coming soon)", comingSoon: true },
 ];
 

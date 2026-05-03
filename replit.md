@@ -30,12 +30,13 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 
 ### Artifacts
 - `artifacts/api-server` — Express 5 REST API, port 8080, path `/api` (Daneel engine: workflow runtime, providers, agents)
-- `artifacts/recruiting-os` — React + Vite frontend, path `/` (ShortlistPro UI layer; package name `@workspace/recruiting-os` is the engine codename and stays unchanged)
+- `artifacts/recruiting-os` — React + Vite frontend, path `/` (HiringAI UI layer; package name `@workspace/recruiting-os` is the engine codename and stays unchanged)
 
 ### Product positioning
-- **ShortlistPro** is the user-facing product (UI copy, reports, "Client Mission" terminology, agency-oriented branding).
+- **HiringAI** is the user-facing product (UI copy, reports, "Job" terminology, startup-oriented branding). Phase 1 of the "1 product + 3 templates" plan collapsed the live app into a single coherent HiringAI product — ShortlistPro / HireFlow agency vocabulary and white-label fields (`clientName`, `clientLogoUrl`) have been removed.
 - **Daneel** is the underlying engine (kept in code naming, internal types, README, and the "Powered by Daneel" attribution shown in the sidebar and exported reports).
-- Do NOT rename internal modules, package names, type names, or the engine architecture to "ShortlistPro" — only UI-visible strings and reports use the ShortlistPro brand.
+- Do NOT rename internal modules, package names, type names, or the engine architecture to "HiringAI" — only UI-visible strings and reports use the HiringAI brand.
+- Phases 2-3 (template loader at `config/template.ts` reading `APP_TEMPLATE` env, externalized prompts) are deferred — the codebase is ready for them but not yet wired up.
 
 ### Shared Libraries
 - `lib/db` — Drizzle ORM schema + DB client (`@workspace/db`)
@@ -52,7 +53,7 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 ### Team Collaboration
 - **Team roster** — hard-coded HR roster in `artifacts/api-server/src/lib/team-roster.ts` (no auth yet); exposed via `GET /api/team`.
 - **@mentions in comments** — `candidate_comments.mentions` JSONB column stores `{id,name}[]`; `MentionTextarea` provides `@`-triggered autocomplete and `CommentBody` renders matched names as highlighted chips.
-- **Mentions inbox** — `GET /api/team/:memberId/mentions` lists comments mentioning a teammate (with candidate/job context). `/mentions` page shows the inbox; sidebar badge counts unread items per current user. The "current user" and "last read" timestamp are persisted in `localStorage` (keys `hireflow.currentUserId`, `hireflow.mentionsLastReadAt:{userId}`).
+- **Mentions inbox** — `GET /api/team/:memberId/mentions` lists comments mentioning a teammate (with candidate/job context). `/mentions` page shows the inbox; sidebar badge counts unread items per current user. The "current user" and "last read" timestamp are persisted in `localStorage` (keys `hiringai.currentUserId`, `hiringai.mentionsLastReadAt:{userId}`).
 - **Applications** — candidateId + jobId join, stage pipeline (Sourced → Hired)
 
 ### AI Workflow Engine (`artifacts/api-server/src/routes/workflows/`)
@@ -76,7 +77,7 @@ Each candidate evaluation stores three complementary scores:
 
 | Score | Source | Formula |
 |---|---|---|
-| **Fit Score** (0-100) | AI (GPT) | Weighted: skillsMatch×0.35 + experienceDepth×0.30 + autonomy×0.20 + productMindset×0.15. Recomputed server-side for consistency. |
+| **Fit Score** (0-100) | AI (GPT) | Weighted: autonomy×0.35 + productMindset×0.30 + impact×0.35 (HiringAI 3-dimension rubric, configurable per-job). Recomputed server-side for consistency. |
 | **Data Confidence Score** (0-100) | Server (engine.ts) | Derived from profile completeness: enrichmentStatus (+30-40), LinkedIn (+15), skills count (+5-20), summary length (+8-20), headline (+5). |
 | **Decision Score** (0-100) | Server (engine.ts) | `round(fitScore × (0.6 + 0.4 × dataConfidence/100))`. Main ranking/sorting score. |
 

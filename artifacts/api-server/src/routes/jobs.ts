@@ -30,8 +30,6 @@ router.post("/jobs", async (req, res) => {
       location: body.location,
       seniority: body.seniority,
       mustHaveSkills: body.mustHaveSkills,
-      clientName: body.clientName ?? null,
-      clientLogoUrl: body.clientLogoUrl ?? null,
       scoringWeights: body.scoringWeights ?? DEFAULT_SCORING_WEIGHTS,
     })
     .returning();
@@ -64,8 +62,6 @@ router.put("/jobs/:id", async (req, res) => {
       location: body.location,
       seniority: body.seniority,
       mustHaveSkills: body.mustHaveSkills,
-      clientName: body.clientName ?? null,
-      clientLogoUrl: body.clientLogoUrl ?? null,
       // Only overwrite weights when the client explicitly sends them.
       // Omitting the field preserves the job's existing customized weights.
       ...(body.scoringWeights ? { scoringWeights: body.scoringWeights } : {}),

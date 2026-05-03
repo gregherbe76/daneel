@@ -20,13 +20,9 @@ import { ScoringWeightsEditor, sumWeights } from "@/components/scoring-weights-e
 import { DEFAULT_SCORING_WEIGHTS } from "@/components/score-breakdown";
 
 const weightsSchema = z.object({
-  skillsMatch: z.number().int().min(0).max(100),
-  experienceDepth: z.number().int().min(0).max(100),
-  softSkills: z.number().int().min(0).max(100),
   autonomy: z.number().int().min(0).max(100),
-  cultureFit: z.number().int().min(0).max(100),
-  longTermPotential: z.number().int().min(0).max(100),
   productMindset: z.number().int().min(0).max(100),
+  impact: z.number().int().min(0).max(100),
 });
 
 const formSchema = z.object({
@@ -44,8 +40,6 @@ const formSchema = z.object({
     Seniority.VP,
   ]),
   mustHaveSkills: z.array(z.string()).min(1, "At least one skill is required"),
-  clientName: z.string().optional(),
-  clientLogoUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   scoringWeights: weightsSchema.refine((w) => sumWeights(w) === 100, {
     message: "Scoring weights must add up to 100%",
   }),
@@ -72,8 +66,6 @@ export default function EditJobPage() {
       location: "",
       seniority: Seniority.Mid,
       mustHaveSkills: [],
-      clientName: "",
-      clientLogoUrl: "",
       scoringWeights: { ...DEFAULT_SCORING_WEIGHTS },
     },
   });
@@ -86,8 +78,6 @@ export default function EditJobPage() {
         location: job.location,
         seniority: job.seniority,
         mustHaveSkills: job.mustHaveSkills,
-        clientName: job.clientName ?? "",
-        clientLogoUrl: job.clientLogoUrl ?? "",
         scoringWeights: job.scoringWeights ?? { ...DEFAULT_SCORING_WEIGHTS },
       });
     }
@@ -95,14 +85,7 @@ export default function EditJobPage() {
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     updateJob.mutate(
-      {
-        id: jobId,
-        data: {
-          ...values,
-          clientName: values.clientName || null,
-          clientLogoUrl: values.clientLogoUrl || null,
-        },
-      },
+      { id: jobId, data: values },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListJobsQueryKey() });
@@ -288,38 +271,6 @@ export default function EditJobPage() {
                     </FormItem>
                   )}
                 />
-              </div>
-
-              <div className="border-t pt-4">
-                <p className="text-sm font-medium text-muted-foreground mb-3">Client Branding (optional)</p>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="clientName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Client Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g. Acme Corp" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="clientLogoUrl"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Client Logo URL</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://example.com/logo.png" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
               </div>
             </CardContent>
             <CardFooter className="flex justify-end gap-2 border-t pt-6">

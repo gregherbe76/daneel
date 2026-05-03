@@ -43,37 +43,17 @@ export interface ScoringWeights {
    * @minimum 0
    * @maximum 100
    */
-  skillsMatch: number;
-  /**
-   * @minimum 0
-   * @maximum 100
-   */
-  experienceDepth: number;
-  /**
-   * @minimum 0
-   * @maximum 100
-   */
-  softSkills: number;
-  /**
-   * @minimum 0
-   * @maximum 100
-   */
   autonomy: number;
   /**
    * @minimum 0
    * @maximum 100
    */
-  cultureFit: number;
-  /**
-   * @minimum 0
-   * @maximum 100
-   */
-  longTermPotential: number;
-  /**
-   * @minimum 0
-   * @maximum 100
-   */
   productMindset: number;
+  /**
+   * @minimum 0
+   * @maximum 100
+   */
+  impact: number;
 }
 
 export interface Job {
@@ -83,8 +63,6 @@ export interface Job {
   location: string;
   seniority: Seniority;
   mustHaveSkills: string[];
-  clientName?: string | null;
-  clientLogoUrl?: string | null;
   scoringWeights: ScoringWeights;
   createdAt: string;
   updatedAt: string;
@@ -96,8 +74,6 @@ export interface CreateJobBody {
   location: string;
   seniority: Seniority;
   mustHaveSkills: string[];
-  clientName?: string | null;
-  clientLogoUrl?: string | null;
   scoringWeights?: ScoringWeights;
 }
 
