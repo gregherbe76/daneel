@@ -1,17 +1,26 @@
 import { Link, useLocation } from "wouter";
-import { Briefcase, Users, LayoutDashboard, Settings } from "lucide-react";
-import { LogoMark } from "./logo-mark";
+import { Briefcase, Users, PlayCircle, ListChecks } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
   const navigation = [
-    { name: "Client Missions", href: "/jobs", icon: Briefcase },
+    { name: "Jobs", href: "/jobs", icon: Briefcase },
     { name: "Candidates", href: "/candidates", icon: Users },
-  ];
-
-  const settingsNavigation = [
-    { name: "Advanced", href: "/settings/providers", icon: Settings },
+    { 
+      name: "Workflow", 
+      href: "/jobs", 
+      icon: PlayCircle, 
+      caption: "Run AI on a job",
+      match: "__never__" 
+    },
+    { 
+      name: "Shortlist", 
+      href: "/jobs", 
+      icon: ListChecks, 
+      caption: "View top candidates",
+      match: "__never__"
+    },
   ];
 
   return (
@@ -31,7 +40,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
         <nav className="flex-1 p-4 space-y-1">
           {navigation.map((item) => {
-            const isActive = location.startsWith(item.href);
+            const isActive = item.match 
+              ? location === item.match
+              : location.startsWith(item.href);
             return (
               <Link key={item.name} href={item.href}>
                 <div
@@ -42,31 +53,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   }`}
                 >
                   <item.icon className="h-5 w-5" />
-                  {item.name}
+                  <div className="flex flex-col">
+                    <span>{item.name}</span>
+                    {item.caption && (
+                      <span className="text-[10px] opacity-50 font-normal">{item.caption}</span>
+                    )}
+                  </div>
                 </div>
               </Link>
             );
           })}
         </nav>
-        <div className="p-4 border-t border-border space-y-1">
-          {settingsNavigation.map((item) => {
-            const isActive = location.startsWith(item.href);
-            return (
-              <Link key={item.name} href={item.href}>
-                <div
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors cursor-pointer ${
-                    isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  }`}
-                >
-                  <item.icon className="h-5 w-5" />
-                  {item.name}
-                </div>
-              </Link>
-            );
-          })}
-        </div>
       </div>
 
       {/* Main Content */}

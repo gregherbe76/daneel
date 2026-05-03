@@ -153,11 +153,12 @@ The fitScore = round(
   softSkills*${fmt(weights.softSkills)} + cultureFit*${fmt(weights.cultureFit)} + longTermPotential*${fmt(weights.longTermPotential)}
 ).
 
-IMPORTANT — Fit scoring rules:
+IMPORTANT — Scoring rules:
 - Score ONLY based on evidence present in the profile. Do NOT assume or invent qualifications.
 - Do NOT penalize for missing data. Instead, score conservatively on that dimension and flag the gap in missingDataWarnings.
 - If a dimension has no evidence at all, score it at 20-30 (not 0) and flag it.
 - Never fabricate experience or skills that are not explicitly listed.
+- Treat must-have skills as a baseline expectation: weave skill coverage into Impact reasoning rather than as a standalone dimension.
 
 Dimension definitions (the weights below are tuned per-job by the hiring manager):
 - skillsMatch (${fmt(weights.skillsMatch)}): Coverage of must-have skills from the job. Cite specific skill matches or gaps.
@@ -257,7 +258,7 @@ Return only valid JSON matching this exact structure:
   private async runShortlistGeneration(payload: ShortlistPayload): Promise<ShortlistResult[]> {
     const { job, insight, evaluations } = payload;
     const top5 = [...evaluations].sort((a, b) => b.score - a.score).slice(0, 5);
-    const prompt = `You are a technical recruiter creating a hiring shortlist.
+    const prompt = `You are creating a startup hiring shortlist for a founder. Be ultra-direct: no jargon, no filler, no diplomatic hedging. Founders want a verdict and the evidence behind it — nothing more.
 
 JOB: ${job.title}
 Ideal Profile: ${insight.idealCandidateProfile}
@@ -267,18 +268,23 @@ ${top5.map((c, i) => `${i + 1}. ${c.candidateName} (Score: ${c.score}, Recommend
    Strengths: ${c.strengths.join(", ")}
    Gaps: ${c.gaps.join(", ")}`).join("\n\n")}
 
-For each candidate, provide a brief hiring summary. Return JSON array:
+For each candidate, return:
+- whyRelevant: ONE short sentence verdict — the headline reason to talk to them. No preamble.
+- keyRisks: ONE short sentence naming the single biggest risk. No softening language.
+- finalRecommendation: ONE short imperative sentence ("Interview now.", "Pass.", "Phone screen first to verify X.").
+
+Hard limits: each field <= 25 words. Reference concrete evidence from strengths/gaps. Do NOT repeat the candidate's name inside the fields. Do NOT use phrases like "this candidate", "appears to", "seems to be", "could be a great fit".
+
+Return only a valid JSON array:
 [
   {
     "candidateId": <number>,
     "candidateName": "<name>",
-    "whyRelevant": "1-2 sentences on why they are a strong match",
-    "keyRisks": "1 sentence on the main risk or gap",
-    "finalRecommendation": "1 sentence final hiring recommendation"
+    "whyRelevant": "<one short verdict sentence>",
+    "keyRisks": "<one short risk sentence>",
+    "finalRecommendation": "<one short imperative sentence>"
   }
-]
-
-Return only valid JSON array.`;
+]`;
 
     const response = await openai.chat.completions.create({
       model: "gpt-5.1",

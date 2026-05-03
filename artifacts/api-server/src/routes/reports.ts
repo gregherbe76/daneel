@@ -228,7 +228,7 @@ router.get("/reports/job/:jobId/latest/markdown", async (req, res) => {
   const clientDisplayName = job.clientName ?? branding.companyName;
   const md: string[] = [];
 
-  md.push(`# ${branding.productName} Report — ${job.title}`);
+  md.push(`# HiringAI Shortlist Report — ${job.title}`);
   md.push(`**Prepared for:** ${clientDisplayName}  `);
   md.push(`**Location:** ${job.location} | **Seniority:** ${job.seniority}  `);
   md.push(`**Report Date:** ${new Date(generatedAt).toLocaleDateString("en-US", { dateStyle: "long" })}  `);
@@ -278,21 +278,6 @@ router.get("/reports/job/:jobId/latest/markdown", async (req, res) => {
   md.push("---");
   md.push("");
 
-  if (insight) {
-    md.push("## Client Mission Understanding");
-    md.push("");
-    md.push(`**Ideal Candidate Profile:** ${insight.idealCandidateProfile}`);
-    md.push("");
-    md.push("**Must-Have Skills:**");
-    ((insight.mustHaveSkills ?? []) as string[]).forEach((s) => md.push(`- ${s}`));
-    md.push("");
-    md.push("**Evaluation Criteria:**");
-    ((insight.evaluationCriteria ?? []) as string[]).forEach((c) => md.push(`- ${c}`));
-    md.push("");
-    md.push("---");
-    md.push("");
-  }
-
   md.push("## Recommendation Summary");
   md.push("");
   md.push(`| Rating | Count |`);
@@ -310,28 +295,19 @@ router.get("/reports/job/:jobId/latest/markdown", async (req, res) => {
   md.push("");
   top5.forEach((e, i) => {
     const cand = e.candidate;
-    md.push(`### ${i + 1}. ${cand?.name ?? "Unknown"}`);
-    if (cand?.headline) md.push(`_${cand.headline}_`);
+    const score = e.score;
+    const recommendation = e.recommendation;
+    const verdict = e.summary?.whyRelevant ?? e.summary?.finalRecommendation ?? "";
+    const strengths = ((e.strengths ?? []) as string[]).slice(0, 3);
+    const risk = e.summary?.keyRisks ?? ((e.risks ?? []) as string[])[0] ?? "";
+
+    md.push(`### ${i + 1}. ${cand?.name ?? "Unknown"} — ${score}/100 · ${recommendation}`);
+    if (verdict) md.push(`**Verdict:** ${verdict}`);
     md.push("");
-    md.push(`**Score:** ${e.score}/100 | **Recommendation:** ${e.recommendation}`);
-    if (e.summary?.whyRelevant) {
+    strengths.forEach((s) => md.push(`- ${s}`));
+    if (risk) {
       md.push("");
-      md.push(`**Why Relevant:** ${e.summary.whyRelevant}`);
-    }
-    md.push("");
-    md.push("**Strengths:**");
-    ((e.strengths ?? []) as string[]).forEach((s) => md.push(`- ${s}`));
-    md.push("");
-    md.push("**Gaps:**");
-    ((e.gaps ?? []) as string[]).forEach((g) => md.push(`- ${g}`));
-    if (((e.risks ?? []) as string[]).length > 0) {
-      md.push("");
-      md.push("**Risks:**");
-      ((e.risks ?? []) as string[]).forEach((r) => md.push(`- ${r}`));
-    }
-    if (e.summary?.keyRisks) {
-      md.push("");
-      md.push(`**Key Risks:** ${e.summary.keyRisks}`);
+      md.push(`> **Risk:** ${risk}`);
     }
     if (e.clientFitNarrative) {
       md.push("");
@@ -343,24 +319,6 @@ router.get("/reports/job/:jobId/latest/markdown", async (req, res) => {
 
   md.push("---");
   md.push("");
-
-  if (risks.length > 0) {
-    md.push("## Risk Summary");
-    md.push("");
-    risks.forEach((r) => md.push(`- ${r}`));
-    md.push("");
-    md.push("---");
-    md.push("");
-  }
-
-  if (interviewFocusAreas.length > 0) {
-    md.push("## Suggested Interview Focus Areas");
-    md.push("");
-    interviewFocusAreas.forEach((a) => md.push(`- ${a}`));
-    md.push("");
-    md.push("---");
-    md.push("");
-  }
 
   md.push("## Full Evaluation Table");
   md.push("");
@@ -566,48 +524,43 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
     const boxY = doc.y;
     doc.rect(50, boxY, W, 8).fill(scoreColor(e.score));
     doc.y = boxY + 12;
+
+    const rank = i + 1;
+    const name = cand?.name ?? "Unknown";
+    const score = e.score;
+    const recommendation = e.recommendation;
+    const verdict = e.summary?.whyRelevant ?? e.summary?.finalRecommendation ?? "";
+    const strengths = ((e.strengths ?? []) as string[]).slice(0, 3);
+    const risk = e.summary?.keyRisks ?? ((e.risks ?? []) as string[])[0] ?? "";
+
     doc.fill(PRIMARY).fontSize(11).font("Helvetica-Bold")
-      .text(`${i + 1}. ${cand?.name ?? "Unknown"}`, 50, doc.y, { continued: true });
-    doc.fill(scoreColor(e.score)).font("Helvetica-Bold").fontSize(11)
-      .text(`  ${e.score}/100`, { continued: true });
-    doc.fill(MUTED).font("Helvetica").fontSize(10)
-      .text(`  ${e.recommendation}`);
-    if (cand?.headline) {
-      doc.fill(MUTED).fontSize(9).font("Helvetica").text(cand.headline, { indent: 14 });
+      .text(`${rank}. ${name} — ${score}/100 · ${recommendation}`, 50, doc.y);
+
+    if (verdict) {
+      doc.moveDown(0.2);
+      doc.fill(PRIMARY).fontSize(9).font("Helvetica-Bold").text("Verdict: ", { continued: true, indent: 14 });
+      doc.font("Helvetica").text(verdict);
     }
-    if (e.summary?.whyRelevant) {
-      doc.fill(PRIMARY).fontSize(9).font("Helvetica").text(e.summary.whyRelevant, { indent: 14, width: W - 14 });
-    }
-    doc.moveDown(0.2);
-    const strengths = (e.strengths as string[]).slice(0, 2);
-    const gaps = (e.gaps as string[]).slice(0, 2);
+
     if (strengths.length > 0) {
-      doc.fill(GREEN).fontSize(8).text("Strengths: " + strengths.join("  ·  "), { indent: 14, width: W - 14 });
+      doc.moveDown(0.2);
+      strengths.forEach((s) => {
+        doc.fill(PRIMARY).fontSize(9).font("Helvetica").text(`• ${s}`, { indent: 24, width: W - 24 });
+      });
     }
-    if (gaps.length > 0) {
-      doc.fill(RED).fontSize(8).text("Gaps: " + gaps.join("  ·  "), { indent: 14, width: W - 14 });
+
+    if (risk) {
+      doc.moveDown(0.2);
+      doc.fill(RED).fontSize(9).font("Helvetica").text(`Risk: ${risk}`, { indent: 14, width: W - 14 });
     }
+
     if (e.clientFitNarrative) {
       doc.moveDown(0.2);
-      doc.fill(MUTED).fontSize(8).font("Helvetica-Bold").text("WHY THIS CANDIDATE FITS YOUR CLIENT", { indent: 14, width: W - 14 });
-      doc.fill("#1e40af").fontSize(8).font("Helvetica").text(e.clientFitNarrative, { indent: 14, width: W - 14 });
+      doc.fill(PRIMARY).fontSize(9).font("Helvetica-Oblique").text(e.clientFitNarrative, { indent: 24, width: W - 24 });
     }
+
     doc.moveDown(0.6);
   });
-
-  // ── RISKS
-  if (risks.length > 0) {
-    if (doc.y > doc.page.height - 120) doc.addPage();
-    sectionHeading("Risk Summary");
-    bulletList(risks, RED);
-  }
-
-  // ── INTERVIEW FOCUS AREAS
-  if (interviewFocusAreas.length > 0) {
-    if (doc.y > doc.page.height - 120) doc.addPage();
-    sectionHeading("Suggested Interview Focus Areas");
-    bulletList(interviewFocusAreas, PRIMARY);
-  }
 
   // ── FULL EVALUATION TABLE
   if (doc.y > doc.page.height - 160) doc.addPage();
