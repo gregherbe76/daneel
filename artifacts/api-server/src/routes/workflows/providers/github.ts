@@ -34,6 +34,26 @@ type GhRepo = {
   language: string | null;
   fork: boolean;
 };
+type GhCommitAuthor = { name?: string; email?: string };
+type GhPushEventCommit = { sha: string; author: GhCommitAuthor };
+type GhEvent = {
+  type: string;
+  actor?: { login?: string };
+  payload?: { commits?: GhPushEventCommit[] };
+};
+
+function isUsableEmail(email: string | undefined | null, login: string): boolean {
+  if (!email) return false;
+  const e = email.toLowerCase().trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return false;
+  if (e.endsWith("@users.noreply.github.com")) return false;
+  if (e.endsWith("@noreply.github.com")) return false;
+  // Filter out bot/automation accounts that frequently appear in events.
+  if (e.includes("[bot]")) return false;
+  if (e === `action@github.com`) return false;
+  if (e.startsWith(`${login.toLowerCase()}+`) && e.includes("@users.noreply")) return false;
+  return true;
+}
 
 export class GithubSourcingProvider implements AgentProvider {
   readonly id: number;
@@ -125,6 +145,70 @@ export class GithubSourcingProvider implements AgentProvider {
     return parts.join(" ");
   }
 
+  /**
+   * Best-effort discovery of a contactable email from public commit metadata.
+   * GitHub exposes commit author emails in /users/{login}/events/public PushEvent
+   * payloads. We prefer commits authored by the user themselves (matched by
+   * actor login or display name) and skip noreply/bot addresses.
+   */
+  private async discoverEmailFromCommits(
+    login: string,
+    displayName: string | null,
+  ): Promise<string | null> {
+    let events: GhEvent[];
+    try {
+      events = await this.ghFetch<GhEvent[]>(
+        `/users/${encodeURIComponent(login)}/events/public?per_page=100`,
+      );
+    } catch (err) {
+      logger.debug(
+        { login, err: err instanceof Error ? err.message : String(err) },
+        "GitHub email discovery: events fetch failed",
+      );
+      return null;
+    }
+
+    const loginLc = login.toLowerCase();
+    const nameLc = (displayName ?? "").toLowerCase().trim();
+
+    // Only accept commits whose author identity strongly matches the user.
+    // This avoids attributing a co-author / merged-commit email to the wrong
+    // person — a real risk when scanning PushEvent payloads in bulk.
+    const matchedCounts = new Map<string, number>();
+    for (const ev of events) {
+      if (ev.type !== "PushEvent") continue;
+      const commits = ev.payload?.commits ?? [];
+      for (const c of commits) {
+        const email = c.author?.email;
+        if (!isUsableEmail(email, login)) continue;
+        const authorName = (c.author?.name ?? "").toLowerCase().trim();
+        const emailLc = email!.toLowerCase();
+        const looksLikeUser =
+          authorName === loginLc ||
+          (nameLc && authorName === nameLc) ||
+          emailLc.startsWith(`${loginLc}@`) ||
+          emailLc.startsWith(`${loginLc}+`);
+        if (!looksLikeUser) continue;
+        matchedCounts.set(email!, (matchedCounts.get(email!) ?? 0) + 1);
+      }
+    }
+    if (matchedCounts.size === 0) return null;
+    let best: string | null = null;
+    let bestCount = 0;
+    for (const [e, n] of matchedCounts) {
+      if (n > bestCount) {
+        best = e;
+        bestCount = n;
+      }
+    }
+    return best;
+  }
+
+  /** Last-resort noreply address — never deliverable, but signals identity. */
+  private noreplyEmail(login: string): string {
+    return `${login}@users.noreply.github.com`;
+  }
+
   async run(input: AgentProviderRunInput): Promise<SourcingCandidate[]> {
     const payload = input.payload as SourcingPayload;
     const desired = Math.min(20, Math.max(1, Number(payload.count ?? 7)));
@@ -202,8 +286,15 @@ export class GithubSourcingProvider implements AgentProvider {
           headline: "",
           location: user.location ?? "",
           currentCompany: "",
-          // Never fabricate an email — recruiters must see when GitHub does not expose one.
-          email: user.email,
+          // Email resolution order:
+          //   1. Public profile email (when GitHub exposes it).
+          //   2. Real address discovered from the user's public commit metadata.
+          //   3. Noreply fallback so the candidate row always carries a stable
+          //      identifier — recruiters can tell at a glance it isn't deliverable.
+          email: isUsableEmail(user.email, user.login)
+            ? user.email!
+            : (await this.discoverEmailFromCommits(user.login, user.name)) ??
+              this.noreplyEmail(user.login),
           linkedinUrl: "",
           githubUrl: user.html_url,
           username: user.login,
