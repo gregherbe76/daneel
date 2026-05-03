@@ -256,9 +256,18 @@ router.get("/reports/job/:jobId/latest/markdown", async (req, res) => {
 
   const branding = await loadBrandingSettings();
   const clientDisplayName = branding.companyName;
+  const jobClientName = job.clientName ?? null;
+  const jobClientLogoUrl = job.clientLogoUrl ?? null;
   const md: string[] = [];
 
+  if (jobClientLogoUrl) {
+    md.push(`![${jobClientName ?? "Client logo"}](${jobClientLogoUrl})`);
+    md.push("");
+  }
   md.push(`# ${branding.productName} Shortlist Report — ${job.title}`);
+  if (jobClientName) {
+    md.push(`**Client:** ${jobClientName}  `);
+  }
   md.push(`**Prepared for:** ${clientDisplayName}  `);
   md.push(`**Location:** ${job.location} | **Seniority:** ${job.seniority}  `);
   md.push(`**Report Date:** ${new Date(generatedAt).toLocaleDateString("en-US", { dateStyle: "long" })}  `);
@@ -393,7 +402,11 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
   // services or cloud metadata endpoints.
   const branding = await loadBrandingSettings();
   const logoUrl = branding.logoUrl || null;
-  const logoBuffer: Buffer | null = await loadLogoBytes(logoUrl);
+  const clientLogoUrl = job.clientLogoUrl || null;
+  const [logoBuffer, clientLogoBuffer]: [Buffer | null, Buffer | null] = await Promise.all([
+    loadLogoBytes(logoUrl),
+    loadLogoBytes(clientLogoUrl),
+  ]);
 
   const doc = new PDFDocument({ margin: 50, size: "A4" });
   doc.pipe(res);
@@ -411,6 +424,7 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
   const RED = "#dc2626";
   const clientDisplayName = branding.companyName;
   const reportTitle = `${branding.productName} Report`;
+  const jobClientName = job.clientName ?? null;
 
   const scoreColor = (score: number) => score >= 80 ? GREEN : score >= 60 ? ACCENT : score >= 40 ? AMBER : RED;
   const recColor = (rec: string) =>
@@ -420,6 +434,31 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
 
   // ── COVER / HEADER
   doc.rect(0, 0, doc.page.width, 140).fill("#1e293b");
+
+  // Logo slots in the top-right of the header band:
+  //   - HiringAI / central branding logo (rightmost)
+  //   - Per-job client logo (just left of it, with separator)
+  // Both are best-effort: a failed/blocked fetch yields a null buffer and we
+  // simply skip rendering, so the header still looks intact.
+  const logoBoxH = 40;
+  const logoBoxY = 24;
+  const logoRightEdge = doc.page.width - 50;
+  let nextLogoRight = logoRightEdge;
+  const drawLogo = (buf: Buffer | null): number => {
+    if (!buf) return 0;
+    try {
+      const maxW = 90;
+      doc.image(buf, nextLogoRight - maxW, logoBoxY, { fit: [maxW, logoBoxH], align: "right", valign: "center" });
+      nextLogoRight -= maxW + 12;
+      return maxW + 12;
+    } catch (err) {
+      logger.warn({ err }, "Failed to embed logo image in PDF report");
+      return 0;
+    }
+  };
+  drawLogo(logoBuffer);
+  drawLogo(clientLogoBuffer);
+
   doc.fill("#ffffff").fontSize(22).font("Helvetica-Bold").text(job.title, 50, 40, { width: W });
   doc.fill("#94a3b8").fontSize(11).font("Helvetica").text(
     `${job.location}  ·  ${job.seniority}  ·  ${branding.productName} Hiring Report`,
@@ -428,7 +467,7 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
     { width: W }
   );
   doc.fill("#64748b").fontSize(9).font("Helvetica").text(
-    `Prepared for: ${clientDisplayName}`,
+    jobClientName ? `Client: ${jobClientName}  ·  Prepared for: ${clientDisplayName}` : `Prepared for: ${clientDisplayName}`,
     50,
     86,
     { width: W }
