@@ -698,6 +698,12 @@ export const GetLatestJobWorkflowResponse = zod.object({
       confidenceLevel: zod.enum(["High", "Medium", "Low"]).nullish(),
       confidenceReason: zod.string().nullish(),
       missingDataWarnings: zod.array(zod.string()).optional(),
+      requiresEnrichment: zod
+        .boolean()
+        .nullish()
+        .describe(
+          "True when data confidence was too low and no enrichment provider was available. Score reliability is reduced — enrichment is recommended before acting on this result.",
+        ),
       strengths: zod.array(zod.string()),
       gaps: zod.array(zod.string()),
       risks: zod.array(zod.string()),

@@ -52,6 +52,15 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 3. **Candidate Matching** — scores every candidate using three-score model (see below)
 4. **Shortlist Generation** — top-5 ranked by decisionScore with hiring summaries
 
+### Enrichment-First Logic (Pre-Matching)
+Before any candidate is sent to the AI for evaluation, the engine pre-screens data confidence (using `computeDataConfidenceScore`):
+
+- **If `dataConfidenceScore < 50` and an enrichment provider is configured** → `runInlineEnrichmentForCandidates()` is called for that batch, candidate rows are updated in DB, and the AI receives the enriched profiles. Server logs: `"Enrichment triggered before evaluation"`.
+- **If `dataConfidenceScore < 50` and no enrichment provider** → scoring continues with existing data. The evaluation is stored with `requiresEnrichment = true` and `"Low reliability — enrichment recommended"` is appended to `missingDataWarnings`. Server logs: `"Skipped full evaluation due to low confidence — no enrichment provider configured"`.
+- **Workflow never blocks**: enrichment failures fall back gracefully; low-confidence candidates always get scored.
+
+`requiresEnrichment: boolean` on `ai_evaluations` is the persistent flag. UI surfaces it as an amber "Enrich recommended" badge on pipeline cards, all-evaluations list, and the Full Evaluation Table. The Score Reliability section also includes `requiresEnrichment` candidates.
+
 ### Three-Score Candidate Scoring Model
 Each candidate evaluation stores three complementary scores:
 

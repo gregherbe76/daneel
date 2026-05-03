@@ -14,7 +14,7 @@ import { eq, ne, and, inArray } from "drizzle-orm";
 import { logger } from "../../lib/logger";
 import { resolveProvider, resolveSourcingProvider, resolveEnrichmentProvider } from "./providers";
 import type { JobInsightResult, CandidateMatchResult, ShortlistResult } from "./engine-types";
-import type { SourcingCandidate, EnrichmentResult } from "./providers";
+import type { AgentProvider, SourcingCandidate, EnrichmentResult, EnrichmentCandidate } from "./providers";
 
 export type { JobInsightResult, CandidateMatchResult, ShortlistResult };
 
@@ -377,6 +377,54 @@ function computeDataConfidenceScore(c: CandidateForConfidence): {
   return { score, level, reason };
 }
 
+/**
+ * Runs targeted enrichment for a specific batch of low-confidence candidates
+ * before they are evaluated. Updates candidate rows in the database in-place.
+ * Non-throwing — the caller handles errors and falls back gracefully.
+ */
+async function runInlineEnrichmentForCandidates(
+  runId: number,
+  job: { title: string; seniority: string; mustHaveSkills: string[] },
+  candidates: EnrichmentCandidate[],
+  provider: AgentProvider,
+): Promise<void> {
+  const rawResponse = await provider.run({
+    step: "enrichment",
+    runId,
+    jobId: 0,
+    payload: {
+      candidates,
+      jobContext: { title: job.title, seniority: job.seniority, mustHaveSkills: job.mustHaveSkills },
+    },
+  });
+
+  const results = rawResponse as EnrichmentResult[];
+  const now = new Date();
+
+  for (const r of results) {
+    const confidence = typeof r.confidence === "number" ? Math.min(1, Math.max(0, r.confidence)) : 0;
+    const missingSet = new Set<string>(Array.isArray(r.missingFields) ? r.missingFields : []);
+    const status: string =
+      confidence >= 0.7 && missingSet.size === 0 ? "enriched" : confidence >= 0.4 ? "partial" : "failed";
+
+    await db
+      .update(candidatesTable)
+      .set({
+        ...(r.experienceSummary && !missingSet.has("summary") ? { summary: r.experienceSummary } : {}),
+        ...(Array.isArray(r.skills) && r.skills.length > 0 && !missingSet.has("skills") ? { skills: r.skills } : {}),
+        ...(r.enrichedHeadline && !missingSet.has("headline") ? { headline: r.enrichedHeadline } : {}),
+        ...(r.currentCompany && !missingSet.has("currentCompany") ? { currentCompany: r.currentCompany } : {}),
+        ...(r.location && !missingSet.has("location") ? { location: r.location } : {}),
+        enrichedAt: now,
+        enrichmentSource: provider.name,
+        enrichmentConfidence: confidence,
+        enrichmentStatus: status,
+        updatedAt: now,
+      })
+      .where(eq(candidatesTable.id, r.candidateId));
+  }
+}
+
 async function runCandidateMatching(
   runId: number,
   jobId: number,
@@ -392,9 +440,59 @@ async function runCandidateMatching(
     enrichmentConfidence: number | null;
     linkedIn: string | null;
     headline: string | null;
+    currentCompany: string | null;
+    location: string | null;
+    githubUrl: string | null;
   }>,
 ): Promise<void> {
   await logStep(runId, "candidate_matching", "running", { candidateCount: candidates.length });
+
+  // ── Enrichment-first pre-screening ────────────────────────────────────────────
+  // Before sending any candidate to the AI, measure data confidence.
+  // Candidates below 50 points get inline enrichment if a provider is available.
+  // If no provider is configured, scoring continues but those candidates are
+  // flagged `requiresEnrichment = true` in the evaluation result. Never blocks.
+
+  const requiresEnrichmentSet = new Set<number>();
+  let candidatesForMatching = [...candidates];
+
+  const lowConfCandidates = candidates.filter(
+    (c) => computeDataConfidenceScore(c).score < 50,
+  );
+
+  if (lowConfCandidates.length > 0) {
+    const enrichmentProvider = await resolveEnrichmentProvider();
+
+    if (enrichmentProvider) {
+      // Provider available — trigger targeted enrichment before evaluation
+      logger.info(
+        { runId, count: lowConfCandidates.length, candidates: lowConfCandidates.map((c) => c.name) },
+        "Enrichment triggered before evaluation",
+      );
+      try {
+        await runInlineEnrichmentForCandidates(runId, job, lowConfCandidates, enrichmentProvider);
+        // Re-fetch the enriched rows so the AI sees updated profiles
+        const enrichedIds = lowConfCandidates.map((c) => c.id);
+        const refreshed = await db.select().from(candidatesTable).where(inArray(candidatesTable.id, enrichedIds));
+        const refreshedMap = new Map(refreshed.map((c) => [c.id, c]));
+        candidatesForMatching = candidatesForMatching.map((c) => refreshedMap.get(c.id) ?? c);
+        logger.info({ runId, refreshed: refreshed.length }, "Re-fetched enriched candidates for matching");
+      } catch (err) {
+        // Enrichment failed — continue with original data; mark those as requiring enrichment
+        logger.error({ runId, err }, "Inline enrichment failed — continuing with original candidate data");
+        for (const c of lowConfCandidates) requiresEnrichmentSet.add(c.id);
+      }
+    } else {
+      // No provider configured — score anyway but flag each candidate
+      for (const c of lowConfCandidates) {
+        logger.info(
+          { runId, candidateId: c.id, candidateName: c.name },
+          "Skipped full evaluation due to low confidence — no enrichment provider configured",
+        );
+        requiresEnrichmentSet.add(c.id);
+      }
+    }
+  }
 
   const provider = await resolveProvider("candidate_matching");
   logger.info({ runId, step: "candidate_matching", provider: provider.name }, "Step dispatched");
@@ -404,10 +502,10 @@ async function runCandidateMatching(
       step: "candidate_matching",
       runId,
       jobId,
-      payload: { job, insight, candidates },
+      payload: { job, insight, candidates: candidatesForMatching },
     })) as CandidateMatchResult[];
 
-    const candidateMap = new Map(candidates.map((c) => [c.id, c]));
+    const candidateMap = new Map(candidatesForMatching.map((c) => [c.id, c]));
 
     await Promise.all(
       results.map((r) => {
@@ -419,6 +517,11 @@ async function runCandidateMatching(
         const fitScore = r.fitScore ?? r.score;
         const decisionScore = Math.round(fitScore * (0.6 + 0.4 * dataConf.score / 100));
 
+        const requiresEnrichment = requiresEnrichmentSet.has(r.candidateId);
+        // Append the reliability warning to missingDataWarnings when enrichment was skipped
+        const warnings = [...(r.missingDataWarnings ?? [])];
+        if (requiresEnrichment) warnings.push("Low reliability — enrichment recommended");
+
         return db.insert(aiEvaluationsTable).values({
           runId,
           jobId,
@@ -429,7 +532,8 @@ async function runCandidateMatching(
           decisionScore,
           confidenceLevel: dataConf.level,
           confidenceReason: r.confidenceReason ?? dataConf.reason,
-          missingDataWarnings: r.missingDataWarnings ?? [],
+          missingDataWarnings: warnings.length > 0 ? warnings : [],
+          requiresEnrichment,
           strengths: r.strengths,
           gaps: r.gaps,
           risks: r.risks,
@@ -441,6 +545,10 @@ async function runCandidateMatching(
 
     await logStep(runId, "candidate_matching", "completed", { candidateCount: candidates.length, provider: provider.name }, {
       scores: results.map((r) => ({ name: r.candidateName, fitScore: r.fitScore ?? r.score, rec: r.recommendation })),
+      enrichmentPreScreen: {
+        lowConfidenceCount: lowConfCandidates.length,
+        requiresEnrichmentCount: requiresEnrichmentSet.size,
+      },
     });
   } catch (err) {
     await logStep(runId, "candidate_matching", "failed", { candidateCount: candidates.length, provider: provider.name }, {

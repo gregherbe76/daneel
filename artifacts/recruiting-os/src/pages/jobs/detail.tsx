@@ -654,6 +654,11 @@ export default function JobDetailPage() {
                                         {evalData.fitScore != null && evalData.fitScore !== (evalData.decisionScore ?? evalData.score) && (
                                           <span className="text-[10px] text-muted-foreground">Fit: {evalData.fitScore}</span>
                                         )}
+                                        {evalData.requiresEnrichment && (
+                                          <Badge variant="outline" className="text-[10px] py-0 h-5 bg-amber-500/10 border-amber-200 text-amber-700">
+                                            <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />Enrich
+                                          </Badge>
+                                        )}
                                       </div>
                                     </CardDescription>
                                   )}
@@ -696,6 +701,7 @@ export default function JobDetailPage() {
                             {workflowData.evaluations.map((ev: {
                               id: number; candidateId: number; score: number;
                               fitScore?: number | null; decisionScore?: number | null; confidenceLevel?: string | null;
+                              requiresEnrichment?: boolean | null;
                               recommendation: string;
                               strengths: string[]; gaps: string[];
                               candidate: { name: string; source?: string | null };
@@ -729,6 +735,11 @@ export default function JobDetailPage() {
                                         }`}>
                                           {confLevel}
                                         </span>
+                                      )}
+                                      {ev.requiresEnrichment && (
+                                        <Badge variant="outline" className="text-[9px] py-0 h-5 bg-amber-500/10 border-amber-200 text-amber-700">
+                                          <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />Enrich recommended
+                                        </Badge>
                                       )}
                                     </div>
                                   </div>
@@ -896,10 +907,15 @@ export default function JobDetailPage() {
                             </div>
                             
                             {evalData && (
-                              <div className="mb-3">
+                              <div className="mb-3 flex flex-wrap gap-1">
                                 <Badge variant="outline" className={`text-[10px] py-0 h-5 ${getRecommendationColor(evalData.recommendation)}`}>
                                   {evalData.recommendation}
                                 </Badge>
+                                {evalData.requiresEnrichment && (
+                                  <Badge variant="outline" className="text-[10px] py-0 h-5 bg-amber-500/10 border-amber-200 text-amber-700">
+                                    <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />Enrich recommended
+                                  </Badge>
+                                )}
                               </div>
                             )}
                             

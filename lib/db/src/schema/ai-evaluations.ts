@@ -6,6 +6,7 @@ import {
   timestamp,
   jsonb,
   pgEnum,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { agentRunsTable } from "./agent-runs";
 import { jobsTable } from "./jobs";
@@ -36,6 +37,7 @@ export const aiEvaluationsTable = pgTable("ai_evaluations", {
   confidenceLevel: text("confidence_level"), // "High" | "Medium" | "Low"
   confidenceReason: text("confidence_reason"),
   missingDataWarnings: jsonb("missing_data_warnings").$type<string[]>(),
+  requiresEnrichment: boolean("requires_enrichment").notNull().default(false),
   strengths: jsonb("strengths").$type<string[]>().notNull().default([]),
   gaps: jsonb("gaps").$type<string[]>().notNull().default([]),
   risks: jsonb("risks").$type<string[]>().notNull().default([]),

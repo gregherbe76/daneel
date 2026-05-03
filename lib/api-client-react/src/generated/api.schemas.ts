@@ -330,6 +330,8 @@ export interface CandidateEvaluation {
   confidenceLevel?: ConfidenceLevel | null;
   confidenceReason?: string | null;
   missingDataWarnings?: string[];
+  /** True when data confidence was too low and no enrichment provider was available. Score reliability is reduced — enrichment is recommended before acting on this result. */
+  requiresEnrichment?: boolean | null;
   strengths: string[];
   gaps: string[];
   risks: string[];

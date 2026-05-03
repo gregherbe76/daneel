@@ -1272,6 +1272,10 @@ components:
           type: array
           items:
             type: string
+        requiresEnrichment:
+          type: boolean
+          nullable: true
+          description: "True when data confidence was too low and no enrichment provider was available. Score reliability is reduced — enrichment is recommended before acting on this result."
         strengths:
           type: array
           items:

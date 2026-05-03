@@ -66,6 +66,7 @@ type ReportEvaluation = {
   confidenceLevel?: string | null;
   confidenceReason?: string | null;
   missingDataWarnings?: string[];
+  requiresEnrichment?: boolean | null;
   strengths: string[];
   gaps: string[];
   risks: string[];
@@ -561,7 +562,7 @@ export default function JobReportPage() {
         </section>
 
         {/* ── Score Reliability ── */}
-        {evaluations.some((e) => (e.fitScore ?? e.score) >= 60 && e.confidenceLevel === "Low") && (
+        {evaluations.some((e) => ((e.fitScore ?? e.score) >= 60 && e.confidenceLevel === "Low") || e.requiresEnrichment) && (
           <section>
             <h2 className="text-base font-semibold text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-amber-600" />
@@ -580,7 +581,7 @@ export default function JobReportPage() {
               <CardContent className="p-0">
                 <div className="divide-y divide-border">
                   {evaluations
-                    .filter((e) => (e.fitScore ?? e.score) >= 60 && e.confidenceLevel === "Low")
+                    .filter((e) => ((e.fitScore ?? e.score) >= 60 && e.confidenceLevel === "Low") || e.requiresEnrichment)
                     .map((e) => (
                       <div key={e.id} className="px-5 py-3 flex flex-wrap items-center justify-between gap-3">
                         <div className="min-w-0">
@@ -588,9 +589,14 @@ export default function JobReportPage() {
                           {e.confidenceReason && (
                             <p className="text-xs text-muted-foreground mt-0.5">{e.confidenceReason}</p>
                           )}
-                          {e.missingDataWarnings && e.missingDataWarnings.length > 0 && (
+                          {e.requiresEnrichment && (
+                            <p className="text-[11px] text-amber-700 mt-0.5 flex items-center gap-1">
+                              <AlertTriangle className="h-2.5 w-2.5 shrink-0" />Low reliability — enrichment recommended
+                            </p>
+                          )}
+                          {e.missingDataWarnings && e.missingDataWarnings.filter(w => w !== "Low reliability — enrichment recommended").length > 0 && (
                             <ul className="mt-1 space-y-0.5">
-                              {e.missingDataWarnings.map((w, i) => (
+                              {e.missingDataWarnings.filter(w => w !== "Low reliability — enrichment recommended").map((w, i) => (
                                 <li key={i} className="text-[11px] text-amber-700 flex items-center gap-1">
                                   <AlertTriangle className="h-2.5 w-2.5 shrink-0" />{w}
                                 </li>
@@ -858,6 +864,7 @@ export default function JobReportPage() {
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground w-16">Fit</th>
                       {diff && <th className="text-left px-4 py-3 font-medium text-muted-foreground w-16">Δ</th>}
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground w-24">Conf.</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground w-20">Enrich</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground w-32">Rec.</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Dimensions</th>
                       <th className="text-left px-4 py-3 font-medium text-muted-foreground">Top Strength</th>
@@ -898,6 +905,15 @@ export default function JobReportPage() {
                             {e.confidenceLevel ? (
                               <Badge variant="outline" className={`text-xs ${confidenceBg(e.confidenceLevel)}`}>
                                 {e.confidenceLevel}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {e.requiresEnrichment ? (
+                              <Badge variant="outline" className="text-xs bg-amber-500/10 border-amber-200 text-amber-700">
+                                <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />Needed
                               </Badge>
                             ) : (
                               <span className="text-xs text-muted-foreground">—</span>
