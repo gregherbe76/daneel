@@ -31,6 +31,7 @@ import { ImproveRerunModal, type ImproveRerunCandidate } from "@/components/impr
 import { markJobRunsSeen } from "@/lib/pending-runs";
 import { ScoreBreakdownDisplay, ScoreBreakdownPills } from "@/components/score-breakdown";
 import type { ScoreBreakdown } from "@/components/score-breakdown";
+import { CandidateNotesIndicator } from "@/components/candidate-notes-indicator";
 
 // ── types (derived from API response) ────────────────────────────────────────
 
@@ -1418,8 +1419,15 @@ export default function JobReportPage() {
                         reportQueryKey={reportQueryKey}
                       />
                     )}
-                    <div className="mt-4 pt-3 border-t border-border flex items-center justify-between gap-3">
-                      <p className="text-xs text-muted-foreground">Execute decision:</p>
+                    <div className="mt-4 pt-3 border-t border-border flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-3">
+                        <p className="text-xs text-muted-foreground">Collaborate:</p>
+                        <CandidateNotesIndicator
+                          candidateId={e.candidateId}
+                          jobId={jobId}
+                          candidateName={cand?.name ?? undefined}
+                        />
+                      </div>
                       <CandidateActionButton
                         evaluation={e}
                         jobId={jobId}

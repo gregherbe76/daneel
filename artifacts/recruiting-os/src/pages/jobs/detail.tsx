@@ -41,6 +41,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CandidateNotesIndicator } from "@/components/candidate-notes-indicator";
 
 // ── color helpers ────────────────────────────────────────────────────────────
 
@@ -757,9 +758,15 @@ export default function JobDetailPage() {
                                       <p className="text-muted-foreground">{summary.keyRisks}</p>
                                     </div>
                                   )}
-                                  <div className="mt-auto pt-4 border-t border-border">
+                                  <div className="mt-auto pt-4 border-t border-border flex items-center justify-between gap-2">
+                                    <CandidateNotesIndicator
+                                      candidateId={summary.candidateId}
+                                      jobId={jobId}
+                                      candidateName={summary.candidateName}
+                                      variant="compact"
+                                    />
                                     <Link href={`/candidates/${summary.candidateId}`}>
-                                      <Button variant="ghost" size="sm" className="w-full">View Profile</Button>
+                                      <Button variant="ghost" size="sm">View Profile</Button>
                                     </Link>
                                   </div>
                                 </CardContent>
