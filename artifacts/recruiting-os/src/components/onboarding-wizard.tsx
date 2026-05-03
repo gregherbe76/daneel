@@ -51,7 +51,7 @@ export function OnboardingWizard({
     {
       key: "candidates",
       title: "Add a few candidates",
-      helper: "Paste LinkedIn URLs, upload CVs, or let HireFlow find people for you.",
+      helper: "Paste LinkedIn URLs, upload CVs, or let HiringAI find people for you.",
       icon: Users,
       done: hasCandidates,
       cta: { label: "Add candidates", onClick: onAddCandidates },
@@ -100,7 +100,7 @@ export function OnboardingWizard({
       <div className="px-5 py-4 border-b border-border/50 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-sm font-semibold">Welcome to HireFlow</h3>
+            <h3 className="text-sm font-semibold">Welcome to HiringAI</h3>
             <span className="text-xs text-muted-foreground">
               {completed} of {total} done · {pct}%
             </span>

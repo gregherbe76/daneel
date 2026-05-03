@@ -76,11 +76,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="w-64 border-r border-border bg-sidebar flex flex-col">
         <div className="p-6 border-b border-border">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center shrink-0">
-              <span className="text-primary-foreground font-bold text-sm">H</span>
+            <div className="h-8 w-8 rounded-md bg-[#F97316] flex items-center justify-center shrink-0 relative">
+              <svg viewBox="0 0 180 180" className="h-5 w-5" aria-hidden="true">
+                <path d="M52 46 V134" stroke="white" strokeWidth="14" strokeLinecap="round" />
+                <path d="M114 46 V134" stroke="white" strokeWidth="14" strokeLinecap="round" />
+                <path d="M52 90 H114" stroke="white" strokeWidth="14" strokeLinecap="round" />
+                <circle cx="138" cy="48" r="12" fill="white" />
+              </svg>
             </div>
             <h1 className="text-xl font-bold text-sidebar-foreground tracking-tight">
-              HireFlow
+              HiringAI
             </h1>
           </div>
           <p className="text-[11px] text-sidebar-foreground/50 mt-2">AI hiring workflow platform for teams</p>

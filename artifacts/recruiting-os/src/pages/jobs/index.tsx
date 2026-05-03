@@ -35,7 +35,7 @@ export default function JobsPage() {
             <Briefcase className="h-6 w-6 text-primary" />
           </div>
           <h3 className="text-lg font-semibold mb-1">Let's open your first role</h3>
-          <p className="text-muted-foreground mb-4">Add a job and HireFlow will guide you all the way to a shortlist.</p>
+          <p className="text-muted-foreground mb-4">Add a job and HiringAI will guide you all the way to a shortlist.</p>
           <Link href="/jobs/new">
             <Button variant="outline">Create Client Mission</Button>
           </Link>
