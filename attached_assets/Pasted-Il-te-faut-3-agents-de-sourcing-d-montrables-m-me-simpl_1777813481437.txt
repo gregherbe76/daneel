@@ -1,0 +1,140 @@
+Il te faut 3 agents de sourcing démontrables, même simples.
+
+1. Agent GitHub
+
+Pour profils tech.
+
+Build GitHub sourcing agent.
+
+Input:
+- job title
+- must-have skills
+- location optional
+- seniority
+
+Actions:
+- generate GitHub search queries
+- search public GitHub profiles/repos via GitHub API
+- extract:
+  - name
+  - username
+  - GitHub URL
+  - location
+  - bio
+  - top repos
+  - languages
+  - evidence
+
+Output:
+- normalized candidates
+- source = "GitHub Agent"
+- confidence score
+
+Important:
+No fake data.
+Only use public GitHub data.
+2. Agent Web Search / SerpAPI
+
+Pour LinkedIn public, blogs, portfolios.
+
+Build web sourcing agent using SerpAPI.
+
+Input:
+- job description
+- ideal profile
+- location
+- keywords
+
+Actions:
+- generate Boolean search queries
+- search public web results
+- identify potential candidate profiles
+- extract:
+  - name
+  - headline
+  - public URL
+  - company
+  - location if visible
+  - evidence snippet
+
+Sources:
+- LinkedIn public pages
+- personal websites
+- GitHub
+- blogs
+- conference pages
+
+Output:
+- normalized candidate list
+- source = "Web Search Agent"
+- confidence score
+- evidence URL
+
+Important:
+Do not invent missing data.
+Store evidence URL for every candidate.
+3. Agent Twin / Custom Webhook
+
+Pour montrer que Daneel peut déléguer l’exécution.
+
+Build external sourcing provider demo.
+
+Goal:
+Allow Daneel to send a sourcing request to Twin or any custom agent provider.
+
+Endpoint:
+POST /api/sourcing/external
+
+Payload:
+- job
+- jobInsights
+- searchCriteria
+- limit
+
+Expected response:
+- candidates[]
+- evidence[]
+- confidence
+
+UI:
+Add source selector:
+- GitHub Agent
+- Web Search Agent
+- Twin / Custom Agent
+
+Important:
+Daneel remains the control layer.
+External providers execute sourcing.
+UX démo idéale
+
+Sur la page job :
+
+Find candidates with AI
+
+Choose source:
+[ GitHub ] [ Web Search ] [ Twin ]
+
+Limit:
+[ 10 candidates ]
+
+[ Start sourcing ]
+
+Puis résultat :
+
+12 candidates found
+8 usable
+4 low confidence
+
+[ Import into pipeline ]
+[ Run AI Workflow ]
+Priorité
+
+Fais dans cet ordre :
+
+GitHub Agent — facile, propre, public, crédible.
+Web Search / SerpAPI Agent — utile pour LinkedIn public et profils business.
+Twin / Custom Provider — puissant pour montrer l’architecture ouverte.
+
+Phrase produit :
+
+Daneel does not just score candidates. It can find them through agents.
