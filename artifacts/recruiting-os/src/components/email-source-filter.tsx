@@ -42,6 +42,34 @@ export function serializeEmailSourceParam(selected: Set<string>): string {
     .join(",");
 }
 
+const STORED_SOURCE_FILTER_KEY = "recruiting-os:email-source-filter";
+
+export function getStoredEmailSourceFilter(): Set<string> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STORED_SOURCE_FILTER_KEY);
+    if (!raw) return null;
+    const parsed = parseEmailSourceParam(`emailSource=${encodeURIComponent(raw)}`);
+    return parsed.size > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredEmailSourceFilter(selected: Set<string>): void {
+  if (typeof window === "undefined") return;
+  try {
+    const serialized = serializeEmailSourceParam(selected);
+    if (!serialized) {
+      window.localStorage.removeItem(STORED_SOURCE_FILTER_KEY);
+    } else {
+      window.localStorage.setItem(STORED_SOURCE_FILTER_KEY, serialized);
+    }
+  } catch {
+    // ignore storage errors (e.g. private mode)
+  }
+}
+
 export function matchesEmailSourceFilter(
   emailSource: string | null | undefined,
   selected: Set<string>,

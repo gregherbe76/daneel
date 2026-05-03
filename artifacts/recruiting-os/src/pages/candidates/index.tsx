@@ -25,6 +25,8 @@ import {
   parseEmailSourceParam,
   serializeEmailSourceParam,
   matchesEmailSourceFilter,
+  getStoredEmailSourceFilter,
+  setStoredEmailSourceFilter,
 } from "@/components/email-source-filter";
 
 const SOURCE_LABELS: Record<string, { label: string; className: string }> = {
@@ -97,12 +99,26 @@ export default function CandidatesPage() {
   }, []);
 
   const setSelectedSources = (next: Set<string>) => {
+    setStoredEmailSourceFilter(next);
     const serialized = serializeEmailSourceParam(next);
     updateUrl((p) => {
       if (serialized) p.set("emailSource", serialized);
       else p.delete("emailSource");
     });
   };
+
+  useEffect(() => {
+    const parsed = new URLSearchParams(search);
+    if (parsed.get("emailSource")) return;
+    const stored = getStoredEmailSourceFilter();
+    if (stored && stored.size > 0) {
+      parsed.set("emailSource", serializeEmailSourceParam(stored));
+      const qs = parsed.toString();
+      navigate(`/candidates${qs ? `?${qs}` : ""}`, { replace: true });
+    }
+    // Restore saved preference once on mount when URL has no explicit value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const availableSources = useMemo(() => {
     const set = new Set<string>();
