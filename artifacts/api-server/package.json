@@ -13,6 +13,7 @@
     "@workspace/api-zod": "workspace:*",
     "@workspace/branding": "workspace:*",
     "@workspace/db": "workspace:*",
+    "@workspace/email-validation": "workspace:*",
     "@workspace/integrations-openai-ai-server": "workspace:*",
     "cookie-parser": "^1.4.7",
     "cors": "^2",

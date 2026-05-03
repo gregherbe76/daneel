@@ -175,6 +175,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/email-validation':
+        specifier: workspace:*
+        version: link:../../lib/email-validation
       '@workspace/integrations-openai-ai-server':
         specifier: workspace:*
         version: link:../../lib/integrations-openai-ai-server
@@ -666,6 +669,12 @@ importers:
         specifier: ^0.31.9
         version: 0.31.9
 
+  lib/email-validation:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.3.5
+
   lib/integrations-openai-ai-react:
     devDependencies:
       '@types/react':
@@ -693,6 +702,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../lib/db
+      '@workspace/email-validation':
+        specifier: workspace:*
+        version: link:../lib/email-validation
       '@workspace/integrations-openai-ai-server':
         specifier: workspace:*
         version: link:../lib/integrations-openai-ai-server
