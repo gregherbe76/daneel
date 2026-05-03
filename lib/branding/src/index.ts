@@ -33,13 +33,16 @@ const TEMPLATES = {
 const g = globalThis as any;
 
 function resolveTemplateName(): TemplateName {
-  // Vite (browser/build-time replaced). Guarded so Node doesn't crash on `import.meta.env`.
+  // Vite (browser/build-time replaced). The bare `import.meta.env.VITE_APP_TEMPLATE`
+  // form is REQUIRED — Vite's static replacement regex won't match if you put
+  // optional chaining (`?.`) between `import.meta` and `env` or between `env` and
+  // the var name. Wrapped in try/catch so Node ESM (no env) doesn't crash.
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const viteVal = (import.meta as any)?.env?.VITE_APP_TEMPLATE as string | undefined;
+    const viteVal = (import.meta as any).env.VITE_APP_TEMPLATE as string | undefined;
     if (viteVal && viteVal in TEMPLATES) return viteVal as TemplateName;
   } catch {
-    // import.meta unavailable in plain Node CJS — fall through.
+    // import.meta.env unavailable in plain Node — fall through to process.env.
   }
   // Node (api-server) — accessed via globalThis to avoid needing @types/node here.
   const proc = g.process;
