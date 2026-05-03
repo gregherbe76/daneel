@@ -1,15 +1,20 @@
 import { Link } from "wouter";
 import { ArrowRight } from "lucide-react";
+import { branding, template } from "@workspace/branding";
 
 export default function LandingPage() {
+  const initial = branding.productName.charAt(0);
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       <header className="px-8 py-6 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">H</span>
+          <div
+            className="h-8 w-8 rounded-md flex items-center justify-center"
+            style={{ backgroundColor: branding.colors.accent }}
+          >
+            <span className="text-white font-bold text-sm">{initial}</span>
           </div>
-          <span className="text-lg font-semibold tracking-tight">HiringAI</span>
+          <span className="text-lg font-semibold tracking-tight">{branding.productName}</span>
         </div>
         <Link
           href="/jobs"
@@ -41,14 +46,14 @@ export default function LandingPage() {
           </div>
 
           <p className="mt-8 text-sm text-muted-foreground/80">
-            Built for founders, CTOs, and small teams.
+            Built for {template.primaryUserPlural}.
           </p>
         </div>
       </main>
 
       <footer className="px-8 py-8 border-t border-border">
         <p className="text-xs text-muted-foreground text-center max-w-2xl mx-auto">
-          Built on an agentic recruiting engine. HiringAI is powered by{" "}
+          Built on an agentic recruiting engine. {branding.productName} is powered by{" "}
           <a
             href="https://github.com/emcie-co/daneel"
             target="_blank"
