@@ -31,6 +31,8 @@ async function buildAll() {
       "*.node",
       "pdfkit",
       "fontkit",
+      "pdf-parse",
+      "multer",
       "sharp",
       "better-sqlite3",
       "sqlite3",
