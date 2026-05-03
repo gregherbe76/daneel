@@ -11,6 +11,7 @@ import {
   Star, AlertTriangle, MessageSquare, Users, Zap, TrendingUp,
   CheckCircle2, XCircle, MinusCircle, ChevronRight
 } from "lucide-react";
+import { HumanAIComparison } from "@/components/human-ai-comparison";
 
 // ── types (derived from API response) ────────────────────────────────────────
 
@@ -374,6 +375,12 @@ export default function JobReportPage() {
             })}
           </div>
         </section>
+
+        {/* ── Human vs AI Comparison ── */}
+        <HumanAIComparison
+          evaluations={evaluations}
+          aiTop5Ids={top5.map((e) => e.candidateId)}
+        />
 
         {/* ── Risk Summary + Interview Focus side-by-side ── */}
         <div className="grid md:grid-cols-2 gap-6">
