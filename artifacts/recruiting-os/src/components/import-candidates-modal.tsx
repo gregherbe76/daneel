@@ -67,6 +67,7 @@ function parseLinkedInURLs(raw: string): PendingCandidate[] {
       skills: [],
       source: "LinkedIn Paste",
       linkedIn: url.startsWith("http") ? url : `https://${url}`,
+      summary: "Imported from LinkedIn URL. Enrichment required.",
     });
   }
   return out;
@@ -78,6 +79,7 @@ export interface ImportCandidatesModalProps {
   open: boolean;
   onClose: () => void;
   onImported: (result: { created: number; jobId?: number }) => void;
+  onRunRequested?: () => void;
   jobId?: number;
   jobTitle?: string;
 }
@@ -88,6 +90,7 @@ export function ImportCandidatesModal({
   open,
   onClose,
   onImported,
+  onRunRequested,
   jobId,
   jobTitle,
 }: ImportCandidatesModalProps) {
@@ -183,7 +186,10 @@ export function ImportCandidatesModal({
               <div className="flex flex-col gap-2 w-full">
                 <Button
                   className="w-full gap-2 bg-primary/90 hover:bg-primary"
-                  onClick={() => { handleClose(); }}
+                  onClick={() => {
+                    handleClose();
+                    onRunRequested?.();
+                  }}
                 >
                   <Sparkles className="h-4 w-4" />
                   Run AI Workflow on these candidates

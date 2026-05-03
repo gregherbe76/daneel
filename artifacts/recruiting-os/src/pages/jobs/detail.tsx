@@ -175,6 +175,7 @@ export default function JobDetailPage() {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isFindOpen, setIsFindOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [highlightStep2, setHighlightStep2] = useState(false);
 
   const stages = Object.values(ApplicationStage);
 
@@ -306,7 +307,11 @@ export default function JobDetailPage() {
                 <Button
                   onClick={handleRunWorkflow}
                   disabled={runWorkflow.isPending || workflowRunning}
-                  className="bg-primary/90 hover:bg-primary whitespace-nowrap"
+                  className={`bg-primary/90 hover:bg-primary whitespace-nowrap transition-all ${
+                    highlightStep2
+                      ? "ring-4 ring-primary/40 ring-offset-2 scale-105 shadow-lg"
+                      : ""
+                  }`}
                 >
                   {workflowRunning ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -898,11 +903,19 @@ export default function JobDetailPage() {
           onImported={({ created }) => {
             queryClient.invalidateQueries({ queryKey: getGetJobApplicationsQueryKey(jobId) });
             if (created > 0) {
+              setDataMode("real");
+              setHighlightStep2(true);
+              setTimeout(() => setHighlightStep2(false), 3000);
               toast({
-                title: `${created} candidate${created !== 1 ? "s" : ""} imported`,
-                description: "They've been added to your pipeline. Run AI Workflow to score them.",
+                title: `${created} candidate${created !== 1 ? "s" : ""} added`,
+                description: "Pipeline refreshed. Run AI Workflow to score them.",
               });
             }
+          }}
+          onRunRequested={() => {
+            setDataMode("real");
+            setHighlightStep2(true);
+            setTimeout(() => setHighlightStep2(false), 3000);
           }}
         />
       )}
