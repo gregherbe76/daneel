@@ -107,6 +107,76 @@ export interface UpdateApplicationBody {
   notes?: string | null;
 }
 
+export type ProviderType = (typeof ProviderType)[keyof typeof ProviderType];
+
+export const ProviderType = {
+  native_openai: "native_openai",
+  custom_webhook: "custom_webhook",
+  twin_webhook: "twin_webhook",
+} as const;
+
+export type WorkflowStepName =
+  (typeof WorkflowStepName)[keyof typeof WorkflowStepName];
+
+export const WorkflowStepName = {
+  job_understanding: "job_understanding",
+  candidate_matching: "candidate_matching",
+  shortlist_generation: "shortlist_generation",
+  sourcing_later: "sourcing_later",
+} as const;
+
+export interface AgentProviderRecord {
+  id: number;
+  name: string;
+  type: ProviderType;
+  baseUrl?: string | null;
+  webhookUrl?: string | null;
+  apiKeyEncryptedPlaceholder?: string | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProviderBody {
+  name: string;
+  type: ProviderType;
+  baseUrl?: string | null;
+  webhookUrl?: string | null;
+  apiKeyPlaceholder?: string | null;
+  enabled?: boolean;
+}
+
+export interface ToggleProviderBody {
+  enabled: boolean;
+}
+
+export interface ConnectionTestResult {
+  ok: boolean;
+  error?: string | null;
+  latencyMs?: number | null;
+}
+
+export interface ProviderStepSetting {
+  id: number;
+  workflowStep: WorkflowStepName;
+  providerId: number;
+  enabled: boolean;
+}
+
+export interface ProviderStepSettingWithProvider {
+  id: number;
+  workflowStep: WorkflowStepName;
+  providerId: number;
+  enabled: boolean;
+  provider: AgentProviderRecord;
+}
+
+export interface UpsertStepSettingBody {
+  workflowStep: WorkflowStepName;
+  providerId: number;
+  enabled: boolean;
+}
+
 export interface RunWorkflowBody {
   jobId: number;
 }

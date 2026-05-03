@@ -1,5 +1,3 @@
-import { openai } from "@workspace/integrations-openai-ai-server";
-import { batchProcess } from "@workspace/integrations-openai-ai-server/batch";
 import {
   db,
   agentRunsTable,
@@ -12,8 +10,12 @@ import {
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../../lib/logger";
+import { resolveProvider } from "./providers";
+import type { JobInsightResult, CandidateMatchResult, ShortlistResult } from "./engine-types";
 
-// ── helpers ─────────────────────────────────────────────────────────────────
+export type { JobInsightResult, CandidateMatchResult, ShortlistResult };
+
+// ── helpers ──────────────────────────────────────────────────────────────────
 
 async function logStep(
   runId: number,
@@ -22,111 +24,49 @@ async function logStep(
   input?: unknown,
   output?: unknown,
 ) {
-  await db.insert(agentLogsTable).values({ runId, step, status, input: input ?? null, output: output ?? null });
+  await db
+    .insert(agentLogsTable)
+    .values({ runId, step, status, input: input ?? null, output: output ?? null });
 }
 
 async function setRunStatus(runId: number, status: "running" | "completed" | "failed") {
-  await db.update(agentRunsTable).set({ status, updatedAt: new Date() }).where(eq(agentRunsTable.id, runId));
+  await db
+    .update(agentRunsTable)
+    .set({ status, updatedAt: new Date() })
+    .where(eq(agentRunsTable.id, runId));
 }
 
-function json<T>(content: string): T {
-  const match = content.match(/```json\s*([\s\S]*?)\s*```/);
-  return JSON.parse(match ? match[1] : content);
-}
-
-// ── STEP 1: Job Understanding ────────────────────────────────────────────────
-
-export type JobInsightResult = {
-  mustHaveSkills: string[];
-  seniority: string;
-  evaluationCriteria: string[];
-  idealCandidateProfile: string;
-};
+// ── STEP 1: Job Understanding ─────────────────────────────────────────────────
 
 async function runJobUnderstanding(
   runId: number,
+  jobId: number,
   job: { title: string; description: string; location: string; seniority: string; mustHaveSkills: string[] },
 ): Promise<JobInsightResult> {
   await logStep(runId, "job_understanding", "running", { jobTitle: job.title });
 
-  const prompt = `You are a technical recruiter assistant. Analyze this job posting and return a JSON object.
+  const provider = await resolveProvider("job_understanding");
+  logger.info({ runId, step: "job_understanding", provider: provider.name }, "Step dispatched");
 
-Job Title: ${job.title}
-Location: ${job.location}
-Seniority: ${job.seniority}
-Must-Have Skills: ${job.mustHaveSkills.join(", ")}
-Description:
-${job.description}
+  try {
+    const result = (await provider.run({
+      step: "job_understanding",
+      runId,
+      jobId,
+      payload: { job },
+    })) as JobInsightResult;
 
-Return a JSON object with exactly these fields:
-{
-  "mustHaveSkills": ["skill1", "skill2", ...],
-  "seniority": "exact seniority level",
-  "evaluationCriteria": ["criterion1", "criterion2", ...],
-  "idealCandidateProfile": "2-3 sentence description of the ideal candidate"
+    await logStep(runId, "job_understanding", "completed", { jobTitle: job.title, provider: provider.name }, result);
+    return result;
+  } catch (err) {
+    await logStep(runId, "job_understanding", "failed", { jobTitle: job.title, provider: provider.name }, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
-Keep it concise and accurate. Return only valid JSON, no other text.`;
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-5.1",
-    max_completion_tokens: 1024,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const content = response.choices[0]?.message?.content ?? "{}";
-  const result = json<JobInsightResult>(content);
-
-  await logStep(runId, "job_understanding", "completed", { jobTitle: job.title }, result);
-  return result;
-}
-
-// ── STEP 2: Candidate Matching ───────────────────────────────────────────────
-
-export type CandidateMatchResult = {
-  score: number;
-  strengths: string[];
-  gaps: string[];
-  risks: string[];
-  recommendation: "Strong Yes" | "Yes" | "Maybe" | "No";
-};
-
-async function matchCandidate(
-  job: { title: string; description: string; mustHaveSkills: string[]; seniority: string },
-  insight: JobInsightResult,
-  candidate: { id: number; name: string; email: string; skills: string[]; summary: string | null },
-): Promise<CandidateMatchResult> {
-  const prompt = `You are a technical recruiter. Score this candidate for the job.
-
-JOB: ${job.title} (${job.seniority})
-Must-Have Skills: ${job.mustHaveSkills.join(", ")}
-Evaluation Criteria: ${insight.evaluationCriteria.join(", ")}
-Ideal Profile: ${insight.idealCandidateProfile}
-
-CANDIDATE: ${candidate.name}
-Skills: ${candidate.skills.join(", ")}
-Summary: ${candidate.summary ?? "No summary provided"}
-
-Return JSON:
-{
-  "score": <integer 0-100>,
-  "strengths": ["strength1", "strength2"],
-  "gaps": ["gap1", "gap2"],
-  "risks": ["risk1"],
-  "recommendation": "Strong Yes" | "Yes" | "Maybe" | "No"
-}
-
-Score guidelines: 80-100=Strong Yes, 60-79=Yes, 40-59=Maybe, 0-39=No.
-Return only valid JSON.`;
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-5.1",
-    max_completion_tokens: 512,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  return json<CandidateMatchResult>(response.choices[0]?.message?.content ?? "{}");
-}
+// ── STEP 2: Candidate Matching ────────────────────────────────────────────────
 
 async function runCandidateMatching(
   runId: number,
@@ -137,45 +77,44 @@ async function runCandidateMatching(
 ): Promise<void> {
   await logStep(runId, "candidate_matching", "running", { candidateCount: candidates.length });
 
-  const results = await batchProcess(
-    candidates,
-    async (candidate) => {
-      const match = await matchCandidate(job, insight, candidate);
-      return { candidateId: candidate.id, candidateName: candidate.name, match };
-    },
-    { concurrency: 3, retries: 3 },
-  );
+  const provider = await resolveProvider("candidate_matching");
+  logger.info({ runId, step: "candidate_matching", provider: provider.name }, "Step dispatched");
 
-  // Persist evaluations
-  await Promise.all(
-    results.map(({ candidateId, match }) =>
-      db.insert(aiEvaluationsTable).values({
-        runId,
-        jobId,
-        candidateId,
-        score: match.score,
-        strengths: match.strengths,
-        gaps: match.gaps,
-        risks: match.risks,
-        recommendation: match.recommendation,
-      }),
-    ),
-  );
+  try {
+    const results = (await provider.run({
+      step: "candidate_matching",
+      runId,
+      jobId,
+      payload: { job, insight, candidates },
+    })) as CandidateMatchResult[];
 
-  await logStep(runId, "candidate_matching", "completed", { candidateCount: candidates.length }, {
-    scores: results.map(r => ({ name: r.candidateName, score: r.match.score, rec: r.match.recommendation })),
-  });
+    await Promise.all(
+      results.map((r) =>
+        db.insert(aiEvaluationsTable).values({
+          runId,
+          jobId,
+          candidateId: r.candidateId,
+          score: r.score,
+          strengths: r.strengths,
+          gaps: r.gaps,
+          risks: r.risks,
+          recommendation: r.recommendation,
+        }),
+      ),
+    );
+
+    await logStep(runId, "candidate_matching", "completed", { candidateCount: candidates.length, provider: provider.name }, {
+      scores: results.map((r) => ({ name: r.candidateName, score: r.score, rec: r.recommendation })),
+    });
+  } catch (err) {
+    await logStep(runId, "candidate_matching", "failed", { candidateCount: candidates.length, provider: provider.name }, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
-// ── STEP 3: Shortlist ────────────────────────────────────────────────────────
-
-export type ShortlistResult = {
-  candidateId: number;
-  candidateName: string;
-  whyRelevant: string;
-  keyRisks: string;
-  finalRecommendation: string;
-};
+// ── STEP 3: Shortlist ─────────────────────────────────────────────────────────
 
 async function runShortlist(
   runId: number,
@@ -193,48 +132,32 @@ async function runShortlist(
 ): Promise<void> {
   await logStep(runId, "shortlist", "running", { totalEvaluated: evaluations.length });
 
-  // Sort by score, take top 5
-  const top5 = [...evaluations].sort((a, b) => b.score - a.score).slice(0, 5);
+  const provider = await resolveProvider("shortlist_generation");
+  logger.info({ runId, step: "shortlist_generation", provider: provider.name }, "Step dispatched");
 
-  const prompt = `You are a technical recruiter creating a hiring shortlist.
+  try {
+    const top5 = [...evaluations].sort((a, b) => b.score - a.score).slice(0, 5);
+    const summaries = (await provider.run({
+      step: "shortlist_generation",
+      runId,
+      jobId,
+      payload: { job, insight, evaluations: top5 },
+    })) as ShortlistResult[];
 
-JOB: ${job.title}
-Ideal Profile: ${insight.idealCandidateProfile}
+    await db.insert(shortlistsTable).values({
+      runId,
+      jobId,
+      rankedCandidateIds: top5.map((c) => c.candidateId),
+      summaries,
+    });
 
-TOP CANDIDATES:
-${top5.map((c, i) => `${i + 1}. ${c.candidateName} (Score: ${c.score}, Recommendation: ${c.recommendation})
-   Strengths: ${c.strengths.join(", ")}
-   Gaps: ${c.gaps.join(", ")}`).join("\n\n")}
-
-For each candidate, provide a brief hiring summary. Return JSON array:
-[
-  {
-    "candidateId": <number>,
-    "candidateName": "<name>",
-    "whyRelevant": "1-2 sentences on why they are a strong match",
-    "keyRisks": "1 sentence on the main risk or gap",
-    "finalRecommendation": "1 sentence final hiring recommendation"
+    await logStep(runId, "shortlist", "completed", { top5Count: top5.length, provider: provider.name }, { summaries });
+  } catch (err) {
+    await logStep(runId, "shortlist", "failed", {}, {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
   }
-]
-
-Return only valid JSON array.`;
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-5.1",
-    max_completion_tokens: 1024,
-    messages: [{ role: "user", content: prompt }],
-  });
-
-  const summaries = json<ShortlistResult[]>(response.choices[0]?.message?.content ?? "[]");
-
-  await db.insert(shortlistsTable).values({
-    runId,
-    jobId,
-    rankedCandidateIds: top5.map(c => c.candidateId),
-    summaries,
-  });
-
-  await logStep(runId, "shortlist", "completed", { top5Count: top5.length }, { summaries });
 }
 
 // ── MAIN RUNNER ───────────────────────────────────────────────────────────────
@@ -244,20 +167,16 @@ export async function runWorkflowEngine(runId: number, jobId: number) {
     await setRunStatus(runId, "running");
     logger.info({ runId, jobId }, "Workflow started");
 
-    // Fetch job
     const [job] = await db.select().from(jobsTable).where(eq(jobsTable.id, jobId));
     if (!job) throw new Error(`Job ${jobId} not found`);
 
-    // Fetch all candidates
     const candidates = await db.select().from(candidatesTable);
     if (candidates.length === 0) {
       logger.warn({ runId }, "No candidates found — skipping matching");
     }
 
-    // Step 1: Job Understanding
-    const insight = await runJobUnderstanding(runId, job);
-
-    // Persist insight
+    // Step 1
+    const insight = await runJobUnderstanding(runId, jobId, job);
     await db.insert(jobInsightsTable).values({
       runId,
       jobId,
@@ -267,19 +186,19 @@ export async function runWorkflowEngine(runId: number, jobId: number) {
       idealCandidateProfile: insight.idealCandidateProfile,
     });
 
-    // Step 2: Candidate Matching
+    // Step 2
     if (candidates.length > 0) {
       await runCandidateMatching(runId, jobId, job, insight, candidates);
     }
 
-    // Step 3: Shortlist (fetch fresh evaluations)
+    // Step 3
     const evaluations = await db
       .select()
       .from(aiEvaluationsTable)
       .where(eq(aiEvaluationsTable.runId, runId));
 
-    const candidateMap = new Map(candidates.map(c => [c.id, c]));
-    const evalWithNames = evaluations.map(e => ({
+    const candidateMap = new Map(candidates.map((c) => [c.id, c]));
+    const evalWithNames = evaluations.map((e) => ({
       candidateId: e.candidateId,
       candidateName: candidateMap.get(e.candidateId)?.name ?? "Unknown",
       score: e.score,

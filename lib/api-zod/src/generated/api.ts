@@ -623,6 +623,190 @@ export const GetLatestJobWorkflowResponse = zod.object({
 });
 
 /**
+ * @summary List all agent providers
+ */
+export const ListProvidersResponseItem = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  type: zod.enum(["native_openai", "custom_webhook", "twin_webhook"]),
+  baseUrl: zod.string().nullish(),
+  webhookUrl: zod.string().nullish(),
+  apiKeyEncryptedPlaceholder: zod.string().nullish(),
+  enabled: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListProvidersResponse = zod.array(ListProvidersResponseItem);
+
+/**
+ * @summary Create a new agent provider
+ */
+export const CreateProviderBody = zod.object({
+  name: zod.string(),
+  type: zod.enum(["native_openai", "custom_webhook", "twin_webhook"]),
+  baseUrl: zod.string().nullish(),
+  webhookUrl: zod.string().nullish(),
+  apiKeyPlaceholder: zod.string().nullish(),
+  enabled: zod.boolean().optional(),
+});
+
+/**
+ * @summary Get a provider by ID
+ */
+export const GetProviderParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetProviderResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  type: zod.enum(["native_openai", "custom_webhook", "twin_webhook"]),
+  baseUrl: zod.string().nullish(),
+  webhookUrl: zod.string().nullish(),
+  apiKeyEncryptedPlaceholder: zod.string().nullish(),
+  enabled: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Update a provider
+ */
+export const UpdateProviderParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateProviderBody = zod.object({
+  name: zod.string(),
+  type: zod.enum(["native_openai", "custom_webhook", "twin_webhook"]),
+  baseUrl: zod.string().nullish(),
+  webhookUrl: zod.string().nullish(),
+  apiKeyPlaceholder: zod.string().nullish(),
+  enabled: zod.boolean().optional(),
+});
+
+export const UpdateProviderResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  type: zod.enum(["native_openai", "custom_webhook", "twin_webhook"]),
+  baseUrl: zod.string().nullish(),
+  webhookUrl: zod.string().nullish(),
+  apiKeyEncryptedPlaceholder: zod.string().nullish(),
+  enabled: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete a provider
+ */
+export const DeleteProviderParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Enable or disable a provider
+ */
+export const ToggleProviderParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ToggleProviderBody = zod.object({
+  enabled: zod.boolean(),
+});
+
+export const ToggleProviderResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  type: zod.enum(["native_openai", "custom_webhook", "twin_webhook"]),
+  baseUrl: zod.string().nullish(),
+  webhookUrl: zod.string().nullish(),
+  apiKeyEncryptedPlaceholder: zod.string().nullish(),
+  enabled: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Test a provider connection
+ */
+export const TestProviderConnectionParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const TestProviderConnectionResponse = zod.object({
+  ok: zod.boolean(),
+  error: zod.string().nullish(),
+  latencyMs: zod.number().nullish(),
+});
+
+/**
+ * @summary List all workflow step → provider assignments
+ */
+export const ListProviderStepSettingsResponseItem = zod.object({
+  id: zod.number(),
+  workflowStep: zod.enum([
+    "job_understanding",
+    "candidate_matching",
+    "shortlist_generation",
+    "sourcing_later",
+  ]),
+  providerId: zod.number(),
+  enabled: zod.boolean(),
+  provider: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    type: zod.enum(["native_openai", "custom_webhook", "twin_webhook"]),
+    baseUrl: zod.string().nullish(),
+    webhookUrl: zod.string().nullish(),
+    apiKeyEncryptedPlaceholder: zod.string().nullish(),
+    enabled: zod.boolean(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+export const ListProviderStepSettingsResponse = zod.array(
+  ListProviderStepSettingsResponseItem,
+);
+
+/**
+ * @summary Assign a provider to a workflow step (create or replace)
+ */
+export const UpsertProviderStepSettingBody = zod.object({
+  workflowStep: zod.enum([
+    "job_understanding",
+    "candidate_matching",
+    "shortlist_generation",
+    "sourcing_later",
+  ]),
+  providerId: zod.number(),
+  enabled: zod.boolean(),
+});
+
+export const UpsertProviderStepSettingResponse = zod.object({
+  id: zod.number(),
+  workflowStep: zod.enum([
+    "job_understanding",
+    "candidate_matching",
+    "shortlist_generation",
+    "sourcing_later",
+  ]),
+  providerId: zod.number(),
+  enabled: zod.boolean(),
+  provider: zod.object({
+    id: zod.number(),
+    name: zod.string(),
+    type: zod.enum(["native_openai", "custom_webhook", "twin_webhook"]),
+    baseUrl: zod.string().nullish(),
+    webhookUrl: zod.string().nullish(),
+    apiKeyEncryptedPlaceholder: zod.string().nullish(),
+    enabled: zod.boolean(),
+    createdAt: zod.coerce.date(),
+    updatedAt: zod.coerce.date(),
+  }),
+});
+
+/**
  * @summary Get pipeline summary - counts per stage across all jobs
  */
 export const GetPipelineSummaryResponse = zod.object({

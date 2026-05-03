@@ -18,6 +18,8 @@ tags:
     description: Application pipeline operations
   - name: workflows
     description: Agentic workflow operations
+  - name: providers
+    description: Agent provider management
 paths:
   /healthz:
     get:
@@ -421,6 +423,172 @@ paths:
         "404":
           description: No runs found for this job
 
+  # ── AGENT PROVIDERS ────────────────────────────────────────────────────────
+  /providers:
+    get:
+      operationId: listProviders
+      tags: [providers]
+      summary: List all agent providers
+      responses:
+        "200":
+          description: List of providers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentProviderRecord"
+    post:
+      operationId: createProvider
+      tags: [providers]
+      summary: Create a new agent provider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProviderBody"
+      responses:
+        "201":
+          description: Provider created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentProviderRecord"
+
+  /providers/{id}:
+    get:
+      operationId: getProvider
+      tags: [providers]
+      summary: Get a provider by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Provider found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentProviderRecord"
+        "404":
+          description: Not found
+    put:
+      operationId: updateProvider
+      tags: [providers]
+      summary: Update a provider
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProviderBody"
+      responses:
+        "200":
+          description: Provider updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentProviderRecord"
+    delete:
+      operationId: deleteProvider
+      tags: [providers]
+      summary: Delete a provider
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /providers/{id}/toggle:
+    post:
+      operationId: toggleProvider
+      tags: [providers]
+      summary: Enable or disable a provider
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToggleProviderBody"
+      responses:
+        "200":
+          description: Provider toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentProviderRecord"
+
+  /providers/{id}/test:
+    post:
+      operationId: testProviderConnection
+      tags: [providers]
+      summary: Test a provider connection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Test result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectionTestResult"
+
+  /providers/steps:
+    get:
+      operationId: listProviderStepSettings
+      tags: [providers]
+      summary: List all workflow step → provider assignments
+      responses:
+        "200":
+          description: Step settings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderStepSettingWithProvider"
+    post:
+      operationId: upsertProviderStepSetting
+      tags: [providers]
+      summary: Assign a provider to a workflow step (create or replace)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertStepSettingBody"
+      responses:
+        "200":
+          description: Setting saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderStepSettingWithProvider"
+
   # ── SUMMARY / WOW ─────────────────────────────────────────────────────────
   /pipeline/summary:
     get:
@@ -615,6 +783,122 @@ components:
           type: string
           nullable: true
       required: [stage]
+
+    # ── PROVIDERS ──
+    ProviderType:
+      type: string
+      enum: [native_openai, custom_webhook, twin_webhook]
+
+    WorkflowStepName:
+      type: string
+      enum: [job_understanding, candidate_matching, shortlist_generation, sourcing_later]
+
+    AgentProviderRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/ProviderType"
+        baseUrl:
+          type: string
+          nullable: true
+        webhookUrl:
+          type: string
+          nullable: true
+        apiKeyEncryptedPlaceholder:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, type, enabled, createdAt, updatedAt]
+
+    CreateProviderBody:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/ProviderType"
+        baseUrl:
+          type: string
+          nullable: true
+        webhookUrl:
+          type: string
+          nullable: true
+        apiKeyPlaceholder:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+      required: [name, type]
+
+    ToggleProviderBody:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+      required: [enabled]
+
+    ConnectionTestResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        error:
+          type: string
+          nullable: true
+        latencyMs:
+          type: integer
+          nullable: true
+      required: [ok]
+
+    ProviderStepSetting:
+      type: object
+      properties:
+        id:
+          type: integer
+        workflowStep:
+          $ref: "#/components/schemas/WorkflowStepName"
+        providerId:
+          type: integer
+        enabled:
+          type: boolean
+      required: [id, workflowStep, providerId, enabled]
+
+    ProviderStepSettingWithProvider:
+      type: object
+      properties:
+        id:
+          type: integer
+        workflowStep:
+          $ref: "#/components/schemas/WorkflowStepName"
+        providerId:
+          type: integer
+        enabled:
+          type: boolean
+        provider:
+          $ref: "#/components/schemas/AgentProviderRecord"
+      required: [id, workflowStep, providerId, enabled, provider]
+
+    UpsertStepSettingBody:
+      type: object
+      properties:
+        workflowStep:
+          $ref: "#/components/schemas/WorkflowStepName"
+        providerId:
+          type: integer
+        enabled:
+          type: boolean
+      required: [workflowStep, providerId, enabled]
 
     # ── WORKFLOWS ──
     RunWorkflowBody:
