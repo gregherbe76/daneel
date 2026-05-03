@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Briefcase, Users, LayoutDashboard, Settings } from "lucide-react";
+import { LogoMark } from "./logo-mark";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -18,8 +19,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Sidebar */}
       <div className="w-64 border-r border-border bg-sidebar flex flex-col">
         <div className="p-6 border-b border-border">
-          <h1 className="text-xl font-bold text-sidebar-foreground">ShortlistPro</h1>
-          <p className="text-[11px] text-sidebar-foreground/50 mt-1">AI shortlist engine for agencies</p>
+          <div className="flex items-center gap-2.5">
+            <LogoMark className="h-8 w-8 rounded-md shrink-0" />
+            <h1 className="text-xl font-bold text-sidebar-foreground tracking-tight">
+              Shortlist<span className="text-[#FF3C00]">Pro</span>
+            </h1>
+          </div>
+          <p className="text-[11px] text-sidebar-foreground/50 mt-2">AI shortlist engine for agencies</p>
         </div>
         <nav className="flex-1 p-4 space-y-1">
           {navigation.map((item) => {

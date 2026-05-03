@@ -386,17 +386,34 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
 
   // ── COVER / HEADER
   doc.rect(0, 0, doc.page.width, 140).fill("#1e293b");
-  doc.fill("#ffffff").fontSize(22).font("Helvetica-Bold").text(job.title, 50, 40, { width: W });
-  doc.fill("#94a3b8").fontSize(11).font("Helvetica").text(
-    `${job.location}  ·  ${job.seniority}  ·  ShortlistPro Client Report`,
+
+  // Brand mark: orange rounded square with checkmark + list lines
+  const markX = 50;
+  const markY = 28;
+  const markSize = 36;
+  doc.roundedRect(markX, markY, markSize, markSize, 7).fill(ACCENT);
+  doc.lineWidth(2).strokeColor("#ffffff").lineCap("round");
+  doc.moveTo(markX + 8, markY + 12).lineTo(markX + 20, markY + 12).stroke();
+  doc.moveTo(markX + 8, markY + 18).lineTo(markX + 24, markY + 18).stroke();
+  doc.moveTo(markX + 8, markY + 24).lineTo(markX + 16, markY + 24).stroke();
+  doc.lineWidth(2.4).strokeColor("#ffffff");
+  doc.moveTo(markX + 22, markY + 24).lineTo(markX + 26, markY + 28).lineTo(markX + 32, markY + 18).stroke();
+
+  // Wordmark
+  doc.fill("#ffffff").fontSize(13).font("Helvetica-Bold")
+    .text("ShortlistPro", markX + markSize + 10, markY + 11, { width: W - markSize - 10 });
+
+  doc.fill("#ffffff").fontSize(22).font("Helvetica-Bold").text(job.title, 50, 78, { width: W });
+  doc.fill("#94a3b8").fontSize(10).font("Helvetica").text(
+    `${job.location}  ·  ${job.seniority}  ·  Client Shortlist Report`,
     50,
-    70,
+    106,
     { width: W }
   );
   doc.fill("#64748b").fontSize(9).text(
     `Workflow: ${new Date(run.runDate).toLocaleDateString("en-US", { dateStyle: "long" })}${run.runSourcing ? "  (Sourcing enabled)" : ""}   |   Generated: ${new Date(generatedAt).toLocaleDateString("en-US", { dateStyle: "long" })}`,
     50,
-    95,
+    122,
     { width: W }
   );
 
