@@ -6,6 +6,7 @@ import {
 import { eq } from "drizzle-orm";
 import type { AgentProvider, WorkflowStep } from "./interface";
 import { NativeOpenAIProvider } from "./native-openai";
+import { NativeOpenAIEnrichmentProvider } from "./native-openai-enrichment";
 import { CustomWebhookProvider } from "./custom-webhook";
 import { TwinWebhookProvider } from "./twin-webhook";
 import { logger } from "../../../lib/logger";
@@ -62,6 +63,40 @@ export async function resolveSourcingProvider(): Promise<AgentProvider> {
   } catch (err) {
     logger.error({ step: "sourcing", err }, "Failed to resolve sourcing provider — falling back to native");
     return new NativeOpenAISourcingProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME);
+  }
+}
+
+/**
+ * Resolve the provider for the enrichment step specifically.
+ * Returns NativeOpenAIEnrichmentProvider as fallback.
+ */
+export async function resolveEnrichmentProvider(): Promise<AgentProvider> {
+  try {
+    const [setting] = await db
+      .select()
+      .from(workflowProviderSettingsTable)
+      .where(eq(workflowProviderSettingsTable.workflowStep, "enrichment"))
+      .limit(1);
+
+    if (!setting || !setting.enabled) {
+      return new NativeOpenAIEnrichmentProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME);
+    }
+
+    const [providerRow] = await db
+      .select()
+      .from(agentProvidersTable)
+      .where(eq(agentProvidersTable.id, setting.providerId))
+      .limit(1);
+
+    if (!providerRow || !providerRow.enabled) {
+      logger.warn({ step: "enrichment", providerId: setting.providerId }, "Enrichment provider not found or disabled — falling back to native");
+      return new NativeOpenAIEnrichmentProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME);
+    }
+
+    return buildProvider(providerRow);
+  } catch (err) {
+    logger.error({ step: "enrichment", err }, "Failed to resolve enrichment provider — falling back to native");
+    return new NativeOpenAIEnrichmentProvider(NATIVE_FALLBACK_ID, NATIVE_FALLBACK_NAME);
   }
 }
 

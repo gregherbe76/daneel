@@ -111,6 +111,12 @@ export class CustomWebhookProvider implements AgentProvider {
       shortlist_generation: {
         summaries: [{ candidateId: "number", candidateName: "string", whyRelevant: "string", keyRisks: "string", finalRecommendation: "string" }],
       },
+      sourcing: {
+        candidates: [{ name: "string", headline: "string", location: "string", currentCompany: "string", email: "string", linkedinUrl: "string", githubUrl: "string", skills: ["string"], summary: "string", evidence: "string", potentialRisks: "string", source: "string" }],
+      },
+      enrichment: {
+        results: [{ candidateId: "number", enrichedSummary: "string", enrichedSkills: ["string"], enrichedHeadline: "string | null", additionalSignals: ["string"], confidence: "number 0.0-1.0" }],
+      },
     };
     return (schemas[step] ?? {}) as Record<string, unknown>;
   }

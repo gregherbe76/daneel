@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -15,6 +15,10 @@ export const candidatesTable = pgTable("candidates", {
   currentCompany: text("current_company"),
   githubUrl: text("github_url"),
   source: text("source"),
+  // Enrichment fields
+  enrichedAt: timestamp("enriched_at"),
+  enrichmentSource: text("enrichment_source"),
+  enrichmentConfidence: real("enrichment_confidence"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

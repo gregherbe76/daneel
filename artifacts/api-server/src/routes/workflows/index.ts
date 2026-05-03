@@ -17,20 +17,22 @@ const router = Router();
 
 // POST /workflows/run — create run and kick off async workflow
 router.post("/workflows/run", async (req, res) => {
-  const { jobId, runSourcing } = RunWorkflowBody.parse(req.body);
+  const body = RunWorkflowBody.parse(req.body);
+  const runSourcing = body.runSourcing ?? false;
+  const runEnrichment = (body as { runEnrichment?: boolean }).runEnrichment ?? false;
 
   const [run] = await db
     .insert(agentRunsTable)
-    .values({ jobId, status: "pending", runSourcing: runSourcing ?? false })
+    .values({ jobId: body.jobId, status: "pending", runSourcing })
     .returning();
 
-  setImmediate(() => runWorkflowEngine(run.id, jobId, { runSourcing: runSourcing ?? false }));
+  setImmediate(() => runWorkflowEngine(run.id, body.jobId, { runSourcing, runEnrichment }));
 
   res.status(201).json(run);
 });
 
 // POST /workflows/run-variant — create variant run with modified criteria
-const RunVariantBody = z.object({
+const RunVariantBodySchema = z.object({
   jobId: z.number().int(),
   baseRunId: z.number().int(),
   variantLabel: z.string().optional().nullable(),
@@ -40,10 +42,11 @@ const RunVariantBody = z.object({
     focusNote: z.string().optional().nullable(),
   }),
   runSourcing: z.boolean().optional(),
+  runEnrichment: z.boolean().optional(),
 });
 
 router.post("/workflows/run-variant", async (req, res) => {
-  const { jobId, baseRunId, variantLabel, variantCriteria, runSourcing } = RunVariantBody.parse(req.body);
+  const { jobId, baseRunId, variantLabel, variantCriteria, runSourcing, runEnrichment } = RunVariantBodySchema.parse(req.body);
 
   const [run] = await db
     .insert(agentRunsTable)
@@ -64,6 +67,7 @@ router.post("/workflows/run-variant", async (req, res) => {
   setImmediate(() =>
     runWorkflowEngine(run.id, jobId, {
       runSourcing: runSourcing ?? false,
+      runEnrichment: runEnrichment ?? false,
       variantCriteria: {
         seniority: variantCriteria.seniority ?? undefined,
         mustHaveSkills: variantCriteria.mustHaveSkills ?? undefined,

@@ -832,6 +832,16 @@ components:
         source:
           type: string
           nullable: true
+        enrichedAt:
+          type: string
+          format: date-time
+          nullable: true
+        enrichmentSource:
+          type: string
+          nullable: true
+        enrichmentConfidence:
+          type: number
+          nullable: true
         createdAt:
           type: string
           format: date-time
@@ -939,7 +949,7 @@ components:
 
     WorkflowStepName:
       type: string
-      enum: [job_understanding, candidate_matching, shortlist_generation, sourcing_later, sourcing]
+      enum: [job_understanding, candidate_matching, shortlist_generation, sourcing_later, sourcing, enrichment]
 
     AgentProviderRecord:
       type: object
@@ -1056,6 +1066,8 @@ components:
           type: integer
         runSourcing:
           type: boolean
+        runEnrichment:
+          type: boolean
       required: [jobId]
 
     VariantCriteria:
@@ -1086,6 +1098,8 @@ components:
         variantCriteria:
           $ref: "#/components/schemas/VariantCriteria"
         runSourcing:
+          type: boolean
+        runEnrichment:
           type: boolean
       required: [jobId, baseRunId, variantCriteria]
 

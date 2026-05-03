@@ -166,6 +166,7 @@ export default function JobDetailPage() {
   const [isAllEvalsOpen, setIsAllEvalsOpen] = useState(false);
   const [isSourcedOpen, setIsSourcedOpen] = useState(true);
   const [runSourcing, setRunSourcing] = useState(false);
+  const [runEnrichment, setRunEnrichment] = useState(false);
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
 
   const stages = Object.values(ApplicationStage);
@@ -183,12 +184,17 @@ export default function JobDetailPage() {
   };
 
   const handleRunWorkflow = () => {
-    runWorkflow.mutate({ data: { jobId, runSourcing } }, {
+    runWorkflow.mutate({ data: { jobId, runSourcing, runEnrichment } }, {
       onSuccess: () => {
+        const parts: string[] = [];
+        if (runSourcing) parts.push("sourcing");
+        if (runEnrichment) parts.push("enrichment");
         toast({
-          title: runSourcing ? "Workflow started with sourcing" : "Workflow started",
+          title: parts.length > 0 ? `Workflow started with ${parts.join(" + ")}` : "Workflow started",
           description: runSourcing
             ? "Generating new candidates before matching..."
+            : runEnrichment
+            ? "Enriching candidate profiles before matching..."
             : "Analysing candidates against the job...",
         });
         setTimeout(() => {
@@ -323,6 +329,29 @@ export default function JobDetailPage() {
                 </Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   AI will source 7 mock candidates tailored to this role
+                </p>
+              </div>
+            </div>
+            {/* Enrichment option */}
+            <div className={`flex items-start gap-2 px-3 py-2 rounded-md border transition-colors ${
+              runEnrichment
+                ? "border-blue-200 bg-blue-500/5"
+                : "border-border bg-muted/30"
+            }`}>
+              <Checkbox
+                id="run-enrichment"
+                checked={runEnrichment}
+                onCheckedChange={(v) => setRunEnrichment(!!v)}
+                disabled={workflowRunning}
+                className="mt-0.5"
+              />
+              <div>
+                <Label htmlFor="run-enrichment" className="text-sm font-medium cursor-pointer flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-blue-600" />
+                  Enrich candidate profiles before matching
+                </Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  AI will enrich profiles with additional signals and confidence scores
                 </p>
               </div>
             </div>

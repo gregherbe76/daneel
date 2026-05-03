@@ -11,22 +11,35 @@ import { logger } from "../../../lib/logger";
  * the same step interface as the native provider.
  *
  * Extends CustomWebhookProvider — all HTTP/timeout logic is reused.
- * The difference: twin endpoints receive an additional `twinContext`
- * field with metadata about the source system, enabling the twin
- * to adapt its behaviour per client/deployment.
+ * Step-specific routing:
+ *   sourcing   → POST {baseUrl}/workflow/sourcing
+ *   enrichment → POST {baseUrl}/workflow/enrichment
+ *   all others → POST {baseUrl}/workflow/step
  */
 export class TwinWebhookProvider extends CustomWebhookProvider {
   override readonly type = "twin_webhook";
   private readonly baseUrl: string;
+  private readonly apiKeyForTwin?: string;
 
   constructor(id: number, name: string, baseUrl: string, apiKey?: string) {
-    // Derive the webhook URL from the baseUrl for twin convention
+    // Default webhook URL; overridden per-step in run()
     const webhookUrl = `${baseUrl.replace(/\/$/, "")}/workflow/step`;
     super(id, name, webhookUrl, apiKey);
     this.baseUrl = baseUrl;
+    this.apiKeyForTwin = apiKey;
+  }
+
+  /** Resolve the correct Twin endpoint URL for a given step. */
+  private stepUrl(step: string): string {
+    const base = this.baseUrl.replace(/\/$/, "");
+    if (step === "sourcing") return `${base}/workflow/sourcing`;
+    if (step === "enrichment") return `${base}/workflow/enrichment`;
+    return `${base}/workflow/step`;
   }
 
   override async run(input: AgentProviderRunInput): Promise<unknown> {
+    const url = this.stepUrl(input.step);
+
     // Augment payload with twin context metadata
     const augmented: AgentProviderRunInput = {
       ...input,
@@ -39,8 +52,15 @@ export class TwinWebhookProvider extends CustomWebhookProvider {
         },
       },
     };
-    logger.info({ providerId: this.id, step: input.step, runId: input.runId, baseUrl: this.baseUrl }, "Twin webhook dispatching step");
-    return super.run(augmented);
+
+    logger.info(
+      { providerId: this.id, step: input.step, runId: input.runId, url },
+      "Twin webhook dispatching step",
+    );
+
+    // Temporarily swap the parent's webhook URL by creating a one-shot provider
+    const oneShot = new CustomWebhookProvider(this.id, this.name, url, this.apiKeyForTwin);
+    return oneShot.run(augmented);
   }
 
   override async validateConnection(): Promise<{ ok: boolean; error?: string }> {

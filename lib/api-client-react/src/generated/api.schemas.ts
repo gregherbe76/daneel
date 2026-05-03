@@ -66,6 +66,9 @@ export interface Candidate {
   currentCompany?: string | null;
   githubUrl?: string | null;
   source?: string | null;
+  enrichedAt?: string | null;
+  enrichmentSource?: string | null;
+  enrichmentConfidence?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -129,6 +132,7 @@ export const WorkflowStepName = {
   shortlist_generation: "shortlist_generation",
   sourcing_later: "sourcing_later",
   sourcing: "sourcing",
+  enrichment: "enrichment",
 } as const;
 
 export interface AgentProviderRecord {
@@ -186,6 +190,7 @@ export interface UpsertStepSettingBody {
 export interface RunWorkflowBody {
   jobId: number;
   runSourcing?: boolean;
+  runEnrichment?: boolean;
 }
 
 export interface VariantCriteria {
@@ -200,6 +205,7 @@ export interface RunVariantBody {
   variantLabel?: string | null;
   variantCriteria: VariantCriteria;
   runSourcing?: boolean;
+  runEnrichment?: boolean;
 }
 
 export type RunStatus = (typeof RunStatus)[keyof typeof RunStatus];

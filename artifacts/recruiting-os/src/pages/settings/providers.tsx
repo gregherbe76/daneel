@@ -67,7 +67,9 @@ type WorkflowStep =
   | "job_understanding"
   | "candidate_matching"
   | "shortlist_generation"
-  | "sourcing_later";
+  | "sourcing_later"
+  | "sourcing"
+  | "enrichment";
 
 interface Provider {
   id: number;
@@ -81,12 +83,13 @@ interface Provider {
   updatedAt: string;
 }
 
-const WORKFLOW_STEPS: { key: WorkflowStep; label: string; description: string }[] = [
+const WORKFLOW_STEPS: { key: WorkflowStep; label: string; description: string; comingSoon?: boolean }[] = [
   { key: "job_understanding", label: "Job Understanding", description: "Analyzes the job posting and extracts requirements" },
   { key: "candidate_matching", label: "Candidate Matching", description: "Scores all candidates against the job criteria" },
   { key: "shortlist_generation", label: "Shortlist Generation", description: "Ranks top candidates and generates hiring summaries" },
-  { key: "sourcing" as WorkflowStep, label: "Sourcing", description: "Generate new candidate profiles before matching" },
-  { key: "sourcing_later", label: "Sourcing (future)", description: "Proactive outreach and external sourcing (coming soon)" },
+  { key: "sourcing", label: "Sourcing", description: "Generate new candidate profiles before matching. Twin uses POST /workflow/sourcing" },
+  { key: "enrichment", label: "Enrichment", description: "Enrich candidate profiles with additional signals before matching. Twin uses POST /workflow/enrichment" },
+  { key: "sourcing_later", label: "Sourcing (future)", description: "Proactive outreach and external sourcing (coming soon)", comingSoon: true },
 ];
 
 const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
@@ -257,7 +260,7 @@ function StepAssignmentRow({
   providers,
   currentSetting,
 }: {
-  step: { key: WorkflowStep; label: string; description: string };
+  step: { key: WorkflowStep; label: string; description: string; comingSoon?: boolean };
   providers: Provider[];
   currentSetting?: { providerId: number; enabled: boolean; provider?: Provider };
 }) {
@@ -296,13 +299,15 @@ function StepAssignmentRow({
         <p className="text-xs text-muted-foreground mt-0.5">{step.description}</p>
       </div>
       <div className="w-56 shrink-0">
-        {enabledProviders.length === 0 ? (
+        {step.comingSoon ? (
+          <p className="text-xs text-muted-foreground italic">Coming soon</p>
+        ) : enabledProviders.length === 0 ? (
           <p className="text-xs text-muted-foreground italic">No enabled providers</p>
         ) : (
           <Select
             value={currentProviderId?.toString() ?? ""}
             onValueChange={handleChange}
-            disabled={saving || step.key === "sourcing_later"}
+            disabled={saving}
           >
             <SelectTrigger className="w-full text-sm">
               <SelectValue placeholder="Native OpenAI (default)" />
