@@ -7,6 +7,7 @@ import {
   shortlistsTable,
   aiEvaluationsTable,
   candidatesTable,
+  applicationsTable,
 } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import PDFDocument from "pdfkit";
@@ -586,6 +587,136 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
 
   doc.end();
   logger.info({ jobId }, "PDF report generated");
+});
+
+// ── Decision Execution Actions ────────────────────────────────────────────────
+
+router.post("/reports/job/:jobId/candidate/:candidateId/action", async (req, res) => {
+  const jobId = parseInt(req.params.jobId, 10);
+  const candidateId = parseInt(req.params.candidateId, 10);
+  const action = req.body.action as string;
+
+  if (!["interview", "deprioritize", "enrich"].includes(action)) {
+    res.status(400).json({ error: "Invalid action" });
+    return;
+  }
+
+  const [candidate] = await db
+    .select()
+    .from(candidatesTable)
+    .where(eq(candidatesTable.id, candidateId))
+    .limit(1);
+
+  if (!candidate) {
+    res.status(404).json({ error: "Candidate not found" });
+    return;
+  }
+
+  // ── interview / deprioritize
+  if (action === "interview" || action === "deprioritize") {
+    const stage = action === "interview" ? "Interview" : "Rejected";
+    const [existing] = await db
+      .select()
+      .from(applicationsTable)
+      .where(and(eq(applicationsTable.jobId, jobId), eq(applicationsTable.candidateId, candidateId)))
+      .limit(1);
+
+    let application;
+    if (existing) {
+      const newNotes =
+        action === "interview" && !existing.notes?.includes("Recommended by AI")
+          ? existing.notes
+            ? `${existing.notes}\nRecommended by AI`
+            : "Recommended by AI"
+          : existing.notes ?? null;
+      [application] = await db
+        .update(applicationsTable)
+        .set({ stage, notes: newNotes, updatedAt: new Date() })
+        .where(eq(applicationsTable.id, existing.id))
+        .returning();
+    } else {
+      [application] = await db
+        .insert(applicationsTable)
+        .values({ jobId, candidateId, stage, notes: action === "interview" ? "Recommended by AI" : null })
+        .returning();
+    }
+
+    logger.info({ jobId, candidateId, action, stage }, "Report action executed");
+    res.json({ ok: true, application, candidateName: candidate.name, stage });
+    return;
+  }
+
+  // ── enrich
+  const { resolveEnrichmentProvider } = await import("./workflows/providers");
+  const provider = await resolveEnrichmentProvider();
+
+  if (!provider) {
+    res.json({ ok: false, message: "No enrichment provider configured — candidate will be enriched on the next workflow run" });
+    return;
+  }
+
+  const [job] = await db.select().from(jobsTable).where(eq(jobsTable.id, jobId)).limit(1);
+
+  const rawResponse = await provider.run({
+    step: "enrichment",
+    runId: 0,
+    jobId,
+    payload: {
+      candidates: [{
+        id: candidate.id,
+        name: candidate.name,
+        email: candidate.email,
+        skills: candidate.skills as string[],
+        summary: candidate.summary,
+        headline: candidate.headline,
+        location: candidate.location,
+        currentCompany: candidate.currentCompany,
+        githubUrl: candidate.githubUrl,
+        linkedIn: candidate.linkedIn,
+      }],
+      jobContext: {
+        title: job?.title ?? "",
+        seniority: job?.seniority ?? "",
+        mustHaveSkills: (job?.mustHaveSkills as string[]) ?? [],
+      },
+    },
+  });
+
+  const results = rawResponse as Array<{
+    candidateId: number;
+    enrichedHeadline: string | null;
+    currentCompany: string | null;
+    location: string | null;
+    skills: string[];
+    experienceSummary: string;
+    confidence: number;
+    missingFields: string[];
+  }>;
+
+  const now = new Date();
+  for (const r of results) {
+    const confidence = typeof r.confidence === "number" ? Math.min(1, Math.max(0, r.confidence)) : 0;
+    const missingSet = new Set<string>(Array.isArray(r.missingFields) ? r.missingFields : []);
+    const status = confidence >= 0.7 && missingSet.size === 0 ? "enriched" : confidence >= 0.4 ? "partial" : "failed";
+    await db
+      .update(candidatesTable)
+      .set({
+        ...(r.experienceSummary && !missingSet.has("summary") ? { summary: r.experienceSummary } : {}),
+        ...(Array.isArray(r.skills) && r.skills.length > 0 && !missingSet.has("skills") ? { skills: r.skills } : {}),
+        ...(r.enrichedHeadline && !missingSet.has("headline") ? { headline: r.enrichedHeadline } : {}),
+        ...(r.currentCompany && !missingSet.has("currentCompany") ? { currentCompany: r.currentCompany } : {}),
+        ...(r.location && !missingSet.has("location") ? { location: r.location } : {}),
+        enrichedAt: now,
+        enrichmentSource: provider.name,
+        enrichmentConfidence: confidence,
+        enrichmentStatus: status,
+        updatedAt: now,
+      })
+      .where(eq(candidatesTable.id, r.candidateId));
+  }
+
+  logger.info({ jobId, candidateId, enriched: results.length }, "Candidate enriched via report action");
+  res.json({ ok: true, candidateName: candidate.name, enriched: true });
 });
 
 export default router;

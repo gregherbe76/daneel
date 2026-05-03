@@ -19,8 +19,9 @@ import {
   Star, AlertTriangle, MessageSquare, Users, Zap, TrendingUp,
   CheckCircle2, XCircle, MinusCircle, ChevronRight, GitBranch,
   ArrowUp, ArrowDown, Minus, Info, FlaskConical, Database, ShieldAlert,
-  ClipboardList,
+  ClipboardList, CalendarClock, Sparkles, ExternalLink,
 } from "lucide-react";
+import { toast } from "sonner";
 import { HumanAIComparison } from "@/components/human-ai-comparison";
 import { ScoreBreakdownDisplay, ScoreBreakdownPills } from "@/components/score-breakdown";
 import type { ScoreBreakdown } from "@/components/score-breakdown";
@@ -198,6 +199,95 @@ function DeltaBadge({ delta, type }: { delta: number | null; type: "rank" | "sco
   );
 }
 
+// ── CandidateActionButton ─────────────────────────────────────────────────────
+
+function CandidateActionButton({
+  evaluation,
+  jobId,
+  state,
+  onExecute,
+  compact = false,
+  dark = false,
+}: {
+  evaluation: ReportEvaluation;
+  jobId: number;
+  state: "idle" | "loading" | "done" | "error";
+  onExecute: (id: number, name: string, action: ActionLabel) => void;
+  compact?: boolean;
+  dark?: boolean;
+}) {
+  const action = getActionLabel(evaluation);
+  const name = evaluation.candidate?.name ?? "Unknown";
+
+  if (state === "done") {
+    return (
+      <span className={`flex items-center gap-1 text-xs font-medium ${dark ? "text-green-400" : "text-green-600"}`}>
+        <CheckCircle2 className="h-3 w-3" />
+        Done
+      </span>
+    );
+  }
+
+  if (action === "Review manually") {
+    return (
+      <Link href={`/candidates/${evaluation.candidateId}`}>
+        <Button
+          size="sm"
+          variant="outline"
+          className={`gap-1.5 font-medium ${compact ? "h-6 text-[11px] px-2.5" : "h-7 text-xs px-3"} ${
+            dark
+              ? "bg-transparent border-blue-500/40 text-blue-300 hover:bg-blue-500/10"
+              : "text-blue-700 border-blue-200 hover:bg-blue-50"
+          }`}
+        >
+          <ExternalLink className="h-3 w-3" />
+          {compact ? name : "View Profile →"}
+        </Button>
+      </Link>
+    );
+  }
+
+  const actionCfg = {
+    "Interview now": {
+      icon: CalendarClock,
+      label: compact ? name : "Move to Interview",
+      lightCls: "bg-green-600 hover:bg-green-700 text-white border-0",
+      darkCls: "bg-transparent border-green-500/40 text-green-300 hover:bg-green-500/10",
+    },
+    "Enrich before deciding": {
+      icon: Sparkles,
+      label: compact ? name : "Trigger Enrichment",
+      lightCls: "bg-amber-500 hover:bg-amber-600 text-white border-0",
+      darkCls: "bg-transparent border-amber-500/40 text-amber-300 hover:bg-amber-500/10",
+    },
+    "Reject / low priority": {
+      icon: MinusCircle,
+      label: compact ? name : "Deprioritize",
+      lightCls: "text-slate-500 border-slate-300 hover:bg-slate-50",
+      darkCls: "bg-transparent border-slate-600 text-slate-400 hover:bg-slate-700/50",
+    },
+  }[action as "Interview now" | "Enrich before deciding" | "Reject / low priority"];
+
+  if (!actionCfg) return null;
+  const Icon = actionCfg.icon;
+  const isLoading = state === "loading";
+
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className={`gap-1.5 font-medium ${compact ? "h-6 text-[11px] px-2.5" : "h-7 text-xs px-3"} ${
+        dark ? actionCfg.darkCls : actionCfg.lightCls
+      }`}
+      disabled={isLoading}
+      onClick={() => onExecute(evaluation.candidateId, name, action)}
+    >
+      {isLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Icon className="h-3 w-3" />}
+      {actionCfg.label}
+    </Button>
+  );
+}
+
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function JobReportPage() {
@@ -256,6 +346,41 @@ export default function JobReportPage() {
     });
     return groups;
   }, [report]);
+
+  const [actionState, setActionState] = useState<Record<number, "idle" | "loading" | "done" | "error">>({});
+
+  const executeAction = async (candidateId: number, candidateName: string, action: ActionLabel) => {
+    if (action === "Review manually") return;
+    const apiAction =
+      action === "Interview now" ? "interview"
+      : action === "Enrich before deciding" ? "enrich"
+      : "deprioritize";
+    setActionState((prev) => ({ ...prev, [candidateId]: "loading" }));
+    try {
+      const res = await fetch(`/api/reports/job/${jobId}/candidate/${candidateId}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: apiAction }),
+      });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json() as { ok: boolean; enriched?: boolean; message?: string };
+      setActionState((prev) => ({ ...prev, [candidateId]: "done" }));
+      if (apiAction === "interview") {
+        toast.success("Moved to Interview", { description: `${candidateName} is now queued for interview scheduling` });
+      } else if (apiAction === "deprioritize") {
+        toast("Deprioritized", { description: `${candidateName} moved to Rejected` });
+      } else if (apiAction === "enrich") {
+        if (data.ok && data.enriched) {
+          toast.success("Profile enriched", { description: `${candidateName}'s profile has been updated` });
+        } else {
+          toast("Enrichment queued", { description: data.message ?? `${candidateName} will be enriched on the next run` });
+        }
+      }
+    } catch (err) {
+      setActionState((prev) => ({ ...prev, [candidateId]: "error" }));
+      toast.error("Action failed", { description: String(err) });
+    }
+  };
 
   const handleDownload = (type: "markdown" | "pdf") => {
     window.open(`/api/reports/job/${jobId}/latest/${type}`, "_blank");
@@ -558,44 +683,60 @@ export default function JobReportPage() {
             </div>
 
             {/* Next actions */}
-            <div className="px-7 py-5 border-t border-slate-700/80 space-y-2.5">
+            <div className="px-7 py-5 border-t border-slate-700/80 space-y-3.5">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.12em] mb-3">Recommended Next Actions</p>
               {actionGroups["Interview now"].length > 0 && (
                 <div className="flex items-start gap-2.5">
-                  <span className="text-green-400 font-bold text-sm shrink-0 leading-tight mt-0.5">→</span>
-                  <p className="text-sm text-white leading-relaxed">
-                    <span className="font-semibold">Schedule interviews:</span>{" "}
-                    <span className="text-slate-300">{actionGroups["Interview now"].map((e) => e.candidate?.name ?? "Unknown").join(", ")}</span>
-                  </p>
+                  <span className="text-green-400 font-bold text-sm shrink-0 leading-tight mt-1.5">→</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white mb-1.5">Schedule interviews:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {actionGroups["Interview now"].map((e) => (
+                        <CandidateActionButton key={e.candidateId} evaluation={e} jobId={jobId} state={actionState[e.candidateId] ?? "idle"} onExecute={executeAction} compact dark />
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
               {actionGroups["Review manually"].length > 0 && (
                 <div className="flex items-start gap-2.5">
-                  <span className="text-blue-400 font-bold text-sm shrink-0 leading-tight mt-0.5">→</span>
-                  <p className="text-sm text-white leading-relaxed">
-                    <span className="font-semibold">Review before advancing:</span>{" "}
-                    <span className="text-slate-300">{actionGroups["Review manually"].map((e) => e.candidate?.name ?? "Unknown").join(", ")}</span>
-                    <span className="text-slate-500 text-xs ml-1.5">— verify experience depth and fit</span>
-                  </p>
+                  <span className="text-blue-400 font-bold text-sm shrink-0 leading-tight mt-1.5">→</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white mb-1.5">Review before advancing:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {actionGroups["Review manually"].map((e) => (
+                        <CandidateActionButton key={e.candidateId} evaluation={e} jobId={jobId} state={actionState[e.candidateId] ?? "idle"} onExecute={executeAction} compact dark />
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1.5">— verify experience depth and fit</p>
+                  </div>
                 </div>
               )}
               {actionGroups["Enrich before deciding"].length > 0 && (
                 <div className="flex items-start gap-2.5">
-                  <span className="text-amber-400 font-bold text-sm shrink-0 leading-tight mt-0.5">→</span>
-                  <p className="text-sm text-white leading-relaxed">
-                    <span className="font-semibold">Enrich profiles first:</span>{" "}
-                    <span className="text-slate-300">{actionGroups["Enrich before deciding"].map((e) => e.candidate?.name ?? "Unknown").join(", ")}</span>
-                    <span className="text-slate-500 text-xs ml-1.5">— too sparse to make a reliable call</span>
-                  </p>
+                  <span className="text-amber-400 font-bold text-sm shrink-0 leading-tight mt-1.5">→</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-white mb-1.5">Enrich profiles first:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {actionGroups["Enrich before deciding"].map((e) => (
+                        <CandidateActionButton key={e.candidateId} evaluation={e} jobId={jobId} state={actionState[e.candidateId] ?? "idle"} onExecute={executeAction} compact dark />
+                      ))}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1.5">— too sparse to make a reliable call</p>
+                  </div>
                 </div>
               )}
               {actionGroups["Reject / low priority"].length > 0 && (
                 <div className="flex items-start gap-2.5">
-                  <span className="text-slate-500 font-bold text-sm shrink-0 leading-tight mt-0.5">→</span>
-                  <p className="text-sm text-slate-400 leading-relaxed">
-                    <span className="font-semibold text-slate-300">Deprioritize:</span>{" "}
-                    {actionGroups["Reject / low priority"].map((e) => e.candidate?.name ?? "Unknown").join(", ")}
-                  </p>
+                  <span className="text-slate-500 font-bold text-sm shrink-0 leading-tight mt-1.5">→</span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-300 mb-1.5">Deprioritize:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {actionGroups["Reject / low priority"].map((e) => (
+                        <CandidateActionButton key={e.candidateId} evaluation={e} jobId={jobId} state={actionState[e.candidateId] ?? "idle"} onExecute={executeAction} compact dark />
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -936,6 +1077,15 @@ export default function JobReportPage() {
                         <span className="font-medium">Key Risk: </span>{e.summary.keyRisks}
                       </div>
                     )}
+                    <div className="mt-4 pt-3 border-t border-border flex items-center justify-between gap-3">
+                      <p className="text-xs text-muted-foreground">Execute decision:</p>
+                      <CandidateActionButton
+                        evaluation={e}
+                        jobId={jobId}
+                        state={actionState[e.candidateId] ?? "idle"}
+                        onExecute={executeAction}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
               );
@@ -1059,15 +1209,24 @@ export default function JobReportPage() {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            {(() => {
-                              const action = getActionLabel(e);
-                              const cfg = ACTION_CONFIG[action];
-                              return (
-                                <Badge variant="outline" className={`text-xs font-medium ${cfg.bg} ${cfg.border} ${cfg.text}`}>
-                                  {action}
-                                </Badge>
-                              );
-                            })()}
+                            <div className="flex flex-col gap-1.5 items-start">
+                              {(() => {
+                                const action = getActionLabel(e);
+                                const cfg = ACTION_CONFIG[action];
+                                return (
+                                  <Badge variant="outline" className={`text-xs font-medium ${cfg.bg} ${cfg.border} ${cfg.text}`}>
+                                    {action}
+                                  </Badge>
+                                );
+                              })()}
+                              <CandidateActionButton
+                                evaluation={e}
+                                jobId={jobId}
+                                state={actionState[e.candidateId] ?? "idle"}
+                                onExecute={executeAction}
+                                compact
+                              />
+                            </div>
                           </td>
                           <td className="px-4 py-3">
                             <Badge variant="outline" className={`text-xs ${recBg(e.recommendation)}`}>
