@@ -15,7 +15,7 @@ import { logger } from "../../lib/logger";
 import { validateEmail } from "../../lib/email-validation";
 import { resolveProvider, resolveSourcingProvider, resolveEnrichmentProvider } from "./providers";
 import type { JobInsightResult, CandidateMatchResult, ShortlistResult } from "./engine-types";
-import type { AgentProvider, SourcingCandidate, EnrichmentResult, EnrichmentCandidate } from "./providers";
+import type { AgentProvider, SourcingCandidate, SourcingStats, SourcingRunResult, EnrichmentResult, EnrichmentCandidate } from "./providers";
 
 export type { JobInsightResult, CandidateMatchResult, ShortlistResult };
 
@@ -76,12 +76,22 @@ async function runSourcing(
   logger.info({ runId, step: "sourcing", provider: provider.name, sourceTag }, "Sourcing step dispatched");
 
   try {
-    const candidates = (await provider.run({
+    const rawSourcingResult = (await provider.run({
       step: "sourcing",
       runId,
       jobId,
       payload: { job, insight },
-    })) as SourcingCandidate[];
+    })) as SourcingRunResult;
+
+    // Providers may return either a bare array (legacy) or { candidates, stats }.
+    // Normalize so the rest of the engine — and the sourcing log — can treat
+    // both the same, while still surfacing GitHub-style filter counts.
+    const candidates: SourcingCandidate[] = Array.isArray(rawSourcingResult)
+      ? rawSourcingResult
+      : rawSourcingResult.candidates;
+    const sourcingStats: SourcingStats | null = Array.isArray(rawSourcingResult)
+      ? null
+      : rawSourcingResult.stats ?? null;
 
     // Deduplicate by githubUrl OR email against existing candidates.
     // Either signal is enough to identify the same person; GitHub-sourced rows
@@ -156,6 +166,9 @@ async function runSourcing(
     await logStep(runId, "sourcing", "completed", { jobTitle: job.title, provider: provider.name, sourceTag }, {
       generated: candidates.length,
       saved: newCandidateIds.length,
+      // Persisted so the run-detail UI can explain why a "0 candidates" run
+      // was actually filtered (empty bios / stale activity) vs. a broken search.
+      stats: sourcingStats,
     });
     return newCandidateIds;
   } catch (err) {

@@ -1,5 +1,5 @@
 import type { AgentProvider, AgentProviderRunInput } from "./interface";
-import type { SourcingCandidate } from "./native-openai-sourcing";
+import type { SourcingCandidate, SourcingRunResult, SourcingStats } from "./native-openai-sourcing";
 import type { GithubProviderConfig } from "@workspace/db";
 import { logger } from "../../../lib/logger";
 
@@ -277,7 +277,7 @@ export class GithubSourcingProvider implements AgentProvider {
     };
   }
 
-  async run(input: AgentProviderRunInput): Promise<SourcingCandidate[]> {
+  async run(input: AgentProviderRunInput): Promise<SourcingRunResult> {
     const payload = input.payload as SourcingPayload;
     const desired = Math.min(20, Math.max(1, Number(payload.count ?? 7)));
     const q = this.buildQuery(payload);
@@ -325,6 +325,9 @@ export class GithubSourcingProvider implements AgentProvider {
         : null;
     let droppedNoBio = 0;
     let droppedStale = 0;
+    let droppedFetchError = 0;
+    const searchTotalCount = search.total_count;
+    const consideredCount = Math.min(search.items.length, desired);
 
     // Only fetch /events/public when we actually need it: either to enforce
     // the activity filter or to discover an email when the public profile
@@ -446,6 +449,7 @@ export class GithubSourcingProvider implements AgentProvider {
           source: "GitHub Agent",
         });
       } catch (err) {
+        droppedFetchError++;
         logger.warn(
           { providerId: this.id, login: item.login, err: err instanceof Error ? err.message : String(err) },
           "GitHub sourcing: skipping user due to fetch failure",
@@ -453,17 +457,24 @@ export class GithubSourcingProvider implements AgentProvider {
       }
     }
 
+    const stats: SourcingStats = {
+      searchTotalCount,
+      consideredCount,
+      droppedNoBio,
+      droppedStale,
+      droppedFetchError,
+      returnedCount: results.length,
+    };
+
     logger.info(
       {
         providerId: this.id,
         runId: input.runId,
-        count: results.length,
-        droppedNoBio,
-        droppedStale,
+        ...stats,
       },
       "GitHub sourcing completed",
     );
-    return results;
+    return { candidates: results, stats };
   }
 
   async validateConnection(): Promise<{ ok: boolean; error?: string }> {

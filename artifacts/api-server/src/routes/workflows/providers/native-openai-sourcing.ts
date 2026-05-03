@@ -2,6 +2,31 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import type { AgentProvider, AgentProviderRunInput } from "./interface";
 import type { JobInsightResult } from "../engine-types";
 
+/**
+ * Optional per-run summary stats a sourcing provider can return alongside
+ * the candidate list. Lets the UI explain WHY a run returned few/no results
+ * (e.g. quality filters dropped them) instead of looking broken.
+ */
+export type SourcingStats = {
+  /** Raw hit count reported by the upstream search (e.g. GitHub total_count). */
+  searchTotalCount?: number;
+  /** Number of candidates the provider actually fetched and inspected. */
+  consideredCount?: number;
+  /** Dropped because the provider's "must have a bio" filter rejected them. */
+  droppedNoBio?: number;
+  /** Dropped because the provider's "active within N months" filter rejected them. */
+  droppedStale?: number;
+  /** Dropped because of a transient per-candidate fetch failure. */
+  droppedFetchError?: number;
+  /** Final count of candidates returned to the engine. */
+  returnedCount?: number;
+};
+
+/** Sourcing providers may return a bare array OR an object with stats. */
+export type SourcingRunResult =
+  | SourcingCandidate[]
+  | { candidates: SourcingCandidate[]; stats?: SourcingStats };
+
 export type SourcingCandidate = {
   name: string;
   headline: string;

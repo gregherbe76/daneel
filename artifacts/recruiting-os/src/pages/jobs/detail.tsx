@@ -633,7 +633,25 @@ export default function JobDetailPage() {
                     {workflowData.run.runSourcing && (() => {
                       const sourcingLog = workflowData.logs?.find((l: { step: string; status: string; output?: unknown }) => l.step === "sourcing");
                       if (!sourcingLog) return null;
-                      const output = sourcingLog.output as { generated?: number; saved?: number; error?: string } | null;
+                      type SourcingStats = {
+                        searchTotalCount?: number;
+                        consideredCount?: number;
+                        droppedNoBio?: number;
+                        droppedStale?: number;
+                        droppedFetchError?: number;
+                        returnedCount?: number;
+                      };
+                      const output = sourcingLog.output as {
+                        generated?: number;
+                        saved?: number;
+                        error?: string;
+                        stats?: SourcingStats | null;
+                      } | null;
+                      const stats = output?.stats ?? null;
+                      const totalDropped =
+                        (stats?.droppedNoBio ?? 0) +
+                        (stats?.droppedStale ?? 0) +
+                        (stats?.droppedFetchError ?? 0);
                       return (
                         <div className={`rounded-md border p-4 flex items-start gap-3 ${
                           sourcingLog.status === "completed"
@@ -645,7 +663,7 @@ export default function JobDetailPage() {
                           ) : (
                             <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
                           )}
-                          <div>
+                          <div className="flex-1">
                             <p className="text-sm font-medium">
                               {sourcingLog.status === "completed"
                                 ? `Sourcing complete — ${output?.saved ?? 0} new candidates generated`
@@ -654,10 +672,57 @@ export default function JobDetailPage() {
                             {sourcingLog.status === "failed" && output?.error && (
                               <p className="text-xs text-destructive mt-1">{output.error}</p>
                             )}
-                            {sourcingLog.status === "completed" && (
+                            {sourcingLog.status === "completed" && !stats && (
                               <p className="text-xs text-muted-foreground mt-0.5">
                                 All profiles are AI-generated mock candidates and clearly labelled.
                               </p>
+                            )}
+                            {sourcingLog.status === "completed" && stats && (
+                              <div className="mt-2 space-y-1.5">
+                                <div className="flex flex-wrap gap-1.5 text-[11px]">
+                                  {stats.searchTotalCount != null && (
+                                    <Badge variant="outline" className="bg-background">
+                                      {stats.searchTotalCount.toLocaleString()} search hits
+                                    </Badge>
+                                  )}
+                                  {stats.consideredCount != null && (
+                                    <Badge variant="outline" className="bg-background">
+                                      {stats.consideredCount} inspected
+                                    </Badge>
+                                  )}
+                                  {stats.returnedCount != null && (
+                                    <Badge variant="outline" className="bg-purple-500/10 text-purple-700 border-purple-200">
+                                      {stats.returnedCount} returned
+                                    </Badge>
+                                  )}
+                                  {(stats.droppedNoBio ?? 0) > 0 && (
+                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-800 border-amber-200">
+                                      {stats.droppedNoBio} dropped: empty bio
+                                    </Badge>
+                                  )}
+                                  {(stats.droppedStale ?? 0) > 0 && (
+                                    <Badge variant="outline" className="bg-amber-500/10 text-amber-800 border-amber-200">
+                                      {stats.droppedStale} dropped: stale activity
+                                    </Badge>
+                                  )}
+                                  {(stats.droppedFetchError ?? 0) > 0 && (
+                                    <Badge variant="outline" className="bg-muted text-muted-foreground">
+                                      {stats.droppedFetchError} dropped: fetch error
+                                    </Badge>
+                                  )}
+                                </div>
+                                {totalDropped > 0 && (output?.saved ?? 0) === 0 && (
+                                  <p className="text-xs text-amber-800">
+                                    Quality filters dropped every candidate. Loosen the “require bio” or
+                                    “active within” settings on the GitHub provider to widen the pool.
+                                  </p>
+                                )}
+                                {totalDropped > 0 && (output?.saved ?? 0) > 0 && (
+                                  <p className="text-xs text-muted-foreground">
+                                    {totalDropped} candidate{totalDropped === 1 ? " was" : "s were"} filtered out by your provider's quality settings.
+                                  </p>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
