@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { HumanAIComparison } from "@/components/human-ai-comparison";
+import { ImproveRerunModal, type ImproveRerunCandidate } from "@/components/improve-rerun-modal";
 import { ScoreBreakdownDisplay, ScoreBreakdownPills } from "@/components/score-breakdown";
 import type { ScoreBreakdown } from "@/components/score-breakdown";
 
@@ -382,6 +383,7 @@ export default function JobReportPage() {
   const [actionState, setActionState] = useState<Record<number, "idle" | "loading" | "done" | "error">>({});
   const [, navigate] = useLocation();
   const improveAndRerun = useImproveAndRerun();
+  const [isImproveModalOpen, setIsImproveModalOpen] = useState(false);
 
   const executeAction = async (candidateId: number, candidateName: string, action: ActionLabel) => {
     if (action === "Review manually") return;
@@ -423,6 +425,7 @@ export default function JobReportPage() {
       { data: { runId } },
       {
         onSuccess: (result) => {
+          setIsImproveModalOpen(false);
           toast.success("Improve and Rerun started", {
             description: `Enriching ${result.lowConfidenceCandidateCount} low-confidence profile${result.lowConfidenceCandidateCount === 1 ? "" : "s"} and re-scoring…`,
           });
@@ -461,14 +464,25 @@ export default function JobReportPage() {
   const isImprovedRun = report?.run?.variantLabel === "Improved Run";
   const vc = report?.run?.variantCriteria;
 
-  const lowConfidenceCount = report
+  const lowConfidenceEvaluations = report
     ? report.evaluations.filter(
         (e) =>
           e.confidenceLevel === "Low" ||
           (e.dataConfidenceScore !== null && e.dataConfidenceScore !== undefined && e.dataConfidenceScore < 50) ||
           e.requiresEnrichment === true,
-      ).length
-    : 0;
+      )
+    : [];
+  const lowConfidenceCount = lowConfidenceEvaluations.length;
+  const lowConfidenceCandidates: ImproveRerunCandidate[] = lowConfidenceEvaluations.map((e) => ({
+    candidateId: e.candidateId,
+    name: e.candidate?.name ?? `Candidate #${e.candidateId}`,
+    headline: e.candidate?.headline ?? null,
+    confidenceLevel: e.confidenceLevel ?? "Low",
+    dataConfidenceScore: e.dataConfidenceScore ?? null,
+    missingDataWarnings: e.missingDataWarnings ?? [],
+    requiresEnrichment: e.requiresEnrichment ?? null,
+    confidenceReason: e.confidenceReason ?? null,
+  }));
 
   const completedRuns = (allRuns ?? []).filter((r) => r.status === "completed");
 
@@ -563,7 +577,7 @@ export default function JobReportPage() {
               variant="outline"
               className="border-amber-300 text-amber-800 hover:bg-amber-50 gap-1.5"
               disabled={improveAndRerun.isPending}
-              onClick={handleImproveAndRerun}
+              onClick={() => setIsImproveModalOpen(true)}
             >
               {improveAndRerun.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1417,6 +1431,14 @@ export default function JobReportPage() {
           <button onClick={() => handleDownload("markdown")} className="underline hover:text-primary">Export Markdown</button>
         </div>
       </div>
+
+      <ImproveRerunModal
+        open={isImproveModalOpen}
+        onOpenChange={setIsImproveModalOpen}
+        candidates={lowConfidenceCandidates}
+        onConfirm={handleImproveAndRerun}
+        isSubmitting={improveAndRerun.isPending}
+      />
     </div>
   );
 }

@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { RunVariantModal } from "@/components/run-variant-modal";
 import { ImportCandidatesModal } from "@/components/import-candidates-modal";
 import { FindCandidatesModal } from "@/components/find-candidates-modal";
+import { ImproveRerunModal, type ImproveRerunCandidate } from "@/components/improve-rerun-modal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -179,6 +180,7 @@ export default function JobDetailPage() {
   const [isFindOpen, setIsFindOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [highlightStep2, setHighlightStep2] = useState(false);
+  const [isImproveModalOpen, setIsImproveModalOpen] = useState(false);
 
   const stages = Object.values(ApplicationStage);
 
@@ -227,6 +229,7 @@ export default function JobDetailPage() {
       { data: { runId } },
       {
         onSuccess: (result) => {
+          setIsImproveModalOpen(false);
           toast({
             title: "Improve and Rerun started",
             description: `Enriching ${result.lowConfidenceCandidateCount} low-confidence profile${result.lowConfidenceCandidateCount === 1 ? "" : "s"} and re-scoring…`,
@@ -299,14 +302,36 @@ export default function JobDetailPage() {
   const sourcedCandidates = (workflowData?.sourcedCandidates ?? []) as SourcedCandidate[];
   const hadSourcingRun = workflowData?.run?.runSourcing && sourcedCandidates.length > 0;
 
-  const lowConfidenceCount = workflowData?.run?.status === "completed"
+  const lowConfidenceEvaluations = workflowData?.run?.status === "completed"
     ? (workflowData.evaluations ?? []).filter(
         (e: { confidenceLevel?: string | null; dataConfidenceScore?: number | null; requiresEnrichment?: boolean | null }) =>
           e.confidenceLevel === "Low" ||
           (e.dataConfidenceScore !== null && e.dataConfidenceScore !== undefined && e.dataConfidenceScore < 50) ||
           e.requiresEnrichment === true,
-      ).length
-    : 0;
+      )
+    : [];
+  const lowConfidenceCount = lowConfidenceEvaluations.length;
+
+  const lowConfidenceCandidates: ImproveRerunCandidate[] = lowConfidenceEvaluations.map(
+    (e: {
+      candidateId: number;
+      confidenceLevel?: string | null;
+      dataConfidenceScore?: number | null;
+      requiresEnrichment?: boolean | null;
+      confidenceReason?: string | null;
+      missingDataWarnings?: string[] | null;
+      candidate?: { name?: string | null; headline?: string | null } | null;
+    }) => ({
+      candidateId: e.candidateId,
+      name: e.candidate?.name ?? `Candidate #${e.candidateId}`,
+      headline: e.candidate?.headline ?? null,
+      confidenceLevel: e.confidenceLevel ?? "Low",
+      dataConfidenceScore: e.dataConfidenceScore ?? null,
+      missingDataWarnings: e.missingDataWarnings ?? [],
+      requiresEnrichment: e.requiresEnrichment ?? null,
+      confidenceReason: e.confidenceReason ?? null,
+    }),
+  );
 
   const isImproving = improveAndRerun.isPending || (
     workflowData?.run?.variantLabel === "Improved Run" && workflowRunning
@@ -558,7 +583,7 @@ export default function JobDetailPage() {
                     variant="outline"
                     className="ml-1 border-amber-300 text-amber-800 hover:bg-amber-50 gap-1.5"
                     disabled={isImproving}
-                    onClick={handleImproveAndRerun}
+                    onClick={() => setIsImproveModalOpen(true)}
                   >
                     {isImproving ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1070,6 +1095,14 @@ export default function JobDetailPage() {
           }}
         />
       )}
+
+      <ImproveRerunModal
+        open={isImproveModalOpen}
+        onOpenChange={setIsImproveModalOpen}
+        candidates={lowConfidenceCandidates}
+        onConfirm={handleImproveAndRerun}
+        isSubmitting={improveAndRerun.isPending}
+      />
 
       {job && (
         <FindCandidatesModal
