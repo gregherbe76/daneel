@@ -967,6 +967,13 @@ export const UpsertProviderStepSettingResponse = zod.object({
 });
 
 /**
+ * @summary Enrich low-confidence candidates from a completed run and re-score them
+ */
+export const ImproveAndRerunBody = zod.object({
+  runId: zod.number().describe("ID of the completed run to improve"),
+});
+
+/**
  * @summary Create and run a variant workflow with modified job criteria
  */
 export const RunVariantWorkflowBody = zod.object({

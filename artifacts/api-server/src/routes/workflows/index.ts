@@ -180,4 +180,96 @@ router.get("/workflows/jobs/:jobId/latest", async (req, res) => {
   });
 });
 
+// ── Helper: detect low-confidence candidates for a run ────────────────────────
+
+export async function getLowConfidenceCandidates(runId: number): Promise<{ candidateId: number; candidateName: string }[]> {
+  const evaluations = await db
+    .select({
+      candidateId: aiEvaluationsTable.candidateId,
+      confidenceLevel: aiEvaluationsTable.confidenceLevel,
+      dataConfidenceScore: aiEvaluationsTable.dataConfidenceScore,
+      requiresEnrichment: aiEvaluationsTable.requiresEnrichment,
+    })
+    .from(aiEvaluationsTable)
+    .where(eq(aiEvaluationsTable.runId, runId));
+
+  const lowConfIds = evaluations
+    .filter(
+      (e) =>
+        e.confidenceLevel === "Low" ||
+        (e.dataConfidenceScore !== null && e.dataConfidenceScore < 50) ||
+        e.requiresEnrichment === true,
+    )
+    .map((e) => e.candidateId);
+
+  if (lowConfIds.length === 0) return [];
+
+  const candidates = await db
+    .select({ id: candidatesTable.id, name: candidatesTable.name })
+    .from(candidatesTable)
+    .where(inArray(candidatesTable.id, lowConfIds));
+
+  return candidates.map((c) => ({ candidateId: c.id, candidateName: c.name }));
+}
+
+// POST /workflows/improve-and-rerun — enrich low-confidence candidates and re-run
+const ImproveAndRerunBodySchema = z.object({
+  runId: z.number().int(),
+});
+
+router.post("/workflows/improve-and-rerun", async (req, res) => {
+  const { runId } = ImproveAndRerunBodySchema.parse(req.body);
+
+  const [previousRun] = await db
+    .select()
+    .from(agentRunsTable)
+    .where(eq(agentRunsTable.id, runId));
+
+  if (!previousRun) {
+    res.status(404).json({ error: "Run not found" });
+    return;
+  }
+
+  if (previousRun.status !== "completed") {
+    res.status(400).json({ error: "Run is not completed — can only improve a completed run" });
+    return;
+  }
+
+  const lowConfCandidates = await getLowConfidenceCandidates(runId);
+
+  if (lowConfCandidates.length === 0) {
+    res.status(400).json({ error: "No low-confidence candidates found in this run — nothing to improve" });
+    return;
+  }
+
+  const targetCandidateIds = lowConfCandidates.map((c) => c.candidateId);
+
+  const [newRun] = await db
+    .insert(agentRunsTable)
+    .values({
+      jobId: previousRun.jobId,
+      status: "pending",
+      runSourcing: false,
+      dataMode: previousRun.dataMode,
+      variantOf: runId,
+      variantLabel: "Improved Run",
+    })
+    .returning();
+
+  setImmediate(() =>
+    runWorkflowEngine(newRun.id, previousRun.jobId, {
+      dataMode: previousRun.dataMode,
+      runSourcing: false,
+      runEnrichment: true,
+      targetCandidateIds,
+    }),
+  );
+
+  res.status(201).json({
+    run: newRun,
+    previousRunId: runId,
+    lowConfidenceCandidateCount: lowConfCandidates.length,
+  });
+});
+
 export default router;

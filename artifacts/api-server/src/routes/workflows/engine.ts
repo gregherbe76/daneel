@@ -614,6 +614,8 @@ export async function runWorkflowEngine(
     runSourcing?: boolean;
     runEnrichment?: boolean;
     variantCriteria?: VariantCriteria;
+    /** When set, only these candidate IDs are enriched (targeted improve-and-rerun path). */
+    targetCandidateIds?: number[];
   } = {},
 ) {
   const dataMode: DataMode = options.dataMode ?? "mock";
@@ -699,7 +701,47 @@ export async function runWorkflowEngine(
     // Step 0b: Enrichment (optional, runs after sourcing, before matching)
     if (options.runEnrichment) {
       try {
-        await runEnrichment(runId, jobId, effectiveJob);
+        if (options.targetCandidateIds && options.targetCandidateIds.length > 0) {
+          // Targeted enrichment path: only enrich specific low-confidence candidates
+          const enrichmentProvider = await resolveEnrichmentProvider();
+          if (enrichmentProvider) {
+            const targetCandidates = await db
+              .select()
+              .from(candidatesTable)
+              .where(inArray(candidatesTable.id, options.targetCandidateIds));
+            if (targetCandidates.length > 0) {
+              await logStep(runId, "enrichment", "running", {
+                candidateCount: targetCandidates.length,
+                provider: enrichmentProvider.name,
+                note: "Targeted enrichment for low-confidence candidates only",
+              });
+              logger.info(
+                { runId, count: targetCandidates.length, provider: enrichmentProvider.name },
+                "Targeted enrichment: enriching specific low-confidence candidates",
+              );
+              try {
+                await runInlineEnrichmentForCandidates(runId, effectiveJob, targetCandidates, enrichmentProvider);
+                await logStep(runId, "enrichment", "completed", { candidateCount: targetCandidates.length, provider: enrichmentProvider.name }, {
+                  enriched: targetCandidates.length,
+                  note: "Targeted enrichment completed",
+                });
+              } catch (err) {
+                logger.error({ runId, err }, "Targeted enrichment failed — continuing with original candidate data");
+                await logStep(runId, "enrichment", "failed", null, {
+                  error: err instanceof Error ? err.message : String(err),
+                  note: "Targeted enrichment failed — continuing with existing candidate data",
+                });
+              }
+            }
+          } else {
+            await logStep(runId, "enrichment", "failed", null, {
+              note: "No enrichment provider configured. Configure one in Settings → Agent Providers → Workflow Step Assignments.",
+            });
+            logger.info({ runId }, "Targeted enrichment skipped: no enrichment provider configured");
+          }
+        } else {
+          await runEnrichment(runId, jobId, effectiveJob);
+        }
       } catch (err) {
         // Enrichment failures are non-fatal — log and continue with existing candidate data.
         // There is NO silent fallback to a native provider here (see registry.ts).

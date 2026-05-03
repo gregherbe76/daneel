@@ -30,6 +30,8 @@ import type {
   CreateProviderBody,
   HealthStatus,
   HiringReport,
+  ImproveAndRerunBody,
+  ImproveAndRerunResult,
   Job,
   JobRunSummary,
   JobWorkflowResult,
@@ -2634,6 +2636,92 @@ export const useUpsertProviderStepSetting = <
   TContext
 > => {
   return useMutation(getUpsertProviderStepSettingMutationOptions(options));
+};
+
+/**
+ * @summary Enrich low-confidence candidates from a completed run and re-score them
+ */
+export const getImproveAndRerunUrl = () => {
+  return `/api/workflows/improve-and-rerun`;
+};
+
+export const improveAndRerun = async (
+  improveAndRerunBody: ImproveAndRerunBody,
+  options?: RequestInit,
+): Promise<ImproveAndRerunResult> => {
+  return customFetch<ImproveAndRerunResult>(getImproveAndRerunUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(improveAndRerunBody),
+  });
+};
+
+export const getImproveAndRerunMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof improveAndRerun>>,
+    TError,
+    { data: BodyType<ImproveAndRerunBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof improveAndRerun>>,
+  TError,
+  { data: BodyType<ImproveAndRerunBody> },
+  TContext
+> => {
+  const mutationKey = ["improveAndRerun"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof improveAndRerun>>,
+    { data: BodyType<ImproveAndRerunBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return improveAndRerun(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ImproveAndRerunMutationResult = NonNullable<
+  Awaited<ReturnType<typeof improveAndRerun>>
+>;
+export type ImproveAndRerunMutationBody = BodyType<ImproveAndRerunBody>;
+export type ImproveAndRerunMutationError = ErrorType<void>;
+
+/**
+ * @summary Enrich low-confidence candidates from a completed run and re-score them
+ */
+export const useImproveAndRerun = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof improveAndRerun>>,
+    TError,
+    { data: BodyType<ImproveAndRerunBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof improveAndRerun>>,
+  TError,
+  { data: BodyType<ImproveAndRerunBody> },
+  TContext
+> => {
+  return useMutation(getImproveAndRerunMutationOptions(options));
 };
 
 /**

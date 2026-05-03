@@ -223,14 +223,9 @@ export interface VariantCriteria {
   focusNote?: string | null;
 }
 
-export interface RunVariantBody {
-  jobId: number;
-  baseRunId: number;
-  variantLabel?: string | null;
-  variantCriteria: VariantCriteria;
-  dataMode?: DataMode;
-  runSourcing?: boolean;
-  runEnrichment?: boolean;
+export interface ImproveAndRerunBody {
+  /** ID of the completed run to improve */
+  runId: number;
 }
 
 export type RunStatus = (typeof RunStatus)[keyof typeof RunStatus];
@@ -241,6 +236,35 @@ export const RunStatus = {
   completed: "completed",
   failed: "failed",
 } as const;
+
+export interface AgentRun {
+  id: number;
+  jobId: number;
+  status: RunStatus;
+  dataMode: DataMode;
+  runSourcing: boolean;
+  variantOf?: number | null;
+  variantLabel?: string | null;
+  variantCriteria?: VariantCriteria | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImproveAndRerunResult {
+  run: AgentRun;
+  previousRunId: number;
+  lowConfidenceCandidateCount: number;
+}
+
+export interface RunVariantBody {
+  jobId: number;
+  baseRunId: number;
+  variantLabel?: string | null;
+  variantCriteria: VariantCriteria;
+  dataMode?: DataMode;
+  runSourcing?: boolean;
+  runEnrichment?: boolean;
+}
 
 export interface JobRunSummary {
   id: number;
@@ -262,19 +286,6 @@ export const StepStatus = {
   completed: "completed",
   failed: "failed",
 } as const;
-
-export interface AgentRun {
-  id: number;
-  jobId: number;
-  status: RunStatus;
-  dataMode: DataMode;
-  runSourcing: boolean;
-  variantOf?: number | null;
-  variantLabel?: string | null;
-  variantCriteria?: VariantCriteria | null;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export interface AgentLog {
   id: number;

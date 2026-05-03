@@ -9,9 +9,10 @@ import {
   useGetLatestJobWorkflow,
   getGetLatestJobWorkflowQueryKey,
   useRunVariantWorkflow,
+  useImproveAndRerun,
   getListJobRunsQueryKey,
 } from "@workspace/api-client-react";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -161,9 +162,11 @@ export default function JobDetailPage() {
 
   const runWorkflow = useRunWorkflow();
   const runVariantWorkflow = useRunVariantWorkflow();
+  const improveAndRerun = useImproveAndRerun();
   const updateApp = useUpdateApplication();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const [isInsightsOpen, setIsInsightsOpen] = useState(true);
   const [isAllEvalsOpen, setIsAllEvalsOpen] = useState(false);
@@ -217,6 +220,45 @@ export default function JobDetailPage() {
     });
   };
 
+  const handleImproveAndRerun = () => {
+    const runId = workflowData?.run?.id;
+    if (!runId) return;
+    improveAndRerun.mutate(
+      { data: { runId } },
+      {
+        onSuccess: (result) => {
+          toast({
+            title: "Improve and Rerun started",
+            description: `Enriching ${result.lowConfidenceCandidateCount} low-confidence profile${result.lowConfidenceCandidateCount === 1 ? "" : "s"} and re-scoring…`,
+          });
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: getGetLatestJobWorkflowQueryKey(jobId) });
+            queryClient.invalidateQueries({ queryKey: getListJobRunsQueryKey(jobId) });
+          }, 2000);
+          const newRunId = result.run.id;
+          const poll = setInterval(async () => {
+            const res = await fetch(`/api/workflows/runs/${newRunId}`);
+            if (!res.ok) return;
+            const run = await res.json() as { status: string };
+            if (run.status === "completed" || run.status === "failed") {
+              clearInterval(poll);
+              queryClient.invalidateQueries({ queryKey: getGetLatestJobWorkflowQueryKey(jobId) });
+              queryClient.invalidateQueries({ queryKey: getListJobRunsQueryKey(jobId) });
+              if (run.status === "completed") {
+                navigate(`/jobs/${jobId}/report?runId=${newRunId}`);
+              } else {
+                toast({ title: "Improve and Rerun failed", variant: "destructive" });
+              }
+            }
+          }, 3000);
+        },
+        onError: () => {
+          toast({ title: "Failed to start Improve and Rerun", variant: "destructive" });
+        },
+      }
+    );
+  };
+
   const handleRunVariant = (label: string, criteria: { seniority?: string | null; mustHaveSkills?: string[] | null; focusNote?: string | null }) => {
     const baseRunId = workflowData?.run?.id;
     if (!baseRunId) return;
@@ -256,6 +298,19 @@ export default function JobDetailPage() {
   const workflowRunning = workflowData?.run?.status === 'pending' || workflowData?.run?.status === 'running';
   const sourcedCandidates = (workflowData?.sourcedCandidates ?? []) as SourcedCandidate[];
   const hadSourcingRun = workflowData?.run?.runSourcing && sourcedCandidates.length > 0;
+
+  const lowConfidenceCount = workflowData?.run?.status === "completed"
+    ? (workflowData.evaluations ?? []).filter(
+        (e: { confidenceLevel?: string | null; dataConfidenceScore?: number | null; requiresEnrichment?: boolean | null }) =>
+          e.confidenceLevel === "Low" ||
+          (e.dataConfidenceScore !== null && e.dataConfidenceScore !== undefined && e.dataConfidenceScore < 50) ||
+          e.requiresEnrichment === true,
+      ).length
+    : 0;
+
+  const isImproving = improveAndRerun.isPending || (
+    workflowData?.run?.variantLabel === "Improved Run" && workflowRunning
+  );
 
   return (
     <div className="h-full flex flex-col">
@@ -496,6 +551,24 @@ export default function JobDetailPage() {
                     <Zap className="h-3 w-3 mr-1" />
                     Sourcing enabled
                   </Badge>
+                )}
+                {lowConfidenceCount > 0 && !workflowRunning && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-1 border-amber-300 text-amber-800 hover:bg-amber-50 gap-1.5"
+                    disabled={isImproving}
+                    onClick={handleImproveAndRerun}
+                  >
+                    {isImproving ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    {isImproving
+                      ? "Improving…"
+                      : `Improve and Rerun — ${lowConfidenceCount} low-confidence profile${lowConfidenceCount === 1 ? "" : "s"}`}
+                  </Button>
                 )}
               </div>
               <CollapsibleTrigger asChild>

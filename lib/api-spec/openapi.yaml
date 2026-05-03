@@ -591,6 +591,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProviderStepSettingWithProvider"
 
+  /workflows/improve-and-rerun:
+    post:
+      operationId: improveAndRerun
+      tags: [workflows]
+      summary: Enrich low-confidence candidates from a completed run and re-score them
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImproveAndRerunBody"
+      responses:
+        "201":
+          description: New run created and started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImproveAndRerunResult"
+        "400":
+          description: No low-confidence candidates found or run not completed
+        "404":
+          description: Run not found
+
   /workflows/run-variant:
     post:
       operationId: runVariantWorkflow
@@ -1090,6 +1113,25 @@ components:
         focusNote:
           type: string
           nullable: true
+
+    ImproveAndRerunBody:
+      type: object
+      properties:
+        runId:
+          type: integer
+          description: ID of the completed run to improve
+      required: [runId]
+
+    ImproveAndRerunResult:
+      type: object
+      properties:
+        run:
+          $ref: "#/components/schemas/AgentRun"
+        previousRunId:
+          type: integer
+        lowConfidenceCandidateCount:
+          type: integer
+      required: [run, previousRunId, lowConfidenceCandidateCount]
 
     RunVariantBody:
       type: object

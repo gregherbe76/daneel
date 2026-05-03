@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
-import { useRoute, Link } from "wouter";
-import { useGetJob, useListJobRuns, getListJobRunsQueryKey } from "@workspace/api-client-react";
+import { useState, useMemo, useEffect } from "react";
+import { useRoute, Link, useLocation, useSearch } from "wouter";
+import { useGetJob, useListJobRuns, useImproveAndRerun, getListJobRunsQueryKey } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -294,7 +294,17 @@ function CandidateActionButton({
 export default function JobReportPage() {
   const [, params] = useRoute("/jobs/:id/report");
   const jobId = parseInt(params?.id || "0", 10);
-  const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
+  const search = useSearch();
+  const queryRunId = useMemo(() => {
+    const parsed = new URLSearchParams(search);
+    const v = parsed.get("runId");
+    return v ? parseInt(v, 10) : null;
+  }, [search]);
+  const [selectedRunId, setSelectedRunId] = useState<number | null>(queryRunId);
+
+  useEffect(() => {
+    if (queryRunId !== null) setSelectedRunId(queryRunId);
+  }, [queryRunId]);
 
   const { data: job } = useGetJob(jobId, {
     query: { enabled: !!jobId, queryKey: [`/api/jobs/${jobId}`] },
@@ -349,6 +359,8 @@ export default function JobReportPage() {
   }, [report]);
 
   const [actionState, setActionState] = useState<Record<number, "idle" | "loading" | "done" | "error">>({});
+  const [, navigate] = useLocation();
+  const improveAndRerun = useImproveAndRerun();
 
   const executeAction = async (candidateId: number, candidateName: string, action: ActionLabel) => {
     if (action === "Review manually") return;
@@ -383,12 +395,59 @@ export default function JobReportPage() {
     }
   };
 
+  const handleImproveAndRerun = () => {
+    const runId = report?.run?.id;
+    if (!runId) return;
+    improveAndRerun.mutate(
+      { data: { runId } },
+      {
+        onSuccess: (result) => {
+          toast.success("Improve and Rerun started", {
+            description: `Enriching ${result.lowConfidenceCandidateCount} low-confidence profile${result.lowConfidenceCandidateCount === 1 ? "" : "s"} and re-scoring…`,
+          });
+          const newRunId = result.run.id;
+          const baseRunId = runId;
+          const poll = setInterval(async () => {
+            const res = await fetch(`/api/workflows/runs/${newRunId}`);
+            if (!res.ok) return;
+            const run = await res.json() as { status: string };
+            if (run.status === "completed" || run.status === "failed") {
+              clearInterval(poll);
+              if (run.status === "completed") {
+                setSelectedRunId(newRunId);
+                navigate(`/jobs/${jobId}/report`);
+                toast.success("Improvement complete", {
+                  description: "Showing improved run — comparing scores vs. previous run",
+                });
+              } else {
+                toast.error("Improve and Rerun failed");
+              }
+            }
+          }, 3000);
+        },
+        onError: () => {
+          toast.error("Failed to start Improve and Rerun");
+        },
+      }
+    );
+  };
+
   const handleDownload = (type: "markdown" | "pdf") => {
     window.open(`/api/reports/job/${jobId}/latest/${type}`, "_blank");
   };
 
   const isVariant = !!report?.run?.variantOf;
+  const isImprovedRun = report?.run?.variantLabel === "Improved Run";
   const vc = report?.run?.variantCriteria;
+
+  const lowConfidenceCount = report
+    ? report.evaluations.filter(
+        (e) =>
+          e.confidenceLevel === "Low" ||
+          (e.dataConfidenceScore !== null && e.dataConfidenceScore !== undefined && e.dataConfidenceScore < 50) ||
+          e.requiresEnrichment === true,
+      ).length
+    : 0;
 
   const completedRuns = (allRuns ?? []).filter((r) => r.status === "completed");
 
@@ -476,6 +535,25 @@ export default function JobReportPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {/* Improve and Rerun button */}
+          {lowConfidenceCount > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-amber-300 text-amber-800 hover:bg-amber-50 gap-1.5"
+              disabled={improveAndRerun.isPending}
+              onClick={handleImproveAndRerun}
+            >
+              {improveAndRerun.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" />
+              )}
+              {improveAndRerun.isPending
+                ? "Improving…"
+                : `Improve and Rerun — ${lowConfidenceCount} low-confidence`}
+            </Button>
+          )}
           {/* Run switcher */}
           {completedRuns.length > 1 && (
             <Select
@@ -554,6 +632,19 @@ export default function JobReportPage() {
               <p className="text-sm font-semibold text-green-800">Real Data Run</p>
               <p className="text-xs text-green-700 mt-0.5">
                 This report scored only imported and Twin-sourced candidates. No mock data was generated or mixed in.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Improved Run Banner ── */}
+        {isImprovedRun && (
+          <div className="rounded-xl border border-teal-200 bg-teal-50/70 px-5 py-4 flex items-start gap-3">
+            <Sparkles className="h-4 w-4 text-teal-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-teal-800">Improved run — low-confidence profiles enriched</p>
+              <p className="text-xs text-teal-700 mt-0.5">
+                Previously flagged low-confidence candidates were enriched and re-scored. The comparison table below shows score changes vs. the previous run.
               </p>
             </div>
           </div>
