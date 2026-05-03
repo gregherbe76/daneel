@@ -20,8 +20,11 @@ import {
   CheckCircle2, XCircle, MinusCircle, ChevronRight, GitBranch,
   ArrowUp, ArrowDown, Minus, Info, FlaskConical, Database, ShieldAlert,
   ClipboardList, CalendarClock, Sparkles, ExternalLink,
+  Pencil, RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Textarea } from "@/components/ui/textarea";
+import { useQueryClient } from "@tanstack/react-query";
 import { HumanAIComparison } from "@/components/human-ai-comparison";
 import { ImproveRerunModal, type ImproveRerunCandidate } from "@/components/improve-rerun-modal";
 import { ScoreBreakdownDisplay, ScoreBreakdownPills } from "@/components/score-breakdown";
@@ -78,6 +81,8 @@ type ReportEvaluation = {
   candidate: ReportCandidate | null;
   summary: { candidateId: number; whyRelevant: string; keyRisks: string; finalRecommendation: string } | null;
   clientFitNarrative?: string | null;
+  clientFitNarrativeGenerated?: string | null;
+  clientFitNarrativeOverride?: string | null;
 };
 
 type JobInsight = {
@@ -311,6 +316,148 @@ function CandidateActionButton({
   );
 }
 
+// ── Client Fit Narrative Editor ───────────────────────────────────────────────
+
+function ClientFitNarrativeEditor({
+  jobId,
+  runId,
+  candidateId,
+  current,
+  generated,
+  hasOverride,
+  reportQueryKey,
+}: {
+  jobId: number;
+  runId: number;
+  candidateId: number;
+  current: string;
+  generated: string | null;
+  hasOverride: boolean;
+  reportQueryKey: readonly unknown[];
+}) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(current);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!editing) setDraft(current);
+  }, [current, editing]);
+
+  const save = async (value: string | null) => {
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/reports/job/${jobId}/run/${runId}/candidate/${candidateId}/narrative`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ narrative: value }),
+        },
+      );
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      await qc.invalidateQueries({ queryKey: reportQueryKey });
+      setEditing(false);
+      toast.success(value === null ? "Reset to AI-generated narrative" : "Narrative saved");
+    } catch (err) {
+      toast.error("Failed to save narrative", { description: String(err) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/60 px-4 py-3">
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide">
+          Why this candidate fits your client
+          {hasOverride && !editing && (
+            <Badge variant="outline" className="ml-2 text-[10px] py-0 h-4 border-blue-300 text-blue-700 bg-white/60">
+              Edited
+            </Badge>
+          )}
+        </p>
+        {!editing && (
+          <div className="flex items-center gap-1">
+            {hasOverride && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 text-[11px] px-2 text-blue-700 hover:bg-blue-100"
+                disabled={saving}
+                onClick={() => save(null)}
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Reset
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 text-[11px] px-2 text-blue-700 hover:bg-blue-100"
+              onClick={() => {
+                setDraft(current);
+                setEditing(true);
+              }}
+            >
+              <Pencil className="h-3 w-3 mr-1" />
+              Edit
+            </Button>
+          </div>
+        )}
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          <Textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={5}
+            className="text-sm bg-white text-blue-950 leading-relaxed"
+            placeholder="Write a personalised narrative for your client…"
+          />
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs"
+              disabled={saving}
+              onClick={() => {
+                setDraft(current);
+                setEditing(false);
+              }}
+            >
+              Cancel
+            </Button>
+            {generated && draft !== generated && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                disabled={saving}
+                onClick={() => setDraft(generated)}
+              >
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Restore AI version
+              </Button>
+            )}
+            <Button
+              size="sm"
+              className="h-7 text-xs"
+              disabled={saving || draft.trim() === "" || draft === current}
+              onClick={() => save(draft.trim())}
+            >
+              {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+              Save
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-blue-900 leading-relaxed italic whitespace-pre-wrap">{current}</p>
+      )}
+    </div>
+  );
+}
+
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function JobReportPage() {
@@ -336,8 +483,13 @@ export default function JobReportPage() {
     query: { enabled: !!jobId, queryKey: getListJobRunsQueryKey(jobId) },
   });
 
+  const reportQueryKey = useMemo(
+    () => (selectedRunId ? ["report", jobId, selectedRunId] : ["report", jobId, "latest"]),
+    [jobId, selectedRunId],
+  );
+
   const { data: report, isLoading, error } = useQuery<HiringReport>({
-    queryKey: selectedRunId ? ["report", jobId, selectedRunId] : ["report", jobId, "latest"],
+    queryKey: reportQueryKey,
     queryFn: async () => {
       const url = selectedRunId
         ? `/api/reports/job/${jobId}/run/${selectedRunId}`
@@ -1238,10 +1390,15 @@ export default function JobReportPage() {
                       </div>
                     )}
                     {e.clientFitNarrative && (
-                      <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50/60 px-4 py-3">
-                        <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-1.5">Why this candidate fits your client</p>
-                        <p className="text-sm text-blue-900 leading-relaxed italic">{e.clientFitNarrative}</p>
-                      </div>
+                      <ClientFitNarrativeEditor
+                        jobId={jobId}
+                        runId={report.run.id}
+                        candidateId={e.candidateId}
+                        current={e.clientFitNarrative}
+                        generated={e.clientFitNarrativeGenerated ?? null}
+                        hasOverride={!!e.clientFitNarrativeOverride}
+                        reportQueryKey={reportQueryKey}
+                      />
                     )}
                     <div className="mt-4 pt-3 border-t border-border flex items-center justify-between gap-3">
                       <p className="text-xs text-muted-foreground">Execute decision:</p>

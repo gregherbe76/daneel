@@ -68,14 +68,17 @@ async function buildReport(jobId: number, runId?: number) {
     const summary = (shortlist?.summaries as Array<{ candidateId: number; whyRelevant: string; keyRisks: string; finalRecommendation: string }> ?? [])
       .find((s) => s.candidateId === e!.candidateId) ?? null;
     const candidateName = candidateMap.get(e!.candidateId)?.name ?? "This candidate";
-    const clientFitNarrative = summary
+    const generatedNarrative = summary
       ? `We believe ${candidateName} is a strong fit for your client's mission. ${summary.whyRelevant} Based on our assessment, ${summary.finalRecommendation.charAt(0).toLowerCase()}${summary.finalRecommendation.slice(1)}`
       : null;
+    const override = e!.clientFitNarrativeOverride ?? null;
     return {
       ...e!,
       candidate: candidateMap.get(e!.candidateId) ?? null,
       summary,
-      clientFitNarrative,
+      clientFitNarrative: override ?? generatedNarrative,
+      clientFitNarrativeGenerated: generatedNarrative,
+      clientFitNarrativeOverride: override,
     };
   });
 
@@ -161,6 +164,37 @@ router.get("/reports/job/:jobId/run/:runId", async (req, res) => {
     return;
   }
   res.json(report);
+});
+
+// ── Update narrative override ─────────────────────────────────────────────────
+router.put("/reports/job/:jobId/run/:runId/candidate/:candidateId/narrative", async (req, res) => {
+  const jobId = parseInt(req.params.jobId, 10);
+  const runId = parseInt(req.params.runId, 10);
+  const candidateId = parseInt(req.params.candidateId, 10);
+  const body = req.body as { narrative?: string | null };
+  const narrative = body?.narrative;
+  const value =
+    narrative === null || narrative === undefined || (typeof narrative === "string" && narrative.trim() === "")
+      ? null
+      : String(narrative);
+
+  const updated = await db
+    .update(aiEvaluationsTable)
+    .set({ clientFitNarrativeOverride: value })
+    .where(
+      and(
+        eq(aiEvaluationsTable.jobId, jobId),
+        eq(aiEvaluationsTable.runId, runId),
+        eq(aiEvaluationsTable.candidateId, candidateId),
+      ),
+    )
+    .returning();
+
+  if (updated.length === 0) {
+    res.status(404).json({ error: "Evaluation not found" });
+    return;
+  }
+  res.json({ ok: true, clientFitNarrativeOverride: value });
 });
 
 router.get("/reports/job/:jobId/latest", async (req, res) => {
@@ -296,14 +330,10 @@ router.get("/reports/job/:jobId/latest/markdown", async (req, res) => {
       md.push("");
       md.push(`**Key Risks:** ${e.summary.keyRisks}`);
     }
-    const cName = (e as typeof e & { candidate?: { name?: string } }).candidate?.name ?? "This candidate";
-    const whyRelevant = e.summary?.whyRelevant ?? "";
-    const finalRec = e.summary?.finalRecommendation ?? "";
-    if (whyRelevant) {
-      const narrative = `We believe ${cName} is a strong fit for your client's mission. ${whyRelevant}${finalRec ? ` Based on our assessment, ${finalRec.charAt(0).toLowerCase()}${finalRec.slice(1)}` : ""}`;
+    if (e.clientFitNarrative) {
       md.push("");
       md.push("**Why this candidate fits your client:**");
-      md.push(`> ${narrative}`);
+      md.push(`> ${e.clientFitNarrative}`);
     }
     md.push("");
   });
@@ -549,14 +579,10 @@ router.get("/reports/job/:jobId/latest/pdf", async (req, res) => {
     if (gaps.length > 0) {
       doc.fill(RED).fontSize(8).text("Gaps: " + gaps.join("  ·  "), { indent: 14, width: W - 14 });
     }
-    const pdfCandName = (e as typeof e & { candidate?: { name?: string } }).candidate?.name ?? "This candidate";
-    const pdfWhyRelevant = e.summary?.whyRelevant ?? "";
-    const pdfFinalRec = e.summary?.finalRecommendation ?? "";
-    if (pdfWhyRelevant) {
-      const clientNarrative = `We believe ${pdfCandName} is a strong fit for your client's mission. ${pdfWhyRelevant}${pdfFinalRec ? ` Based on our assessment, ${pdfFinalRec.charAt(0).toLowerCase()}${pdfFinalRec.slice(1)}` : ""}`;
+    if (e.clientFitNarrative) {
       doc.moveDown(0.2);
       doc.fill(MUTED).fontSize(8).font("Helvetica-Bold").text("WHY THIS CANDIDATE FITS YOUR CLIENT", { indent: 14, width: W - 14 });
-      doc.fill("#1e40af").fontSize(8).font("Helvetica").text(clientNarrative, { indent: 14, width: W - 14 });
+      doc.fill("#1e40af").fontSize(8).font("Helvetica").text(e.clientFitNarrative, { indent: 14, width: W - 14 });
     }
     doc.moveDown(0.6);
   });

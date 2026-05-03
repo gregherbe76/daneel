@@ -43,6 +43,7 @@ export const aiEvaluationsTable = pgTable("ai_evaluations", {
   risks: jsonb("risks").$type<string[]>().notNull().default([]),
   recommendation: recommendationEnum("recommendation").notNull(),
   scoreBreakdown: jsonb("score_breakdown").$type<ScoreBreakdown>(),
+  clientFitNarrativeOverride: text("client_fit_narrative_override"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
