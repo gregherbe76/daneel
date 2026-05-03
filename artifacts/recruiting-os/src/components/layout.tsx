@@ -1,25 +1,72 @@
 import { Link, useLocation } from "wouter";
-import { Briefcase, Users, PlayCircle, ListChecks } from "lucide-react";
+import { Briefcase, Users, PlayCircle, ListChecks, AtSign } from "lucide-react";
+import {
+  useListTeamMembers,
+  useListMentionsForMember,
+} from "@workspace/api-client-react";
+import { useCurrentUser, useMentionsLastRead } from "@/lib/current-user";
+
+function MentionsBadge() {
+  const teamQuery = useListTeamMembers();
+  const user = useCurrentUser(teamQuery.data);
+  const userId = user?.id ?? "";
+  const [lastRead] = useMentionsLastRead(userId);
+
+  const mentionsQuery = useListMentionsForMember(userId, undefined, {
+    query: {
+      queryKey: ["mentions", userId],
+      enabled: Boolean(userId),
+      refetchInterval: 15000,
+    },
+  });
+  const items = mentionsQuery.data ?? [];
+
+  const unread = items.filter((m) => {
+    const iso =
+      typeof m.comment.createdAt === "string"
+        ? m.comment.createdAt
+        : new Date(m.comment.createdAt).toISOString();
+    return !lastRead || new Date(iso) > new Date(lastRead);
+  }).length;
+
+  if (unread === 0) return null;
+  return (
+    <span
+      data-testid="mentions-badge"
+      className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-blue-600 text-white text-[10px] font-semibold"
+    >
+      {unread > 99 ? "99+" : unread}
+    </span>
+  );
+}
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
-  const navigation = [
+  const navigation: Array<{
+    name: string;
+    href: string;
+    icon: typeof Briefcase;
+    caption?: string;
+    match?: string;
+    badge?: React.ReactNode;
+  }> = [
     { name: "Jobs", href: "/jobs", icon: Briefcase },
     { name: "Candidates", href: "/candidates", icon: Users },
-    { 
-      name: "Workflow", 
-      href: "/jobs", 
-      icon: PlayCircle, 
+    { name: "Mentions", href: "/mentions", icon: AtSign, badge: <MentionsBadge /> },
+    {
+      name: "Workflow",
+      href: "/jobs",
+      icon: PlayCircle,
       caption: "Run AI on a job",
-      match: "__never__" 
+      match: "__never__",
     },
-    { 
-      name: "Shortlist", 
-      href: "/jobs", 
-      icon: ListChecks, 
+    {
+      name: "Shortlist",
+      href: "/jobs",
+      icon: ListChecks,
       caption: "View top candidates",
-      match: "__never__"
+      match: "__never__",
     },
   ];
 
@@ -40,7 +87,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
         <nav className="flex-1 p-4 space-y-1">
           {navigation.map((item) => {
-            const isActive = item.match 
+            const isActive = item.match
               ? location === item.match
               : location.startsWith(item.href);
             return (
@@ -53,12 +100,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   }`}
                 >
                   <item.icon className="h-5 w-5" />
-                  <div className="flex flex-col">
+                  <div className="flex flex-col flex-1">
                     <span>{item.name}</span>
                     {item.caption && (
                       <span className="text-[10px] opacity-50 font-normal">{item.caption}</span>
                     )}
                   </div>
+                  {item.badge}
                 </div>
               </Link>
             );

@@ -1,6 +1,11 @@
-import { pgTable, serial, integer, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { candidatesTable } from "./candidates";
 import { jobsTable } from "./jobs";
+
+export type CommentMention = {
+  id: string;
+  name: string;
+};
 
 export const candidateNotesTable = pgTable("candidate_notes", {
   id: serial("id").primaryKey(),
@@ -26,6 +31,7 @@ export const candidateCommentsTable = pgTable("candidate_comments", {
   parentId: integer("parent_id"),
   author: text("author").notNull(),
   body: text("body").notNull(),
+  mentions: jsonb("mentions").$type<CommentMention[]>().notNull().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

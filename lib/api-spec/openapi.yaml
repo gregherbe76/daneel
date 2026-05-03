@@ -24,6 +24,8 @@ tags:
     description: Hiring manager report exports
   - name: notes
     description: Recruiter notes and threaded team comments on candidates
+  - name: team
+    description: Lightweight team roster used for @mentions
 paths:
   /healthz:
     get:
@@ -887,6 +889,50 @@ paths:
         "204":
           description: Deleted
 
+  # ── TEAM ────────────────────────────────────────────────────────────────────
+  /team:
+    get:
+      operationId: listTeamMembers
+      tags: [team]
+      summary: List the team roster used for @mention autocomplete
+      responses:
+        "200":
+          description: Team roster
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamMember"
+
+  /team/{memberId}/mentions:
+    get:
+      operationId: listMentionsForMember
+      tags: [team]
+      summary: List recent comments that mention a given team member
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: since
+          in: query
+          required: false
+          description: ISO timestamp; only return comments newer than this
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Comments mentioning this member
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MentionEntry"
+
   /pipeline/summary:
     get:
       operationId: getPipelineSummary
@@ -1190,6 +1236,15 @@ components:
           type: string
       required: [jobId, author, body]
 
+    CommentMention:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required: [id, name]
+
     CandidateComment:
       type: object
       properties:
@@ -1206,10 +1261,14 @@ components:
           type: string
         body:
           type: string
+        mentions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentMention"
         createdAt:
           type: string
           format: date-time
-      required: [id, candidateId, jobId, author, body, createdAt]
+      required: [id, candidateId, jobId, author, body, mentions, createdAt]
 
     CreateCandidateCommentBody:
       type: object
@@ -1223,7 +1282,40 @@ components:
           type: string
         body:
           type: string
+        mentions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentMention"
       required: [jobId, author, body]
+
+    TeamMember:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+        email:
+          type: string
+        initials:
+          type: string
+        color:
+          type: string
+      required: [id, name, role, email, initials, color]
+
+    MentionEntry:
+      type: object
+      description: A comment that mentions a particular team member, with candidate/job context for the inbox.
+      properties:
+        comment:
+          $ref: "#/components/schemas/CandidateComment"
+        candidateName:
+          type: string
+        jobTitle:
+          type: string
+      required: [comment, candidateName, jobTitle]
 
     # ── PROVIDERS ──
     ProviderType:

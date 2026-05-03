@@ -41,10 +41,13 @@ import type {
   JobWorkflowResult,
   ListCandidateCommentsParams,
   ListCandidateNotesParams,
+  ListMentionsForMemberParams,
+  MentionEntry,
   PipelineSummary,
   ProviderStepSettingWithProvider,
   RunVariantBody,
   RunWorkflowBody,
+  TeamMember,
   ToggleProviderBody,
   UpdateApplicationBody,
   UpsertStepSettingBody,
@@ -3856,6 +3859,202 @@ export const useDeleteCandidateComment = <
 > => {
   return useMutation(getDeleteCandidateCommentMutationOptions(options));
 };
+
+/**
+ * @summary List the team roster used for @mention autocomplete
+ */
+export const getListTeamMembersUrl = () => {
+  return `/api/team`;
+};
+
+export const listTeamMembers = async (
+  options?: RequestInit,
+): Promise<TeamMember[]> => {
+  return customFetch<TeamMember[]>(getListTeamMembersUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTeamMembersQueryKey = () => {
+  return [`/api/team`] as const;
+};
+
+export const getListTeamMembersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTeamMembers>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTeamMembers>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListTeamMembersQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTeamMembers>>> = ({
+    signal,
+  }) => listTeamMembers({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTeamMembers>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTeamMembersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTeamMembers>>
+>;
+export type ListTeamMembersQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List the team roster used for @mention autocomplete
+ */
+
+export function useListTeamMembers<
+  TData = Awaited<ReturnType<typeof listTeamMembers>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTeamMembers>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTeamMembersQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List recent comments that mention a given team member
+ */
+export const getListMentionsForMemberUrl = (
+  memberId: string,
+  params?: ListMentionsForMemberParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/team/${memberId}/mentions?${stringifiedParams}`
+    : `/api/team/${memberId}/mentions`;
+};
+
+export const listMentionsForMember = async (
+  memberId: string,
+  params?: ListMentionsForMemberParams,
+  options?: RequestInit,
+): Promise<MentionEntry[]> => {
+  return customFetch<MentionEntry[]>(
+    getListMentionsForMemberUrl(memberId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListMentionsForMemberQueryKey = (
+  memberId: string,
+  params?: ListMentionsForMemberParams,
+) => {
+  return [
+    `/api/team/${memberId}/mentions`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListMentionsForMemberQueryOptions = <
+  TData = Awaited<ReturnType<typeof listMentionsForMember>>,
+  TError = ErrorType<unknown>,
+>(
+  memberId: string,
+  params?: ListMentionsForMemberParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listMentionsForMember>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getListMentionsForMemberQueryKey(memberId, params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listMentionsForMember>>
+  > = ({ signal }) =>
+    listMentionsForMember(memberId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!memberId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listMentionsForMember>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListMentionsForMemberQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listMentionsForMember>>
+>;
+export type ListMentionsForMemberQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List recent comments that mention a given team member
+ */
+
+export function useListMentionsForMember<
+  TData = Awaited<ReturnType<typeof listMentionsForMember>>,
+  TError = ErrorType<unknown>,
+>(
+  memberId: string,
+  params?: ListMentionsForMemberParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listMentionsForMember>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListMentionsForMemberQueryOptions(
+    memberId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get pipeline summary - counts per stage across all jobs

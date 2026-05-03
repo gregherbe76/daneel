@@ -15,6 +15,7 @@ import JobReportPage from "./pages/jobs/report";
 import CandidatesPage from "./pages/candidates/index";
 import CandidateDetailPage from "./pages/candidates/detail";
 import AgentProvidersPage from "./pages/settings/providers";
+import MentionsPage from "./pages/mentions";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ function Router() {
         <Route path="/candidates/:id" component={CandidateDetailPage} />
         <Route path="/candidates/:id/edit" component={() => <div className="p-8">Candidate Edit (WIP)</div>} />
         <Route path="/pipeline" component={() => <div className="p-8">Pipeline (WIP)</div>} />
+        <Route path="/mentions" component={MentionsPage} />
         <Route path="/settings" component={() => <Redirect to="/settings/providers" />} />
         <Route path="/settings/providers" component={AgentProvidersPage} />
         

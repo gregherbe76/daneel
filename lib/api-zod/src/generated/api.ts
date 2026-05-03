@@ -2051,6 +2051,12 @@ export const ListCandidateCommentsResponseItem = zod.object({
   parentId: zod.number().nullish(),
   author: zod.string(),
   body: zod.string(),
+  mentions: zod.array(
+    zod.object({
+      id: zod.string(),
+      name: zod.string(),
+    }),
+  ),
   createdAt: zod.coerce.date(),
 });
 export const ListCandidateCommentsResponse = zod.array(
@@ -2069,6 +2075,14 @@ export const CreateCandidateCommentBody = zod.object({
   parentId: zod.number().nullish(),
   author: zod.string(),
   body: zod.string(),
+  mentions: zod
+    .array(
+      zod.object({
+        id: zod.string(),
+        name: zod.string(),
+      }),
+    )
+    .optional(),
 });
 
 /**
@@ -2078,6 +2092,60 @@ export const DeleteCandidateCommentParams = zod.object({
   candidateId: zod.coerce.number(),
   commentId: zod.coerce.number(),
 });
+
+/**
+ * @summary List the team roster used for @mention autocomplete
+ */
+export const ListTeamMembersResponseItem = zod.object({
+  id: zod.string(),
+  name: zod.string(),
+  role: zod.string(),
+  email: zod.string(),
+  initials: zod.string(),
+  color: zod.string(),
+});
+export const ListTeamMembersResponse = zod.array(ListTeamMembersResponseItem);
+
+/**
+ * @summary List recent comments that mention a given team member
+ */
+export const ListMentionsForMemberParams = zod.object({
+  memberId: zod.coerce.string(),
+});
+
+export const ListMentionsForMemberQueryParams = zod.object({
+  since: zod
+    .date()
+    .optional()
+    .describe("ISO timestamp; only return comments newer than this"),
+});
+
+export const ListMentionsForMemberResponseItem = zod
+  .object({
+    comment: zod.object({
+      id: zod.number(),
+      candidateId: zod.number(),
+      jobId: zod.number(),
+      parentId: zod.number().nullish(),
+      author: zod.string(),
+      body: zod.string(),
+      mentions: zod.array(
+        zod.object({
+          id: zod.string(),
+          name: zod.string(),
+        }),
+      ),
+      createdAt: zod.coerce.date(),
+    }),
+    candidateName: zod.string(),
+    jobTitle: zod.string(),
+  })
+  .describe(
+    "A comment that mentions a particular team member, with candidate\/job context for the inbox.",
+  );
+export const ListMentionsForMemberResponse = zod.array(
+  ListMentionsForMemberResponseItem,
+);
 
 /**
  * @summary Get pipeline summary - counts per stage across all jobs

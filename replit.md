@@ -48,6 +48,11 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 ### Core CRUD
 - **Jobs** — title, description, location, seniority, mustHaveSkills
 - **Candidates** — name, email, linkedIn, summary, skills + sourcing fields (headline, location, currentCompany, githubUrl, source)
+
+### Team Collaboration
+- **Team roster** — hard-coded HR roster in `artifacts/api-server/src/lib/team-roster.ts` (no auth yet); exposed via `GET /api/team`.
+- **@mentions in comments** — `candidate_comments.mentions` JSONB column stores `{id,name}[]`; `MentionTextarea` provides `@`-triggered autocomplete and `CommentBody` renders matched names as highlighted chips.
+- **Mentions inbox** — `GET /api/team/:memberId/mentions` lists comments mentioning a teammate (with candidate/job context). `/mentions` page shows the inbox; sidebar badge counts unread items per current user. The "current user" and "last read" timestamp are persisted in `localStorage` (keys `hireflow.currentUserId`, `hireflow.mentionsLastReadAt:{userId}`).
 - **Applications** — candidateId + jobId join, stage pipeline (Sourced → Hired)
 
 ### AI Workflow Engine (`artifacts/api-server/src/routes/workflows/`)

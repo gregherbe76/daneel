@@ -3,8 +3,10 @@ import {
   db,
   candidateNotesTable,
   candidateCommentsTable,
+  candidatesTable,
+  jobsTable,
 } from "@workspace/db";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, desc, gt } from "drizzle-orm";
 import {
   CreateCandidateNoteBody,
   CreateCandidateCommentBody,
@@ -90,6 +92,7 @@ router.post("/candidates/:candidateId/comments", async (req, res) => {
       parentId: body.parentId ?? null,
       author: body.author,
       body: body.body,
+      mentions: body.mentions ?? [],
     })
     .returning();
   res.status(201).json(row);
@@ -101,6 +104,43 @@ router.delete("/candidates/:candidateId/comments/:commentId", async (req, res) =
     .delete(candidateCommentsTable)
     .where(and(eq(candidateCommentsTable.id, commentId), eq(candidateCommentsTable.candidateId, candidateId)));
   res.status(204).end();
+});
+
+// ── TEAM ROSTER & MENTION INBOX ──────────────────────────────────────────────
+
+import { TEAM_ROSTER } from "../lib/team-roster";
+
+router.get("/team", (_req, res) => {
+  res.json(TEAM_ROSTER);
+});
+
+router.get("/team/:memberId/mentions", async (req, res) => {
+  const memberId = String(req.params.memberId);
+  const sinceParam = req.query.since ? new Date(String(req.query.since)) : null;
+
+  const where = sinceParam
+    ? gt(candidateCommentsTable.createdAt, sinceParam)
+    : undefined;
+
+  const rows = await db
+    .select({
+      comment: candidateCommentsTable,
+      candidateName: candidatesTable.name,
+      jobTitle: jobsTable.title,
+    })
+    .from(candidateCommentsTable)
+    .innerJoin(candidatesTable, eq(candidateCommentsTable.candidateId, candidatesTable.id))
+    .innerJoin(jobsTable, eq(candidateCommentsTable.jobId, jobsTable.id))
+    .where(where)
+    .orderBy(desc(candidateCommentsTable.createdAt))
+    .limit(100);
+
+  const matched = rows.filter((r) =>
+    Array.isArray(r.comment.mentions) &&
+    r.comment.mentions.some((m) => m.id === memberId),
+  );
+
+  res.json(matched);
 });
 
 export default router;

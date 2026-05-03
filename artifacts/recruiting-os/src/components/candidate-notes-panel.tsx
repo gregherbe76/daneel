@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useListCandidateNotes,
   useCreateCandidateNote,
@@ -6,21 +6,38 @@ import {
   useListCandidateComments,
   useCreateCandidateComment,
   useDeleteCandidateComment,
+  useListTeamMembers,
   getListCandidateNotesQueryKey,
   getListCandidateCommentsQueryKey,
+  type CommentMention,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { MessageSquare, StickyNote, Trash2, CornerDownRight, Loader2, Send } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  MessageSquare,
+  StickyNote,
+  Trash2,
+  CornerDownRight,
+  Loader2,
+  Send,
+  AtSign,
+} from "lucide-react";
+import { MentionTextarea } from "./mention-textarea";
+import { CommentBody } from "./comment-body";
+import { useCurrentUserId, useCurrentUser } from "@/lib/current-user";
 
 interface Props {
   candidateId: number;
   jobId: number;
-  /** the current user's display name */
-  authorName?: string;
 }
 
 function timeAgo(iso: string) {
@@ -33,8 +50,13 @@ function timeAgo(iso: string) {
   return new Date(iso).toLocaleDateString();
 }
 
-export function CandidateNotesPanel({ candidateId, jobId, authorName = "You" }: Props) {
+export function CandidateNotesPanel({ candidateId, jobId }: Props) {
   const qc = useQueryClient();
+
+  const teamQuery = useListTeamMembers();
+  const roster = teamQuery.data ?? [];
+  const [currentUserId, setCurrentUserId] = useCurrentUserId();
+  const currentUser = useCurrentUser(roster);
 
   const notesQuery = useListCandidateNotes(
     candidateId,
@@ -53,10 +75,20 @@ export function CandidateNotesPanel({ candidateId, jobId, authorName = "You" }: 
   const deleteComment = useDeleteCandidateComment();
 
   const [newNote, setNewNote] = useState("");
-  const [author, setAuthor] = useState(authorName);
   const [newComment, setNewComment] = useState("");
+  const [newCommentMentions, setNewCommentMentions] = useState<CommentMention[]>([]);
   const [replyTo, setReplyTo] = useState<number | null>(null);
   const [replyBody, setReplyBody] = useState("");
+  const [replyMentions, setReplyMentions] = useState<CommentMention[]>([]);
+
+  // Ensure currentUserId is valid once roster loads
+  useEffect(() => {
+    if (roster.length > 0 && !roster.find((m) => m.id === currentUserId)) {
+      setCurrentUserId(roster[0].id);
+    }
+  }, [roster, currentUserId, setCurrentUserId]);
+
+  const authorName = currentUser?.name ?? "You";
 
   const invalidateNotes = () =>
     qc.invalidateQueries({ queryKey: getListCandidateNotesQueryKey(candidateId, { jobId }) });
@@ -64,9 +96,9 @@ export function CandidateNotesPanel({ candidateId, jobId, authorName = "You" }: 
     qc.invalidateQueries({ queryKey: getListCandidateCommentsQueryKey(candidateId, { jobId }) });
 
   const submitNote = () => {
-    if (!newNote.trim() || !author.trim()) return;
+    if (!newNote.trim() || !authorName.trim()) return;
     createNote.mutate(
-      { candidateId, data: { jobId, author: author.trim(), body: newNote.trim() } },
+      { candidateId, data: { jobId, author: authorName.trim(), body: newNote.trim() } },
       {
         onSuccess: () => {
           setNewNote("");
@@ -76,16 +108,32 @@ export function CandidateNotesPanel({ candidateId, jobId, authorName = "You" }: 
     );
   };
 
-  const submitComment = (parentId: number | null, body: string) => {
-    if (!body.trim() || !author.trim()) return;
+  const submitComment = (
+    parentId: number | null,
+    body: string,
+    mentions: CommentMention[],
+  ) => {
+    if (!body.trim() || !authorName.trim()) return;
     createComment.mutate(
-      { candidateId, data: { jobId, parentId, author: author.trim(), body: body.trim() } },
+      {
+        candidateId,
+        data: {
+          jobId,
+          parentId,
+          author: authorName.trim(),
+          body: body.trim(),
+          mentions,
+        },
+      },
       {
         onSuccess: () => {
-          if (parentId === null) setNewComment("");
-          else {
+          if (parentId === null) {
+            setNewComment("");
+            setNewCommentMentions([]);
+          } else {
             setReplyTo(null);
             setReplyBody("");
+            setReplyMentions([]);
           }
           invalidateComments();
         },
@@ -106,17 +154,32 @@ export function CandidateNotesPanel({ candidateId, jobId, authorName = "You" }: 
 
   return (
     <div className="space-y-6">
-      {/* shared author input */}
+      {/* current user picker */}
       <div>
         <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
           Posting as
         </label>
-        <Input
-          value={author}
-          onChange={(e) => setAuthor(e.target.value)}
-          placeholder="Your name"
-          className="max-w-xs"
-        />
+        <Select value={currentUserId} onValueChange={setCurrentUserId}>
+          <SelectTrigger className="max-w-xs" data-testid="current-user-select">
+            <SelectValue placeholder="Select a teammate" />
+          </SelectTrigger>
+          <SelectContent>
+            {roster.map((m) => (
+              <SelectItem key={m.id} value={m.id}>
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full text-white text-[10px] font-semibold"
+                    style={{ backgroundColor: m.color }}
+                  >
+                    {m.initials}
+                  </span>
+                  <span>{m.name}</span>
+                  <span className="text-xs text-muted-foreground">· {m.role}</span>
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* ── PRIVATE NOTES ── */}
@@ -141,7 +204,7 @@ export function CandidateNotesPanel({ candidateId, jobId, authorName = "You" }: 
             <Button
               size="sm"
               onClick={submitNote}
-              disabled={!newNote.trim() || !author.trim() || createNote.isPending}
+              disabled={!newNote.trim() || !authorName.trim() || createNote.isPending}
             >
               {createNote.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -202,22 +265,27 @@ export function CandidateNotesPanel({ candidateId, jobId, authorName = "You" }: 
             <MessageSquare className="h-4 w-4 text-blue-600" />
             Team discussion
             <span className="text-xs font-normal text-muted-foreground">
-              · visible to everyone on the team
+              · type <AtSign className="h-3 w-3 inline" /> to mention a teammate
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2 items-start">
-            <Textarea
+            <MentionTextarea
               value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Start a discussion about this candidate…"
-              className="min-h-[68px] flex-1"
+              onChange={(v, mentions) => {
+                setNewComment(v);
+                setNewCommentMentions(mentions);
+              }}
+              roster={roster}
+              placeholder="Start a discussion — type @ to pull in a teammate…"
+              className="min-h-[68px]"
             />
             <Button
               size="sm"
-              onClick={() => submitComment(null, newComment)}
-              disabled={!newComment.trim() || !author.trim() || createComment.isPending}
+              onClick={() => submitComment(null, newComment, newCommentMentions)}
+              disabled={!newComment.trim() || !authorName.trim() || createComment.isPending}
+              data-testid="submit-comment"
             >
               {createComment.isPending ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -253,7 +321,9 @@ export function CandidateNotesPanel({ candidateId, jobId, authorName = "You" }: 
                             {timeAgo(c.createdAt)}
                           </span>
                         </div>
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{c.body}</p>
+                        <p className="text-sm">
+                          <CommentBody body={c.body} mentions={c.mentions} />
+                        </p>
                       </div>
                       <button
                         onClick={() =>
@@ -285,7 +355,9 @@ export function CandidateNotesPanel({ candidateId, jobId, authorName = "You" }: 
                                   {timeAgo(r.createdAt)}
                                 </span>
                               </div>
-                              <p className="text-sm whitespace-pre-wrap leading-relaxed pl-5">{r.body}</p>
+                              <p className="text-sm pl-5">
+                                <CommentBody body={r.body} mentions={r.mentions} />
+                              </p>
                             </div>
                             <button
                               onClick={() =>
@@ -306,17 +378,21 @@ export function CandidateNotesPanel({ candidateId, jobId, authorName = "You" }: 
 
                     {replyTo === c.id ? (
                       <div className="mt-3 flex gap-2 items-start pl-4">
-                        <Textarea
+                        <MentionTextarea
                           autoFocus
                           value={replyBody}
-                          onChange={(e) => setReplyBody(e.target.value)}
-                          placeholder="Write a reply…"
-                          className="min-h-[52px] flex-1 text-sm"
+                          onChange={(v, mentions) => {
+                            setReplyBody(v);
+                            setReplyMentions(mentions);
+                          }}
+                          roster={roster}
+                          placeholder="Write a reply… type @ to mention"
+                          className="min-h-[52px] text-sm"
                         />
                         <div className="flex flex-col gap-1">
                           <Button
                             size="sm"
-                            onClick={() => submitComment(c.id, replyBody)}
+                            onClick={() => submitComment(c.id, replyBody, replyMentions)}
                             disabled={!replyBody.trim()}
                           >
                             Reply
@@ -327,6 +403,7 @@ export function CandidateNotesPanel({ candidateId, jobId, authorName = "You" }: 
                             onClick={() => {
                               setReplyTo(null);
                               setReplyBody("");
+                              setReplyMentions([]);
                             }}
                           >
                             Cancel

@@ -188,6 +188,11 @@ export interface CreateCandidateNoteBody {
   body: string;
 }
 
+export interface CommentMention {
+  id: string;
+  name: string;
+}
+
 export interface CandidateComment {
   id: number;
   candidateId: number;
@@ -195,6 +200,7 @@ export interface CandidateComment {
   parentId?: number | null;
   author: string;
   body: string;
+  mentions: CommentMention[];
   createdAt: string;
 }
 
@@ -203,6 +209,25 @@ export interface CreateCandidateCommentBody {
   parentId?: number | null;
   author: string;
   body: string;
+  mentions?: CommentMention[];
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+  initials: string;
+  color: string;
+}
+
+/**
+ * A comment that mentions a particular team member, with candidate/job context for the inbox.
+ */
+export interface MentionEntry {
+  comment: CandidateComment;
+  candidateName: string;
+  jobTitle: string;
 }
 
 export type ProviderType = (typeof ProviderType)[keyof typeof ProviderType];
@@ -548,4 +573,11 @@ export type ListCandidateNotesParams = {
 
 export type ListCandidateCommentsParams = {
   jobId?: number;
+};
+
+export type ListMentionsForMemberParams = {
+  /**
+   * ISO timestamp; only return comments newer than this
+   */
+  since?: string;
 };
