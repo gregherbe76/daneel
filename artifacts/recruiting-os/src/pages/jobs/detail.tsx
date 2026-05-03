@@ -20,12 +20,13 @@ import {
   Loader2, MapPin, Edit, User, Mail, ArrowRight, Play,
   Sparkles, ChevronDown, ChevronUp, BrainCircuit, Zap,
   Building2, Github, Linkedin, AlertTriangle, FileText, GitBranch,
-  FlaskConical, Database, Upload,
+  FlaskConical, Database, Upload, Bot,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { RunVariantModal } from "@/components/run-variant-modal";
 import { ImportCandidatesModal } from "@/components/import-candidates-modal";
+import { FindCandidatesModal } from "@/components/find-candidates-modal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -172,6 +173,7 @@ export default function JobDetailPage() {
   const [runEnrichment, setRunEnrichment] = useState(false);
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isFindOpen, setIsFindOpen] = useState(false);
 
   const stages = Object.values(ApplicationStage);
 
@@ -277,6 +279,13 @@ export default function JobDetailPage() {
           </div>
           <div className="flex flex-col items-end gap-3 shrink-0">
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsFindOpen(true)}
+              >
+                <Bot className="mr-2 h-4 w-4" />
+                Find with AI
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => setIsImportOpen(true)}
@@ -820,6 +829,26 @@ export default function JobDetailPage() {
             if (created > 0) {
               toast({
                 title: `${created} candidate${created !== 1 ? "s" : ""} imported`,
+                description: "They've been added to your pipeline. Run AI Workflow to score them.",
+              });
+            }
+          }}
+        />
+      )}
+
+      {job && (
+        <FindCandidatesModal
+          open={isFindOpen}
+          onOpenChange={setIsFindOpen}
+          jobId={jobId}
+          jobTitle={job.title}
+          jobSeniority={job.seniority}
+          jobLocation={job.location}
+          onFound={({ created }) => {
+            queryClient.invalidateQueries({ queryKey: getGetJobApplicationsQueryKey(jobId) });
+            if (created > 0) {
+              toast({
+                title: `${created} candidate${created !== 1 ? "s" : ""} sourced`,
                 description: "They've been added to your pipeline. Run AI Workflow to score them.",
               });
             }

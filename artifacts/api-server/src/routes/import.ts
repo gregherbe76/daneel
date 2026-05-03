@@ -1,7 +1,10 @@
 import { Router } from "express";
 import multer from "multer";
-import { db, candidatesTable, applicationsTable } from "@workspace/db";
-import { eq, inArray } from "drizzle-orm";
+import { db, candidatesTable, applicationsTable, jobsTable, agentProvidersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
+import { resolveSourcingProvider, providerFromRow } from "./workflows/providers";
+import type { SourcingCandidate } from "./workflows/providers/native-openai-sourcing";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -306,6 +309,168 @@ router.post("/candidates/import/batch", async (req, res) => {
     skipped,
     candidates: createdCandidates,
   });
+});
+
+// ---------- AI Sourcing ----------
+
+// POST /api/candidates/source
+// Calls the configured (or specified) sourcing provider, saves results to DB,
+// and creates job applications — all in a single request.
+// Body: { jobId, providerId?, count?, location?, seniority? }
+router.post("/candidates/source", async (req, res) => {
+  const { jobId, providerId, count = 7, location, seniority } = req.body as {
+    jobId: number;
+    providerId?: number;
+    count?: number;
+    location?: string;
+    seniority?: string;
+  };
+
+  if (!jobId) {
+    res.status(400).json({ error: "jobId is required" });
+    return;
+  }
+
+  const clampedCount = Math.min(20, Math.max(5, Number(count) || 7));
+
+  // Fetch the job for context
+  const [job] = await db.select().from(jobsTable).where(eq(jobsTable.id, Number(jobId)));
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  // Resolve provider
+  let provider: Awaited<ReturnType<typeof resolveSourcingProvider>>["provider"];
+  let sourceTag: string;
+
+  if (providerId) {
+    const [row] = await db
+      .select()
+      .from(agentProvidersTable)
+      .where(eq(agentProvidersTable.id, Number(providerId)));
+    if (!row || !row.enabled) {
+      res.status(400).json({ error: "Provider not found or disabled" });
+      return;
+    }
+    provider = providerFromRow(row);
+    sourceTag = row.type === "twin_webhook" || row.type === "custom_webhook" ? "Twin" : "Mock";
+  } else {
+    const resolved = await resolveSourcingProvider();
+    provider = resolved.provider;
+    sourceTag = resolved.isTwin ? "Twin" : "Mock";
+  }
+
+  logger.info({ jobId, provider: provider.name, sourceTag, count: clampedCount }, "Direct sourcing requested");
+
+  // Build payload — pass filters so external providers can use them
+  const jobPayload = {
+    title: job.title,
+    description: job.description,
+    location: location?.trim() || job.location,
+    seniority: seniority?.trim() || job.seniority,
+    mustHaveSkills: job.mustHaveSkills,
+  };
+
+  // Minimal insight placeholder for providers that expect it
+  const insight = {
+    idealCandidateProfile: `${seniority?.trim() || job.seniority} ${job.title} candidate`,
+    evaluationCriteria: job.mustHaveSkills,
+    redFlags: [] as string[],
+    mustHaveSkillsAssessment: [] as string[],
+  };
+
+  // Call provider — throw on error so the catch below returns a clean message
+  let raw: SourcingCandidate[];
+  try {
+    raw = (await provider.run({
+      step: "sourcing",
+      runId: 0,
+      jobId: Number(jobId),
+      payload: { job: jobPayload, insight, count: clampedCount, filters: { location, seniority } },
+    })) as SourcingCandidate[];
+  } catch (err) {
+    logger.error({ jobId, provider: provider.name, err }, "Sourcing provider call failed");
+    res.status(502).json({
+      error: `Provider "${provider.name}" failed: ${err instanceof Error ? err.message : String(err)}`,
+    });
+    return;
+  }
+
+  if (!Array.isArray(raw)) {
+    res.status(502).json({ error: `Provider "${provider.name}" returned an unexpected response format.` });
+    return;
+  }
+
+  // Deduplicate against existing candidates
+  const existingRows = await db.select({ email: candidatesTable.email }).from(candidatesTable);
+  const existingEmails = new Set(existingRows.map((r) => r.email.toLowerCase()));
+
+  const created: {
+    id: number; name: string; email: string;
+    headline: string | null; location: string | null; currentCompany: string | null;
+    skills: string[]; summary: string | null; source: string | null;
+  }[] = [];
+  let skipped = 0;
+
+  for (const c of raw) {
+    const emailKey = c.email?.toLowerCase();
+    if (!emailKey || existingEmails.has(emailKey)) { skipped++; continue; }
+    existingEmails.add(emailKey);
+
+    try {
+      const [inserted] = await db
+        .insert(candidatesTable)
+        .values({
+          name: c.name,
+          email: c.email,
+          linkedIn: c.linkedinUrl || null,
+          summary: c.summary || null,
+          skills: Array.isArray(c.skills) ? c.skills : [],
+          headline: c.headline || null,
+          location: c.location || null,
+          currentCompany: c.currentCompany || null,
+          githubUrl: c.githubUrl || null,
+          source: sourceTag,
+        })
+        .returning({
+          id: candidatesTable.id,
+          name: candidatesTable.name,
+          email: candidatesTable.email,
+          headline: candidatesTable.headline,
+          location: candidatesTable.location,
+          currentCompany: candidatesTable.currentCompany,
+          skills: candidatesTable.skills,
+          summary: candidatesTable.summary,
+          source: candidatesTable.source,
+        });
+
+      if (inserted) {
+        created.push(inserted);
+        await db
+          .insert(applicationsTable)
+          .values({
+            jobId: Number(jobId),
+            candidateId: inserted.id,
+            stage: "Sourced",
+            notes: [
+              `AI Sourced — provider: ${provider.name}`,
+              c.evidence ? `Evidence: ${c.evidence}` : null,
+              c.potentialRisks ? `Risks: ${c.potentialRisks}` : null,
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          })
+          .onConflictDoNothing();
+      }
+    } catch (err) {
+      logger.warn({ email: c.email, err }, "Failed to save sourced candidate");
+      skipped++;
+    }
+  }
+
+  logger.info({ jobId, provider: provider.name, created: created.length, skipped }, "Direct sourcing completed");
+  res.json({ created: created.length, skipped, candidates: created });
 });
 
 // Legacy endpoints kept for backward compatibility
