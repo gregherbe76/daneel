@@ -31,6 +31,16 @@ export const candidatesTable = pgTable("candidates", {
   emailValidationStatus: text("email_validation_status"), // "valid" | "invalid" | "risky" | "unchecked"
   emailValidationReason: text("email_validation_reason"),
   emailValidatedAt: timestamp("email_validated_at"),
+  // Soft-delete fields. When `deletedAt` is set the candidate is hidden from
+  // every recruiter-facing list, but the row (and its cascading children:
+  // applications, notes, evaluations) is still on disk so a bulk delete can be
+  // undone via the toast action. A scheduled trash sweeper hard-deletes rows
+  // whose `deletedAt` crosses the retention window.
+  // `deletionBatchId` groups every candidate that was deleted in the same
+  // bulk action so the "Undo" toast can restore exactly that batch (rather
+  // than restoring unrelated rows that happen to be in the trash).
+  deletedAt: timestamp("deleted_at"),
+  deletionBatchId: text("deletion_batch_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

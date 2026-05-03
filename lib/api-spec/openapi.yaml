@@ -283,7 +283,11 @@ paths:
       description: >
         Single endpoint backing the recruiter "bulk action bar". Accepts up to 500 candidate
         ids and one of `delete`, `recheck-email`, `move-stage`, `export-csv`. The frontend is
-        expected to chunk selections larger than 500 itself.
+        expected to chunk selections larger than 500 itself. `delete` performs a soft
+        delete: rows are hidden from every list and a `deletionBatchId` is returned so the
+        frontend's "Undo" toast can call `/candidates/restore` to bring them back. A
+        background sweep hard-deletes rows that have been in the trash longer than the
+        retention window.
       requestBody:
         required: true
         content:
@@ -364,6 +368,29 @@ paths:
                 $ref: "#/components/schemas/BulkCandidateJob"
         "404":
           description: Not found
+
+  /candidates/restore:
+    post:
+      operationId: restoreCandidateBatch
+      tags: [candidates]
+      summary: Restore a soft-deleted batch of candidates
+      description: >
+        Backs the "Undo" toast surfaced after a bulk delete. Restores every
+        candidate that was soft-deleted as part of the given `deletionBatchId`,
+        provided they have not yet been hard-deleted by the trash sweeper.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestoreCandidateBatchBody"
+      responses:
+        "200":
+          description: Restore completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestoreCandidateBatchResult"
 
   /candidates/{id}/applications:
     get:
@@ -1583,6 +1610,13 @@ components:
           items:
             $ref: "#/components/schemas/BulkCandidateRecheckResult"
           description: Per-id outcomes for `recheck-email`.
+        deletionBatchId:
+          type: string
+          nullable: true
+          description: >
+            Populated only when action is `delete`. Identifies the soft-deleted
+            batch so the recruiter's "Undo" toast can pass it back to
+            `/candidates/restore` to bring the rows back.
       required: [ok, action, processed, skipped]
 
     # ── BULK BACKGROUND JOBS ──
@@ -1656,6 +1690,24 @@ components:
           nullable: true
       required:
         [id, action, status, total, processed, skipped, createdAt, updatedAt]
+
+    RestoreCandidateBatchBody:
+      type: object
+      properties:
+        deletionBatchId:
+          type: string
+          minLength: 1
+      required: [deletionBatchId]
+
+    RestoreCandidateBatchResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        restored:
+          type: integer
+          description: Number of candidates that were brought back from the trash.
+      required: [ok, restored]
 
     # ── APPLICATION ──
     Application:

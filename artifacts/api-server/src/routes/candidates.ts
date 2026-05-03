@@ -1,6 +1,7 @@
 import { Router } from "express";
+import { randomUUID } from "node:crypto";
 import { db, candidatesTable, applicationsTable, jobsTable } from "@workspace/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import {
   CreateCandidateBody,
   UpdateCandidateBody,
@@ -12,6 +13,7 @@ import {
   BulkCandidateActionBody,
   EnqueueBulkCandidateJobBody,
   GetBulkCandidateJobParams,
+  RestoreCandidateBatchBody,
 } from "@workspace/api-zod";
 import { revalidateCandidateEmail } from "../lib/email-revalidation";
 import {
@@ -24,11 +26,15 @@ import type { BulkJob } from "@workspace/db";
 
 const router = Router();
 
-// List all candidates
+// List all candidates. Soft-deleted rows (in the trash bin awaiting either an
+// "Undo" toast restore or the retention sweeper) are hidden so recruiters
+// don't see the candidates they just deleted come back the next time the list
+// reloads.
 router.get("/candidates", async (req, res) => {
   const candidates = await db
     .select()
     .from(candidatesTable)
+    .where(isNull(candidatesTable.deletedAt))
     .orderBy(candidatesTable.createdAt);
   res.json(candidates);
 });
@@ -109,13 +115,15 @@ router.get("/candidates/bulk-jobs/:id", async (req, res) => {
   res.json(serializeBulkJob(job));
 });
 
-// Get a candidate by ID
+// Get a candidate by ID. Soft-deleted candidates are reported as "not found"
+// — we don't want detail pages or deep links to surface trash-bin rows that
+// the recruiter expects to be gone.
 router.get("/candidates/:id", async (req, res) => {
   const { id } = GetCandidateParams.parse({ id: Number(req.params.id) });
   const [candidate] = await db
     .select()
     .from(candidatesTable)
-    .where(eq(candidatesTable.id, id));
+    .where(and(eq(candidatesTable.id, id), isNull(candidatesTable.deletedAt)));
   if (!candidate) {
     res.status(404).json({ error: "Candidate not found" });
     return;
@@ -150,10 +158,20 @@ router.put("/candidates/:id", async (req, res) => {
   res.json(candidate);
 });
 
-// Delete a candidate
+// Delete a candidate. Mirrors the bulk soft-delete behavior so a single-row
+// delete from the candidate detail page is just as recoverable as a bulk one
+// — the trash sweeper will hard-delete it after the retention window.
 router.delete("/candidates/:id", async (req, res) => {
   const { id } = DeleteCandidateParams.parse({ id: Number(req.params.id) });
-  await db.delete(candidatesTable).where(eq(candidatesTable.id, id));
+  const now = new Date();
+  await db
+    .update(candidatesTable)
+    .set({
+      deletedAt: now,
+      deletionBatchId: randomUUID(),
+      updatedAt: now,
+    })
+    .where(and(eq(candidatesTable.id, id), isNull(candidatesTable.deletedAt)));
   res.status(204).send();
 });
 
@@ -191,17 +209,35 @@ router.post("/candidates/bulk", async (req, res) => {
   const ids = Array.from(new Set(body.ids));
 
   if (body.action === "delete") {
-    // Cascading FKs on applications + candidate_notes + ai_evaluations etc.
-    // mean removing the candidate row is enough to clean the rest up.
+    // Soft delete: stamp `deletedAt` + a shared `deletionBatchId` so the
+    // frontend's "Undo" toast can restore exactly this batch. Cascading FK
+    // children (applications, notes, evaluations) are intentionally left in
+    // place — the trash sweeper hard-deletes them later via the FK cascade.
+    // Already-soft-deleted ids are filtered out so a duplicate request from a
+    // misbehaving client doesn't reset their `deletedAt` (which would extend
+    // the retention window unfairly).
+    const deletionBatchId = randomUUID();
+    const now = new Date();
     const deleted = await db
-      .delete(candidatesTable)
-      .where(inArray(candidatesTable.id, ids))
+      .update(candidatesTable)
+      .set({
+        deletedAt: now,
+        deletionBatchId,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          inArray(candidatesTable.id, ids),
+          isNull(candidatesTable.deletedAt),
+        ),
+      )
       .returning({ id: candidatesTable.id });
     res.json({
       ok: true,
       action: body.action,
       processed: deleted.length,
       skipped: ids.length - deleted.length,
+      deletionBatchId: deleted.length > 0 ? deletionBatchId : null,
     });
     return;
   }
@@ -336,6 +372,25 @@ router.post("/candidates/bulk", async (req, res) => {
     skipped,
     results,
   });
+});
+
+// Restore a soft-deleted batch. Backs the recruiter's "Undo" toast: the
+// frontend hands us the batch id we returned from the bulk delete and we flip
+// `deletedAt` back to NULL on every row tagged with it. We intentionally key
+// off the batch id (rather than the candidate ids) so a stale undo can't
+// resurrect rows from an unrelated, intentional delete.
+router.post("/candidates/restore", async (req, res) => {
+  const body = RestoreCandidateBatchBody.parse(req.body);
+  const restored = await db
+    .update(candidatesTable)
+    .set({
+      deletedAt: null,
+      deletionBatchId: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(candidatesTable.deletionBatchId, body.deletionBatchId))
+    .returning({ id: candidatesTable.id });
+  res.json({ ok: true, restored: restored.length });
 });
 
 // Get all applications for a candidate (with job details)

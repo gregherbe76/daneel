@@ -214,6 +214,9 @@ export interface BulkCandidateActionResult {
   csv?: string | null;
   /** Per-id outcomes for `recheck-email`. */
   results?: BulkCandidateRecheckResult[] | null;
+  /** Populated only when action is `delete`. Identifies the soft-deleted batch so the recruiter's "Undo" toast can pass it back to `/candidates/restore` to bring the rows back.
+   */
+  deletionBatchId?: string | null;
 }
 
 export interface EnqueueBulkCandidateJobBody {
@@ -255,6 +258,17 @@ export interface BulkCandidateJob {
   updatedAt: string;
   startedAt?: string | null;
   finishedAt?: string | null;
+}
+
+export interface RestoreCandidateBatchBody {
+  /** @minLength 1 */
+  deletionBatchId: string;
+}
+
+export interface RestoreCandidateBatchResult {
+  ok: boolean;
+  /** Number of candidates that were brought back from the trash. */
+  restored: number;
 }
 
 export interface Application {

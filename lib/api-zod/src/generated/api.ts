@@ -573,7 +573,7 @@ export const RecheckCandidateEmailResponse = zod.object({
 });
 
 /**
- * Single endpoint backing the recruiter "bulk action bar". Accepts up to 500 candidate ids and one of `delete`, `recheck-email`, `move-stage`, `export-csv`. The frontend is expected to chunk selections larger than 500 itself.
+ * Single endpoint backing the recruiter "bulk action bar". Accepts up to 500 candidate ids and one of `delete`, `recheck-email`, `move-stage`, `export-csv`. The frontend is expected to chunk selections larger than 500 itself. `delete` performs a soft delete: rows are hidden from every list and a `deletionBatchId` is returned so the frontend's "Undo" toast can call `/candidates/restore` to bring them back. A background sweep hard-deletes rows that have been in the trash longer than the retention window.
 
  * @summary Run a batched action on a filtered set of candidates
  */
@@ -628,6 +628,12 @@ export const BulkCandidateActionResponse = zod.object({
     )
     .nullish()
     .describe("Per-id outcomes for `recheck-email`."),
+  deletionBatchId: zod
+    .string()
+    .nullish()
+    .describe(
+      'Populated only when action is `delete`. Identifies the soft-deleted batch so the recruiter\'s \"Undo\" toast can pass it back to `\/candidates\/restore` to bring the rows back.\n',
+    ),
 });
 
 /**
@@ -743,6 +749,23 @@ export const GetBulkCandidateJobResponse = zod.object({
   updatedAt: zod.coerce.date(),
   startedAt: zod.coerce.date().nullish(),
   finishedAt: zod.coerce.date().nullish(),
+});
+
+/**
+ * Backs the "Undo" toast surfaced after a bulk delete. Restores every candidate that was soft-deleted as part of the given `deletionBatchId`, provided they have not yet been hard-deleted by the trash sweeper.
+
+ * @summary Restore a soft-deleted batch of candidates
+ */
+
+export const RestoreCandidateBatchBody = zod.object({
+  deletionBatchId: zod.string().min(1),
+});
+
+export const RestoreCandidateBatchResponse = zod.object({
+  ok: zod.boolean(),
+  restored: zod
+    .number()
+    .describe("Number of candidates that were brought back from the trash."),
 });
 
 /**

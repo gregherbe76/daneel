@@ -6,9 +6,11 @@ import {
   BulkCandidateActionResult,
   useBulkCandidateAction,
   useEnqueueBulkCandidateJob,
+  useRestoreCandidateBatch,
 } from "@workspace/api-client-react";
 import { trackBulkJob } from "@/lib/bulk-jobs-tracker";
 import { Button } from "@/components/ui/button";
+import { ToastAction } from "@/components/ui/toast";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -99,6 +101,7 @@ export function BulkActionBar({
   const { toast } = useToast();
   const bulk = useBulkCandidateAction();
   const enqueue = useEnqueueBulkCandidateJob();
+  const restore = useRestoreCandidateBatch();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmText, setConfirmText] = useState("");
 
@@ -294,9 +297,60 @@ export function BulkActionBar({
         }),
       );
       const processed = results.reduce((sum, r) => sum + r.processed, 0);
+      // Each chunk gets its own deletionBatchId server-side, so an undo for a
+      // multi-chunk delete needs to restore every batch. Empty/null ids
+      // (chunks that were entirely no-ops) are filtered out so we don't fire
+      // pointless restore requests.
+      const batchIds = results
+        .map((r) => r.deletionBatchId ?? null)
+        .filter((id): id is string => !!id);
       setConfirmDelete(false);
       setConfirmText("");
-      finish(`Deleted ${processed} candidate${processed === 1 ? "" : "s"}`);
+      onAfterChange?.();
+      onClear();
+
+      const undoLabel = `Undo delete of ${processed} candidate${processed === 1 ? "" : "s"}`;
+      const handleUndo = async () => {
+        try {
+          const restoredCounts = await Promise.all(
+            batchIds.map((deletionBatchId) =>
+              restore.mutateAsync({ data: { deletionBatchId } }),
+            ),
+          );
+          const restored = restoredCounts.reduce(
+            (sum, r) => sum + r.restored,
+            0,
+          );
+          onAfterChange?.();
+          toast({
+            title: `Restored ${restored} candidate${restored === 1 ? "" : "s"}`,
+          });
+        } catch (e) {
+          toast({
+            title: "Undo failed",
+            description: e instanceof Error ? e.message : "Please try again",
+            variant: "destructive",
+          });
+        }
+      };
+
+      toast({
+        title: `Deleted ${processed} candidate${processed === 1 ? "" : "s"}`,
+        description:
+          batchIds.length > 0
+            ? "You can undo this for the next few seconds."
+            : undefined,
+        action:
+          batchIds.length > 0 ? (
+            <ToastAction
+              altText={undoLabel}
+              onClick={handleUndo}
+              data-testid="bulk-delete-undo"
+            >
+              Undo
+            </ToastAction>
+          ) : undefined,
+      });
     } catch (e) {
       toast({
         title: "Bulk delete failed",
@@ -422,9 +476,11 @@ export function BulkActionBar({
               Delete {count} candidate{count === 1 ? "" : "s"}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes the selected candidate
+              This removes the selected candidate
               {count === 1 ? "" : "s"} along with their applications and notes
-              across every job. This cannot be undone.
+              from every job. You can undo this from the toast right after,
+              and trashed candidates are kept for 7 days before being
+              permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {needsTypedConfirm && (

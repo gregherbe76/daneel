@@ -5,7 +5,7 @@ import {
   jobsTable,
   candidatesTable,
 } from "@workspace/db";
-import { eq, count, sql } from "drizzle-orm";
+import { eq, count, sql, isNull, and } from "drizzle-orm";
 import {
   CreateApplicationBody,
   UpdateApplicationBody,
@@ -29,7 +29,10 @@ function toWithDetails(r: {
   };
 }
 
-// List all applications with details
+// List all applications with details. Soft-deleted candidates are filtered
+// out via the inner join's WHERE so a recruiter who just bulk-deleted
+// candidates doesn't keep seeing their applications in pipeline-style views
+// while the trash retention window has not yet elapsed.
 router.get("/applications", async (req, res) => {
   const rows = await db
     .select()
@@ -39,6 +42,7 @@ router.get("/applications", async (req, res) => {
       candidatesTable,
       eq(applicationsTable.candidateId, candidatesTable.id),
     )
+    .where(isNull(candidatesTable.deletedAt))
     .orderBy(applicationsTable.createdAt);
   res.json(rows.map(toWithDetails));
 });
@@ -58,7 +62,10 @@ router.post("/applications", async (req, res) => {
   res.status(201).json(application);
 });
 
-// Get a single application with details
+// Get a single application with details. If the linked candidate has been
+// soft-deleted we report the application as not found — recruiters expect a
+// trashed candidate's application records to be invisible too, even though
+// the FK row is still on disk waiting for the trash sweep.
 router.get("/applications/:id", async (req, res) => {
   const { id } = GetApplicationParams.parse({ id: Number(req.params.id) });
   const rows = await db
@@ -69,7 +76,9 @@ router.get("/applications/:id", async (req, res) => {
       candidatesTable,
       eq(applicationsTable.candidateId, candidatesTable.id),
     )
-    .where(eq(applicationsTable.id, id));
+    .where(
+      and(eq(applicationsTable.id, id), isNull(candidatesTable.deletedAt)),
+    );
   if (!rows.length) {
     res.status(404).json({ error: "Application not found" });
     return;
@@ -119,12 +128,21 @@ router.get("/pipeline/summary", async (req, res) => {
   const [totalJobs] = await db
     .select({ count: count() })
     .from(jobsTable);
+  // Soft-deleted candidates (and any application that hangs off them) are
+  // excluded from the headline counts so the pipeline summary matches what
+  // the recruiter sees in the candidate list after a bulk delete.
   const [totalCandidates] = await db
     .select({ count: count() })
-    .from(candidatesTable);
+    .from(candidatesTable)
+    .where(isNull(candidatesTable.deletedAt));
   const [totalApplications] = await db
     .select({ count: count() })
-    .from(applicationsTable);
+    .from(applicationsTable)
+    .innerJoin(
+      candidatesTable,
+      eq(applicationsTable.candidateId, candidatesTable.id),
+    )
+    .where(isNull(candidatesTable.deletedAt));
 
   const stageCounts = await db
     .select({
@@ -132,6 +150,11 @@ router.get("/pipeline/summary", async (req, res) => {
       count: count(),
     })
     .from(applicationsTable)
+    .innerJoin(
+      candidatesTable,
+      eq(applicationsTable.candidateId, candidatesTable.id),
+    )
+    .where(isNull(candidatesTable.deletedAt))
     .groupBy(applicationsTable.stage);
 
   const byStage = STAGES.map((stage) => ({

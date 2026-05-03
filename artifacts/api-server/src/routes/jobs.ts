@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, jobsTable, DEFAULT_SCORING_WEIGHTS } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and, isNull } from "drizzle-orm";
 import {
   CreateJobBody,
   UpdateJobBody,
@@ -83,7 +83,9 @@ router.delete("/jobs/:id", async (req, res) => {
   res.status(204).send();
 });
 
-// Get all applications for a job (with candidate details)
+// Get all applications for a job (with candidate details). Soft-deleted
+// candidates are filtered out so the per-job pipeline view stays in sync
+// with the global candidate list after a bulk delete.
 router.get("/jobs/:id/applications", async (req, res) => {
   const { id } = GetJobApplicationsParams.parse({ id: Number(req.params.id) });
   const rows = await db
@@ -94,7 +96,12 @@ router.get("/jobs/:id/applications", async (req, res) => {
       candidatesTable,
       eq(applicationsTable.candidateId, candidatesTable.id),
     )
-    .where(eq(applicationsTable.jobId, id))
+    .where(
+      and(
+        eq(applicationsTable.jobId, id),
+        isNull(candidatesTable.deletedAt),
+      ),
+    )
     .orderBy(applicationsTable.createdAt);
 
   const result = rows.map((r) => ({

@@ -451,6 +451,10 @@ export async function sweepStaleEmailValidations(
       .where(
         and(
           isNotNull(candidatesTable.email),
+          // Skip rows in the soft-delete trash bin — re-validating an email
+          // we're about to hard-delete is wasted work, and would also dirty
+          // the recruiter's "Undo" view if the row got restored.
+          isNull(candidatesTable.deletedAt),
           or(
             isNull(candidatesTable.emailValidatedAt),
             lt(candidatesTable.emailValidatedAt, cutoff),

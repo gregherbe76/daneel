@@ -59,6 +59,8 @@ import type {
   PreviewGithubQueryBody,
   PreviewGithubQueryResult,
   ProviderStepSettingWithProvider,
+  RestoreCandidateBatchBody,
+  RestoreCandidateBatchResult,
   RunVariantBody,
   RunWorkflowBody,
   TeamMember,
@@ -1146,7 +1148,7 @@ export const useRecheckCandidateEmail = <
 };
 
 /**
- * Single endpoint backing the recruiter "bulk action bar". Accepts up to 500 candidate ids and one of `delete`, `recheck-email`, `move-stage`, `export-csv`. The frontend is expected to chunk selections larger than 500 itself.
+ * Single endpoint backing the recruiter "bulk action bar". Accepts up to 500 candidate ids and one of `delete`, `recheck-email`, `move-stage`, `export-csv`. The frontend is expected to chunk selections larger than 500 itself. `delete` performs a soft delete: rows are hidden from every list and a `deletionBatchId` is returned so the frontend's "Undo" toast can call `/candidates/restore` to bring them back. A background sweep hard-deletes rows that have been in the trash longer than the retention window.
 
  * @summary Run a batched action on a filtered set of candidates
  */
@@ -1487,6 +1489,98 @@ export function useGetBulkCandidateJob<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Backs the "Undo" toast surfaced after a bulk delete. Restores every candidate that was soft-deleted as part of the given `deletionBatchId`, provided they have not yet been hard-deleted by the trash sweeper.
+
+ * @summary Restore a soft-deleted batch of candidates
+ */
+export const getRestoreCandidateBatchUrl = () => {
+  return `/api/candidates/restore`;
+};
+
+export const restoreCandidateBatch = async (
+  restoreCandidateBatchBody: RestoreCandidateBatchBody,
+  options?: RequestInit,
+): Promise<RestoreCandidateBatchResult> => {
+  return customFetch<RestoreCandidateBatchResult>(
+    getRestoreCandidateBatchUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(restoreCandidateBatchBody),
+    },
+  );
+};
+
+export const getRestoreCandidateBatchMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreCandidateBatch>>,
+    TError,
+    { data: BodyType<RestoreCandidateBatchBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreCandidateBatch>>,
+  TError,
+  { data: BodyType<RestoreCandidateBatchBody> },
+  TContext
+> => {
+  const mutationKey = ["restoreCandidateBatch"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreCandidateBatch>>,
+    { data: BodyType<RestoreCandidateBatchBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return restoreCandidateBatch(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreCandidateBatchMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restoreCandidateBatch>>
+>;
+export type RestoreCandidateBatchMutationBody =
+  BodyType<RestoreCandidateBatchBody>;
+export type RestoreCandidateBatchMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Restore a soft-deleted batch of candidates
+ */
+export const useRestoreCandidateBatch = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreCandidateBatch>>,
+    TError,
+    { data: BodyType<RestoreCandidateBatchBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof restoreCandidateBatch>>,
+  TError,
+  { data: BodyType<RestoreCandidateBatchBody> },
+  TContext
+> => {
+  return useMutation(getRestoreCandidateBatchMutationOptions(options));
+};
 
 /**
  * @summary Get all applications for a candidate (with job info)
