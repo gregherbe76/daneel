@@ -1,0 +1,137 @@
+Audit the current state of this repository.
+
+Goal:
+Understand exactly where we are in terms of:
+- engine (Daneel)
+- product (current app)
+- templates (ShortlistPro, HireFlow, HiringAI)
+- consistency between them
+
+Produce a clear, structured report with no fluff.
+
+---
+
+1. ENGINE (Daneel)
+
+Identify:
+- core modules (workflow engine, scoring, providers, reports)
+- what is stable
+- what is duplicated
+- what is hardcoded but should be configurable
+
+Answer:
+- Is the engine clean and reusable?
+- What parts are tightly coupled to UI or templates?
+
+---
+
+2. CURRENT APP (RUNTIME PRODUCT)
+
+Identify:
+- active product identity (branding, labels, UX)
+- inconsistencies (mixed terminology: agency / SaaS / internal)
+- unused or conflicting features
+
+Answer:
+- What product does the app currently behave like?
+- Where is it inconsistent or confusing?
+
+---
+
+3. TEMPLATES (/templates)
+
+For each template:
+- shortlistpro
+- hireflow
+- hiringai
+
+Check:
+- what is defined (branding, prompts, scoring, wording)
+- what is NOT used at runtime
+
+Answer:
+- Are templates only documentation or partially implemented?
+- What is missing to make them executable?
+
+---
+
+4. TEMPLATE SYSTEM
+
+Check:
+- is there a template loader?
+- where should it live?
+- what currently depends on hardcoded values?
+
+Answer:
+- what needs to be abstracted?
+- what can be reused as-is?
+
+---
+
+5. PROMPTS
+
+Identify:
+- where prompts are defined (hardcoded vs external)
+- duplication between templates and engine
+
+Answer:
+- what should be moved into templates?
+- what should stay in the engine?
+
+---
+
+6. SCORING SYSTEM
+
+Check:
+- current dimensions used at runtime
+- mismatches with UI (e.g. sliders vs actual scoring)
+- template-specific scoring logic
+
+Answer:
+- is scoring consistent?
+- what needs to be cleaned?
+
+---
+
+7. REPORTS
+
+Check:
+- wording (agency vs internal vs SaaS)
+- branding usage
+- white-label logic
+
+Answer:
+- is report aligned with current product identity?
+- what should be template-driven?
+
+---
+
+8. UX / FLOW
+
+Check:
+- onboarding
+- main flow (Add → Run → Shortlist)
+- advanced options
+
+Answer:
+- is the UX aligned with one product?
+- what should be simplified or hidden?
+
+---
+
+9. FINAL DIAGNOSIS
+
+Give:
+
+A. What we have actually built (1–2 sentences)
+B. Biggest inconsistencies (max 5 bullets)
+C. What must be fixed immediately (priority list)
+D. What should NOT be touched yet
+
+---
+
+Important:
+- Be precise, not verbose
+- Do not suggest features
+- Focus on clarity and structure
+- Highlight contradictions and technical debt
