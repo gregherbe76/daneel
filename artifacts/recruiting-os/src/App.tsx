@@ -31,6 +31,20 @@ import MentionsPage from "./pages/mentions";
 
 const queryClient = new QueryClient();
 
+/**
+ * Legacy settings paths that all funnel into the new Provider Marketplace.
+ * Exported so tests can verify these redirects against the actual route
+ * declarations rather than a duplicate harness.
+ */
+export const LEGACY_SETTINGS_REDIRECTS: ReadonlyArray<{
+  from: string;
+  to: string;
+}> = [
+  { from: "/settings", to: "/settings/marketplace" },
+  { from: "/settings/providers", to: "/settings/marketplace" },
+  { from: "/settings/agent-providers", to: "/settings/marketplace" },
+];
+
 function AppRoutes() {
   return (
     <Layout>
@@ -46,10 +60,10 @@ function AppRoutes() {
         <Route path="/candidates/:id/edit" component={() => <div className="p-8">Candidate Edit (WIP)</div>} />
         <Route path="/pipeline" component={() => <div className="p-8">Pipeline (WIP)</div>} />
         <Route path="/mentions" component={MentionsPage} />
-        <Route path="/settings" component={() => <Redirect to="/settings/marketplace" />} />
+        {LEGACY_SETTINGS_REDIRECTS.map(({ from, to }) => (
+          <Route key={from} path={from} component={() => <Redirect to={to} />} />
+        ))}
         <Route path="/settings/marketplace" component={MarketplacePage} />
-        <Route path="/settings/providers" component={() => <Redirect to="/settings/marketplace" />} />
-        <Route path="/settings/agent-providers" component={() => <Redirect to="/settings/marketplace" />} />
         <Route path="/settings/providers/legacy" component={AgentProvidersPage} />
         <Route path="/settings/email-revalidation" component={EmailRevalidationSettingsPage} />
         <Route path="/settings/branding" component={BrandingSettingsPage} />
