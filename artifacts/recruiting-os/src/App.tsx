@@ -9,6 +9,7 @@ import { PendingRunsWatcher } from "@/lib/pending-runs";
 import { useBranding } from "@/lib/branding";
 import { applyBrandTheme } from "@/lib/apply-brand";
 import { BulkJobsTracker } from "@/lib/bulk-jobs-tracker";
+import { TelemetryConsentBanner } from "@/components/telemetry-consent-banner";
 
 // Pages
 import LandingPage from "./pages/landing";
@@ -23,6 +24,7 @@ import AgentProvidersPage from "./pages/settings/providers";
 import EmailRevalidationSettingsPage from "./pages/settings/email-revalidation";
 import BrandingSettingsPage from "./pages/settings/branding";
 import NotificationsSettingsPage from "./pages/settings/notifications";
+import TelemetrySettingsPage from "./pages/settings/telemetry";
 import MentionsPage from "./pages/mentions";
 
 const queryClient = new QueryClient();
@@ -47,6 +49,7 @@ function AppRoutes() {
         <Route path="/settings/email-revalidation" component={EmailRevalidationSettingsPage} />
         <Route path="/settings/branding" component={BrandingSettingsPage} />
         <Route path="/settings/notifications" component={NotificationsSettingsPage} />
+        <Route path="/settings/telemetry" component={TelemetrySettingsPage} />
         
         <Route component={NotFound} />
       </Switch>
@@ -76,6 +79,7 @@ function App() {
           <BrandThemeApplier />
           <PendingRunsWatcher />
           <BulkJobsTracker />
+          <TelemetryConsentBanner />
           <Switch>
             <Route path="/" component={LandingPage} />
             <Route component={AppRoutes} />

@@ -104,6 +104,20 @@ Results are fetched via `GET /api/workflows/jobs/:jobId/latest`.
 UI at `/settings/providers` to configure which AI provider handles each workflow step.
 Workflow steps: `job_understanding`, `candidate_matching`, `shortlist_generation`, `sourcing`.
 
+### Telemetry (opt-in, frontend-only)
+PostHog Cloud (EU) product analytics, **off by default**. Wrapper at
+`artifacts/recruiting-os/src/lib/telemetry.ts` exposes `initIfConsented`,
+`setConsent`, `getConsent`, `track`. Banner at
+`components/telemetry-consent-banner.tsx`, Settings page at
+`pages/settings/telemetry.tsx`. Allow-list of five events only:
+`workflow_started`, `workflow_completed`, `provider_card_viewed`,
+`provider_connect_clicked`, `provider_connected`. Payload restricted to
+`provider`, `workflow_step`, `timestamp`, and an anonymous UUID. No-ops in
+`import.meta.env.DEV`, when `VITE_POSTHOG_KEY` is missing, or before consent.
+Full policy: `/docs/TELEMETRY.md`. Env vars in `.env.example`:
+`VITE_POSTHOG_KEY` (optional), `VITE_POSTHOG_HOST` (default
+`https://eu.i.posthog.com`).
+
 ### DB Schema (`lib/db/src/schema/`)
 - `jobs` — job postings
 - `candidates` — includes `headline`, `location`, `currentCompany`, `githubUrl`, `source` (null for manual, "AI Generated / Mock Sourcing" for sourced)

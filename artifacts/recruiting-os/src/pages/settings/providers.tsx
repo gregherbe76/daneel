@@ -66,6 +66,7 @@ import {
   Search,
 } from "lucide-react";
 import { SettingsTabs } from "@/components/settings-tabs";
+import { track as trackTelemetry } from "@/lib/telemetry";
 
 // ── types ────────────────────────────────────────────────────────────────────
 
@@ -207,6 +208,11 @@ function ProviderCard({
 
   const Icon = PROVIDER_TYPE_ICONS[provider.type];
 
+  // Fire `provider_card_viewed` once per mount per provider.
+  useEffect(() => {
+    trackTelemetry("provider_card_viewed", { provider: provider.name });
+  }, [provider.name]);
+
   async function handleToggle(enabled: boolean) {
     await toggle.mutateAsync({ id: provider.id, data: { enabled } });
     qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
@@ -215,10 +221,12 @@ function ProviderCard({
   async function handleTest() {
     setTesting(true);
     setTestResult(null);
+    trackTelemetry("provider_connect_clicked", { provider: provider.name });
     try {
       const result = await testConn.mutateAsync({ id: provider.id });
       setTestResult(result as { ok: boolean; error?: string | null; latencyMs?: number | null });
       if ((result as { ok: boolean }).ok) {
+        trackTelemetry("provider_connected", { provider: provider.name });
         toast({ title: "Connection successful", description: `${provider.name} responded in ${(result as { latencyMs?: number }).latencyMs}ms` });
       } else {
         toast({ title: "Connection failed", description: (result as { error?: string }).error ?? "Unknown error", variant: "destructive" });

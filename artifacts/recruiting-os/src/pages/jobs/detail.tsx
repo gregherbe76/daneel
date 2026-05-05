@@ -32,6 +32,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { RunVariantModal } from "@/components/run-variant-modal";
 import { addPendingImproveRun, markJobRunsSeen } from "@/lib/pending-runs";
+import { track as trackTelemetry } from "@/lib/telemetry";
 import { ImportCandidatesModal } from "@/components/import-candidates-modal";
 import { FindCandidatesModal } from "@/components/find-candidates-modal";
 import { ImproveRerunModal, type ImproveRerunCandidate } from "@/components/improve-rerun-modal";
@@ -340,6 +341,19 @@ export default function JobDetailPage() {
     query: { enabled: !!jobId, queryKey: getListJobRunsQueryKey(jobId) },
   });
 
+  // Fire `workflow_completed` once when the latest run transitions to
+  // completed. Tracks the runId we've already reported to avoid duplicates
+  // across re-renders and refetches.
+  const [lastReportedCompletedRunId, setLastReportedCompletedRunId] = useState<number | null>(null);
+  useEffect(() => {
+    const runId = workflowData?.run?.id;
+    const status = workflowData?.run?.status;
+    if (runId && status === "completed" && lastReportedCompletedRunId !== runId) {
+      trackTelemetry("workflow_completed", { workflow_step: "candidate_matching" });
+      setLastReportedCompletedRunId(runId);
+    }
+  }, [workflowData?.run?.id, workflowData?.run?.status, lastReportedCompletedRunId]);
+
   const runWorkflow = useRunWorkflow();
   const runVariantWorkflow = useRunVariantWorkflow();
   const improveAndRerun = useImproveAndRerun();
@@ -531,6 +545,7 @@ export default function JobDetailPage() {
   };
 
   const handleRunWorkflow = () => {
+    trackTelemetry("workflow_started", { workflow_step: "candidate_matching" });
     runWorkflow.mutate({ data: { jobId, dataMode, runSourcing, runEnrichment } }, {
       onSuccess: () => {
         const modeLabel = dataMode === "real" ? "Real Data Run" : "Demo Run (Mock Data)";
