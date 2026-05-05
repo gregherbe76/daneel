@@ -1712,6 +1712,23 @@ paths:
             type: string
             enum: [7d, 30d]
             default: 7d
+        - in: query
+          name: provider
+          required: false
+          description: |
+            Optional filter — only count events whose `properties.provider`
+            matches this value. Composes with `workflowStep` and `range`.
+          schema:
+            type: string
+        - in: query
+          name: workflowStep
+          required: false
+          description: |
+            Optional filter — only count events whose
+            `properties.workflow_step` matches this value. Composes with
+            `provider` and `range`.
+          schema:
+            type: string
       responses:
         "200":
           description: Aggregated event counts.
@@ -3762,7 +3779,34 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TelemetryEventStats"
-      required: [configured, range, events]
+        filters:
+          type: object
+          description: Echo of the filters that were actually applied.
+          properties:
+            provider:
+              type: string
+              nullable: true
+            workflowStep:
+              type: string
+              nullable: true
+          required: [provider, workflowStep]
+        availableFilters:
+          type: object
+          description: |
+            Distinct filter values discovered in the same time range, so the
+            UI can populate the Provider and Workflow Step dropdowns from the
+            data instead of hard-coding them.
+          properties:
+            providers:
+              type: array
+              items:
+                type: string
+            workflowSteps:
+              type: array
+              items:
+                type: string
+          required: [providers, workflowSteps]
+      required: [configured, range, events, filters, availableFilters]
 
     TelemetryEventStats:
       type: object

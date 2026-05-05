@@ -4414,6 +4414,18 @@ export const GetTelemetryDashboardQueryParams = zod.object({
   range: zod
     .enum(["7d", "30d"])
     .default(getTelemetryDashboardQueryRangeDefault),
+  provider: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Optional filter — only count events whose `properties.provider`\nmatches this value. Composes with `workflowStep` and `range`.\n",
+    ),
+  workflowStep: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Optional filter — only count events whose\n`properties.workflow_step` matches this value. Composes with\n`provider` and `range`.\n",
+    ),
 });
 
 export const GetTelemetryDashboardResponse = zod
@@ -4432,6 +4444,20 @@ export const GetTelemetryDashboardResponse = zod
         ),
       }),
     ),
+    filters: zod
+      .object({
+        provider: zod.string().nullable(),
+        workflowStep: zod.string().nullable(),
+      })
+      .describe("Echo of the filters that were actually applied."),
+    availableFilters: zod
+      .object({
+        providers: zod.array(zod.string()),
+        workflowSteps: zod.array(zod.string()),
+      })
+      .describe(
+        "Distinct filter values discovered in the same time range, so the\nUI can populate the Provider and Workflow Step dropdowns from the\ndata instead of hard-coding them.\n",
+      ),
   })
   .describe(
     "Aggregate counts for the five allow-listed telemetry events. When the\nserver has no PostHog credentials configured, `configured` is false\nand `events` is empty.\n",

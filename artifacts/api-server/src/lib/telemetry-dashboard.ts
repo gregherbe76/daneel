@@ -21,10 +21,17 @@ export interface TelemetryEventStats {
   daily: TelemetryDailyCount[];
 }
 
+export interface TelemetryDashboardFilters {
+  provider?: string;
+  workflowStep?: string;
+}
+
 export interface TelemetryDashboard {
   configured: boolean;
   range: TelemetryRange;
   events: TelemetryEventStats[];
+  filters: { provider: string | null; workflowStep: string | null };
+  availableFilters: { providers: string[]; workflowSteps: string[] };
 }
 
 function getConfig(): { host: string; projectId: string; apiKey: string } | null {
@@ -38,34 +45,42 @@ function getConfig(): { host: string; projectId: string; apiKey: string } | null
   return { host, projectId, apiKey };
 }
 
-function emptyDashboard(range: TelemetryRange, configured: boolean): TelemetryDashboard {
+/**
+ * Sanitize a user-supplied filter value for safe inclusion in a HogQL string
+ * literal. We intentionally restrict to a conservative character set
+ * ([A-Za-z0-9_.\-: ]) — the legitimate values for `provider` and
+ * `workflow_step` are short identifiers like `native-openai` or
+ * `candidate_matching`, never free-form text. Anything outside the set is
+ * dropped and the filter is treated as absent so we never inject quotes or
+ * backslashes into HogQL.
+ */
+function sanitizeFilter(value: string | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > 100) return null;
+  if (!/^[A-Za-z0-9_.\-: ]+$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+function emptyDashboard(
+  range: TelemetryRange,
+  configured: boolean,
+  filters: { provider: string | null; workflowStep: string | null },
+): TelemetryDashboard {
   return {
     configured,
     range,
     events: ALLOWED_EVENTS.map((event) => ({ event, total: 0, daily: [] })),
+    filters,
+    availableFilters: { providers: [], workflowSteps: [] },
   };
 }
 
-/**
- * Query PostHog for daily counts of the five allow-listed telemetry events.
- * Returns a calm "not configured" payload if the server has no PostHog
- * credentials, so the UI can render a configuration hint instead of erroring.
- */
-export async function fetchTelemetryDashboard(
-  range: TelemetryRange,
-): Promise<TelemetryDashboard> {
-  const config = getConfig();
-  if (!config) return emptyDashboard(range, false);
-
-  const days = range === "30d" ? 30 : 7;
-  const eventList = ALLOWED_EVENTS.map((e) => `'${e}'`).join(", ");
-  const hogql = `SELECT event, toString(toDate(timestamp)) AS day, count() AS cnt
-FROM events
-WHERE event IN (${eventList})
-  AND timestamp >= now() - INTERVAL ${days} DAY
-GROUP BY event, day
-ORDER BY day ASC`;
-
+async function runHogql<T>(
+  config: { host: string; projectId: string; apiKey: string },
+  hogql: string,
+): Promise<T[]> {
   const url = `${config.host}/api/projects/${encodeURIComponent(config.projectId)}/query/`;
   const res = await fetch(url, {
     method: "POST",
@@ -88,7 +103,64 @@ ORDER BY day ASC`;
   }
 
   const json = (await res.json()) as { results?: unknown };
-  const rows = Array.isArray(json.results) ? json.results : [];
+  return Array.isArray(json.results) ? (json.results as T[]) : [];
+}
+
+/**
+ * Query PostHog for daily counts of the five allow-listed telemetry events.
+ * Returns a calm "not configured" payload if the server has no PostHog
+ * credentials, so the UI can render a configuration hint instead of erroring.
+ *
+ * Optional `provider` / `workflowStep` filters are appended as HogQL `WHERE`
+ * conditions on `properties.provider` and `properties.workflow_step` so the
+ * product team can slice the funnel without leaving the page.
+ */
+export async function fetchTelemetryDashboard(
+  range: TelemetryRange,
+  rawFilters: TelemetryDashboardFilters = {},
+): Promise<TelemetryDashboard> {
+  const provider = sanitizeFilter(rawFilters.provider);
+  const workflowStep = sanitizeFilter(rawFilters.workflowStep);
+  const appliedFilters = { provider, workflowStep };
+
+  const config = getConfig();
+  if (!config) return emptyDashboard(range, false, appliedFilters);
+
+  const days = range === "30d" ? 30 : 7;
+  const eventList = ALLOWED_EVENTS.map((e) => `'${e}'`).join(", ");
+  const extraConditions: string[] = [];
+  if (provider) extraConditions.push(`properties.provider = '${provider}'`);
+  if (workflowStep) {
+    extraConditions.push(`properties.workflow_step = '${workflowStep}'`);
+  }
+  const extraWhere = extraConditions.length
+    ? `\n  AND ${extraConditions.join("\n  AND ")}`
+    : "";
+
+  const hogql = `SELECT event, toString(toDate(timestamp)) AS day, count() AS cnt
+FROM events
+WHERE event IN (${eventList})
+  AND timestamp >= now() - INTERVAL ${days} DAY${extraWhere}
+GROUP BY event, day
+ORDER BY day ASC`;
+
+  // Discover distinct provider / workflow_step values present in the same
+  // time window so the UI can build dropdowns from real data rather than a
+  // hard-coded list. We deliberately do NOT apply the current filters here —
+  // otherwise selecting "provider = X" would collapse the workflow-step
+  // dropdown to only the steps that fired for X, making it impossible to
+  // switch to a different combination.
+  const distinctHogql = `SELECT
+  arraySort(groupUniqArray(properties.provider)) AS providers,
+  arraySort(groupUniqArray(properties.workflow_step)) AS workflow_steps
+FROM events
+WHERE event IN (${eventList})
+  AND timestamp >= now() - INTERVAL ${days} DAY`;
+
+  const [rows, distinctRows] = await Promise.all([
+    runHogql<unknown>(config, hogql),
+    runHogql<unknown>(config, distinctHogql),
+  ]);
 
   const byEvent = new Map<string, Map<string, number>>();
   for (const event of ALLOWED_EVENTS) byEvent.set(event, new Map());
@@ -112,5 +184,26 @@ ORDER BY day ASC`;
     return { event, total, daily };
   });
 
-  return { configured: true, range, events };
+  const cleanList = (raw: unknown): string[] => {
+    if (!Array.isArray(raw)) return [];
+    const out: string[] = [];
+    for (const v of raw) {
+      if (typeof v !== "string") continue;
+      const trimmed = v.trim();
+      if (trimmed) out.push(trimmed);
+    }
+    return Array.from(new Set(out)).sort((a, b) => a.localeCompare(b));
+  };
+
+  const firstDistinct = Array.isArray(distinctRows[0]) ? distinctRows[0] : [];
+  const providers = cleanList(firstDistinct[0]);
+  const workflowSteps = cleanList(firstDistinct[1]);
+
+  return {
+    configured: true,
+    range,
+    events,
+    filters: appliedFilters,
+    availableFilters: { providers, workflowSteps },
+  };
 }

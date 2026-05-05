@@ -1284,6 +1284,25 @@ export const TelemetryDashboardRange = {
   "30d": "30d",
 } as const;
 
+/**
+ * Echo of the filters that were actually applied.
+ */
+export type TelemetryDashboardFilters = {
+  provider: string | null;
+  workflowStep: string | null;
+};
+
+/**
+ * Distinct filter values discovered in the same time range, so the
+UI can populate the Provider and Workflow Step dropdowns from the
+data instead of hard-coding them.
+
+ */
+export type TelemetryDashboardAvailableFilters = {
+  providers: string[];
+  workflowSteps: string[];
+};
+
 export interface TelemetryDailyCount {
   /** ISO date (YYYY-MM-DD) in UTC. */
   date: string;
@@ -1306,6 +1325,13 @@ export interface TelemetryDashboard {
   configured: boolean;
   range: TelemetryDashboardRange;
   events: TelemetryEventStats[];
+  /** Echo of the filters that were actually applied. */
+  filters: TelemetryDashboardFilters;
+  /** Distinct filter values discovered in the same time range, so the
+UI can populate the Provider and Workflow Step dropdowns from the
+data instead of hard-coding them.
+ */
+  availableFilters: TelemetryDashboardAvailableFilters;
 }
 
 export type ListTrashedCandidates200 = {
@@ -1361,6 +1387,19 @@ export type MarkAllEmailStatusChangesRead200 = {
 
 export type GetTelemetryDashboardParams = {
   range?: GetTelemetryDashboardRange;
+  /**
+ * Optional filter — only count events whose `properties.provider`
+matches this value. Composes with `workflowStep` and `range`.
+
+ */
+  provider?: string;
+  /**
+ * Optional filter — only count events whose
+`properties.workflow_step` matches this value. Composes with
+`provider` and `range`.
+
+ */
+  workflowStep?: string;
 };
 
 export type GetTelemetryDashboardRange =

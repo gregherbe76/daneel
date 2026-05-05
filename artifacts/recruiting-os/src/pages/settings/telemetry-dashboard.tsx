@@ -52,10 +52,21 @@ function formatTick(iso: string): string {
 
 export default function TelemetryDashboardPage() {
   const [range, setRange] = useState<Range>("7d");
-  const query = useGetTelemetryDashboard({ range });
+  const [provider, setProvider] = useState<string>("");
+  const [workflowStep, setWorkflowStep] = useState<string>("");
+
+  const query = useGetTelemetryDashboard({
+    range,
+    ...(provider ? { provider } : {}),
+    ...(workflowStep ? { workflowStep } : {}),
+  });
 
   const events = useMemo(() => query.data?.events ?? [], [query.data]);
   const configured = query.data?.configured ?? false;
+  const availableProviders = query.data?.availableFilters?.providers ?? [];
+  const availableWorkflowSteps =
+    query.data?.availableFilters?.workflowSteps ?? [];
+  const hasFilters = Boolean(provider) || Boolean(workflowStep);
 
   return (
     <div>
@@ -98,6 +109,76 @@ export default function TelemetryDashboardPage() {
             ))}
           </div>
         </div>
+
+        {configured && (
+          <div className="flex flex-wrap items-end gap-3 border border-border rounded-lg p-4 bg-card/40">
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="telemetry-filter-provider"
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Provider
+              </label>
+              <select
+                id="telemetry-filter-provider"
+                data-testid="telemetry-filter-provider"
+                value={provider}
+                onChange={(e) => setProvider(e.target.value)}
+                disabled={availableProviders.length === 0}
+                className="h-9 min-w-[12rem] rounded-md border border-border bg-background px-2 text-sm text-foreground disabled:opacity-50"
+              >
+                <option value="">All providers</option>
+                {availableProviders.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="telemetry-filter-workflow-step"
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Workflow step
+              </label>
+              <select
+                id="telemetry-filter-workflow-step"
+                data-testid="telemetry-filter-workflow-step"
+                value={workflowStep}
+                onChange={(e) => setWorkflowStep(e.target.value)}
+                disabled={availableWorkflowSteps.length === 0}
+                className="h-9 min-w-[12rem] rounded-md border border-border bg-background px-2 text-sm text-foreground disabled:opacity-50"
+              >
+                <option value="">All workflow steps</option>
+                {availableWorkflowSteps.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {hasFilters && (
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="telemetry-filter-clear"
+                onClick={() => {
+                  setProvider("");
+                  setWorkflowStep("");
+                }}
+              >
+                Clear filters
+              </Button>
+            )}
+            {availableProviders.length === 0 &&
+              availableWorkflowSteps.length === 0 && (
+                <p className="text-xs text-muted-foreground self-center">
+                  No provider or workflow-step values seen in this range yet.
+                </p>
+              )}
+          </div>
+        )}
 
         {query.isLoading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
