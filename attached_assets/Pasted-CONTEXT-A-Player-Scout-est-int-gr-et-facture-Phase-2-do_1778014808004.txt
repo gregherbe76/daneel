@@ -1,0 +1,54 @@
+CONTEXT
+A-Player Scout est intégré et facture (Phase 2 done). Twin est validé 
+comme partenaire commercial pour Daneel (cf. VISION.md commercial 
+disclosure). Twin expose une API agentique de sourcing à [URL_DE_DOC_TWIN].
+
+GOAL
+Wrap Twin Agent Browser comme un Daneel SourcingProvider. Le distinguer 
+clairement de Scout dans la marketplace.
+
+CONSTRAINTS
+- Nouveau fichier : 
+  artifacts/api-server/src/routes/workflows/providers/twin-provider.ts
+- Implémente SourcingProvider interface en appelant l'API Twin avec la 
+  clé API utilisateur stockée dans le provider config Daneel.
+- Si Twin streame les résultats : pass through SSE vers le frontend Daneel.
+  Si Twin renvoie en synchrone : adapter pour que le UX reste fluide 
+  (loader avec message "Twin agents are browsing…").
+- Marketplace card pour Twin avec :
+    - Nom : "Twin Agent Browser"
+    - Tagline : "Agentic browsing across LinkedIn, GitHub, and the open 
+      web. Twin's agents decide where to look."
+    - Badge : ⭐ Twin (couleur distincte du badge ⭐ A-Player — utiliser 
+      le jaune Twin #FEDA3D pour le badge Twin, le lavender Daneel 
+      #B794F6 pour le badge A-Player)
+    - Pricing : "Contact Twin" ou pricing Twin officiel selon ce qui 
+      a été convenu
+    - Connect flow : selon ce qui a été convenu — soit paste API key, 
+      soit redirect vers Twin.app/connect avec OAuth-flavored callback
+- Quand l'utilisateur lance un workflow de sourcing, le radio devient 
+  un select à 3 modes :
+    - "I have a JD" → Scout
+    - "I have example profiles" → Extend (Phase 3)
+    - "Let an agent explore" → Twin
+  Chaque mode est expliqué en une phrase.
+- Documenter dans /docs/providers/twin.md : que fait Twin, en quoi c'est 
+  différent de Scout, quand utiliser l'un vs l'autre.
+- Disclosure section dans VISION.md mise à jour : Twin est un partenaire 
+  commercial validé.
+- NE PAS modifier l'engine workflow.
+- NE PAS hardcoder de credentials Twin dans le code.
+
+DELIVERABLES
+1. twin-provider.ts
+2. Marketplace card Twin avec branding distinct
+3. UX 3-modes pour sourcing
+4. /docs/providers/twin.md
+5. VISION.md disclosure update
+6. Commit : "feat: Twin Agent Browser sourcing provider (Phase 2.5)"
+7. Push.
+
+STOP. Test end-to-end : connect Twin, lance un sourcing en mode "Let an 
+agent explore", reçois des candidats. Vérifie que le badge Twin est 
+visuellement distinct du badge A-Player. Confirme avec Twin que 
+l'intégration leur convient avant de pousser publiquement.
