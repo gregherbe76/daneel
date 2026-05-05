@@ -1594,6 +1594,7 @@ export const ListProvidersResponseItem = zod.object({
     "web_search",
     "apify",
     "council",
+    "twin_agent",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -1714,6 +1715,25 @@ export const ListProvidersResponseItem = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
         ),
+      twin_agent: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Twin backend base URL. Defaults to Twin's hosted prod deployment when omitted.",
+            ),
+          streaming: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "When true, open an SSE stream to receive partial candidate cards as Twin's browser agent finds them. Defaults to false (sync JSON response).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -1738,6 +1758,7 @@ export const CreateProviderBody = zod.object({
     "web_search",
     "apify",
     "council",
+    "twin_agent",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -1858,6 +1879,25 @@ export const CreateProviderBody = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
         ),
+      twin_agent: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Twin backend base URL. Defaults to Twin's hosted prod deployment when omitted.",
+            ),
+          streaming: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "When true, open an SSE stream to receive partial candidate cards as Twin's browser agent finds them. Defaults to false (sync JSON response).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -1884,6 +1924,7 @@ export const GetProviderResponse = zod.object({
     "web_search",
     "apify",
     "council",
+    "twin_agent",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2003,6 +2044,25 @@ export const GetProviderResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
+      twin_agent: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Twin backend base URL. Defaults to Twin's hosted prod deployment when omitted.",
+            ),
+          streaming: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "When true, open an SSE stream to receive partial candidate cards as Twin's browser agent finds them. Defaults to false (sync JSON response).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -2031,6 +2091,7 @@ export const UpdateProviderBody = zod.object({
     "web_search",
     "apify",
     "council",
+    "twin_agent",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2151,6 +2212,25 @@ export const UpdateProviderBody = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
         ),
+      twin_agent: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Twin backend base URL. Defaults to Twin's hosted prod deployment when omitted.",
+            ),
+          streaming: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "When true, open an SSE stream to receive partial candidate cards as Twin's browser agent finds them. Defaults to false (sync JSON response).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -2170,6 +2250,7 @@ export const UpdateProviderResponse = zod.object({
     "web_search",
     "apify",
     "council",
+    "twin_agent",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2289,6 +2370,25 @@ export const UpdateProviderResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
+      twin_agent: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Twin backend base URL. Defaults to Twin's hosted prod deployment when omitted.",
+            ),
+          streaming: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "When true, open an SSE stream to receive partial candidate cards as Twin's browser agent finds them. Defaults to false (sync JSON response).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -2329,6 +2429,7 @@ export const ToggleProviderResponse = zod.object({
     "web_search",
     "apify",
     "council",
+    "twin_agent",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2448,6 +2549,25 @@ export const ToggleProviderResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
+      twin_agent: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Twin backend base URL. Defaults to Twin's hosted prod deployment when omitted.",
+            ),
+          streaming: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "When true, open an SSE stream to receive partial candidate cards as Twin's browser agent finds them. Defaults to false (sync JSON response).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -2592,6 +2712,7 @@ export const ListProviderStepSettingsResponseItem = zod.object({
       "web_search",
       "apify",
       "council",
+      "twin_agent",
     ]),
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
@@ -2711,6 +2832,25 @@ export const ListProviderStepSettingsResponseItem = zod.object({
           .optional()
           .describe(
             "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
+          ),
+        twin_agent: zod
+          .object({
+            baseUrl: zod
+              .string()
+              .nullish()
+              .describe(
+                "Override for the Twin backend base URL. Defaults to Twin's hosted prod deployment when omitted.",
+              ),
+            streaming: zod
+              .boolean()
+              .nullish()
+              .describe(
+                "When true, open an SSE stream to receive partial candidate cards as Twin's browser agent finds them. Defaults to false (sync JSON response).",
+              ),
+          })
+          .optional()
+          .describe(
+            "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
           ),
       })
       .describe(
@@ -2767,6 +2907,7 @@ export const UpsertProviderStepSettingResponse = zod.object({
       "web_search",
       "apify",
       "council",
+      "twin_agent",
     ]),
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
@@ -2886,6 +3027,25 @@ export const UpsertProviderStepSettingResponse = zod.object({
           .optional()
           .describe(
             "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
+          ),
+        twin_agent: zod
+          .object({
+            baseUrl: zod
+              .string()
+              .nullish()
+              .describe(
+                "Override for the Twin backend base URL. Defaults to Twin's hosted prod deployment when omitted.",
+              ),
+            streaming: zod
+              .boolean()
+              .nullish()
+              .describe(
+                "When true, open an SSE stream to receive partial candidate cards as Twin's browser agent finds them. Defaults to false (sync JSON response).",
+              ),
+          })
+          .optional()
+          .describe(
+            "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
           ),
       })
       .describe(

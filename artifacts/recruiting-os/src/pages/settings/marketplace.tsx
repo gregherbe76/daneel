@@ -29,6 +29,7 @@ import {
   CATALOG,
   CATEGORIES,
   PHASE_COPY,
+  TWIN_YELLOW,
   type CatalogEntry,
   type ConnectProvider,
   type ConnectProviderType,
@@ -57,6 +58,7 @@ type ProviderRecord = {
   config?: {
     github?: GithubProviderConfig | null;
     web_search?: WebSearchProviderConfig | null;
+    twin_agent?: TwinAgentProviderConfig | null;
   } | null;
 };
 
@@ -73,6 +75,11 @@ interface WebSearchProviderConfig {
   extraKeywords?: string | null;
   targetSites?: string[] | null;
   excludeSites?: string[] | null;
+}
+
+interface TwinAgentProviderConfig {
+  baseUrl?: string | null;
+  streaming?: boolean | null;
 }
 
 type WorkflowStep =
@@ -105,6 +112,7 @@ const APPLICABLE_STEPS: Record<ConnectProviderType, WorkflowStep[]> = {
   ],
   serpapi: ["sourcing"],
   github: ["sourcing"],
+  twin_agent: ["sourcing"],
   apify: ["sourcing"],
 };
 
@@ -114,6 +122,7 @@ function providerTypeFor(connectType: ConnectProviderType): string | null {
   if (connectType === "serpapi") return "web_search";
   if (connectType === "github") return "github";
   if (connectType === "apify") return "apify";
+  if (connectType === "twin_agent") return "twin_agent";
   return null;
 }
 
@@ -142,6 +151,11 @@ function deriveState(entry: ConnectProvider, providers: ProviderRecord[]): ConnS
   }
   if (entry.connectType === "github") {
     const p = providers.find((x) => x.type === "github");
+    if (!p) return "disconnected";
+    return p.enabled ? "connected" : "action_required";
+  }
+  if (entry.connectType === "twin_agent") {
+    const p = providers.find((x) => x.type === "twin_agent");
     if (!p) return "disconnected";
     return p.enabled ? "connected" : "action_required";
   }
@@ -199,6 +213,18 @@ function BadgeRow({ badges }: { badges: CatalogEntry["badges"] }) {
               className="bg-emerald-500/15 text-emerald-700 border border-emerald-500/30 hover:bg-emerald-500/15"
             >
               Free
+            </Badge>
+          );
+        }
+        if (b === "twin") {
+          return (
+            <Badge
+              key={b}
+              className="border border-black/20 hover:opacity-90 gap-1 text-black"
+              style={{ backgroundColor: TWIN_YELLOW }}
+              data-testid="badge-twin"
+            >
+              Twin
             </Badge>
           );
         }
@@ -319,6 +345,10 @@ function ConnectDialog({
   const [wsTargetSites, setWsTargetSites] = useState("");
   const [wsExcludeSites, setWsExcludeSites] = useState("");
 
+  // Twin Agent Browser tuning
+  const [twinBaseUrl, setTwinBaseUrl] = useState("");
+  const [twinStreaming, setTwinStreaming] = useState(false);
+
   const existing = useMemo(() => {
     if (!entry) return null;
     return findProviderForEntry(entry, providers);
@@ -351,6 +381,11 @@ function ConnectDialog({
       setWsExtraKeywords(cfg?.extraKeywords ?? "");
       setWsTargetSites(cfg?.targetSites?.join(", ") ?? "");
       setWsExcludeSites(cfg?.excludeSites?.join(", ") ?? "");
+    }
+    if (entry.connectType === "twin_agent") {
+      const cfg = existing?.config?.twin_agent ?? null;
+      setTwinBaseUrl(cfg?.baseUrl ?? "");
+      setTwinStreaming(cfg?.streaming === true);
     }
   }, [open, entry, existing]);
 
@@ -440,6 +475,34 @@ function ConnectDialog({
         }
         await qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
         toast({ title: "GitHub Agent connected" });
+      } else if (entry.connectType === "twin_agent") {
+        const twinConfig: TwinAgentProviderConfig = {
+          baseUrl: twinBaseUrl.trim() || null,
+          streaming: twinStreaming || null,
+        };
+        const hasTwinConfig =
+          (twinConfig.baseUrl && twinConfig.baseUrl.length > 0) ||
+          twinConfig.streaming === true;
+        const payload = {
+          name: "Twin Agent Browser",
+          type: "twin_agent" as const,
+          webhookUrl: null,
+          baseUrl: null,
+          apiKeyPlaceholder: apiKey || null,
+          config: hasTwinConfig ? { twin_agent: twinConfig } : null,
+          enabled: true,
+        };
+        if (existing) {
+          await update.mutateAsync({ id: existing.id, data: payload });
+        } else {
+          await create.mutateAsync({ data: payload });
+        }
+        await qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
+        toast({
+          title: "Twin Agent Browser connected",
+          description:
+            "Paste your Twin API key from twin.aplayer.ai → Settings to enable agent-browsed sourcing.",
+        });
       } else if (entry.connectType === "apify") {
         const payload = {
           name: "Apify Scrapers",
@@ -658,6 +721,69 @@ function ConnectDialog({
                     onChange={(e) => setGhActiveWithinMonths(e.target.value)}
                     data-testid="gh-active-within"
                   />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {entry.connectType === "twin_agent" && (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="twin-key">Twin API key</Label>
+              <Input
+                id="twin-key"
+                type="password"
+                placeholder="twin_sk_…"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                autoComplete="new-password"
+                data-testid="twin-agent-key"
+              />
+              <p className="text-xs text-muted-foreground">
+                Get your key from <code className="text-xs">twin.aplayer.ai</code> → Settings →
+                API. Sent as <code className="text-xs">Authorization: Bearer …</code> on every
+                browsing run; quota and pricing are enforced by Twin.
+              </p>
+            </div>
+
+            <div className="rounded-md border border-border bg-muted/30 p-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <Label htmlFor="twin-streaming" className="text-xs font-medium">
+                  Stream candidates as they're found
+                </Label>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Twin pushes partial cards over SSE while the browser agent is still working.
+                  Leave off for a single sync JSON response (more reliable on flaky networks).
+                </p>
+              </div>
+              <Switch
+                id="twin-streaming"
+                checked={twinStreaming}
+                onCheckedChange={setTwinStreaming}
+                data-testid="twin-agent-streaming"
+              />
+            </div>
+
+            <AdvancedToggle open={advancedOpen} onToggle={setAdvancedOpen} />
+
+            {advancedOpen && (
+              <div
+                className="space-y-3 rounded-md border border-border p-3"
+                data-testid="twin-agent-advanced"
+              >
+                <div className="space-y-1.5">
+                  <Label>Base URL override</Label>
+                  <Input
+                    placeholder="https://twin.aplayer.ai"
+                    value={twinBaseUrl}
+                    onChange={(e) => setTwinBaseUrl(e.target.value)}
+                    data-testid="twin-agent-base-url"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave blank for production. Override only when pointing at a Twin staging or
+                    self-hosted deployment.
+                  </p>
                 </div>
               </div>
             )}

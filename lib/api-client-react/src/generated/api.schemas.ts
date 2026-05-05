@@ -461,6 +461,7 @@ export const ProviderType = {
   web_search: "web_search",
   apify: "apify",
   council: "council",
+  twin_agent: "twin_agent",
 } as const;
 
 export type WorkflowStepName =
@@ -541,6 +542,19 @@ export interface CouncilProviderConfig {
 }
 
 /**
+ * Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.
+The Twin API key flows through the existing `apiKeyPlaceholder` field
+on the provider record (it is sent as `Authorization: Bearer <key>`).
+
+ */
+export interface TwinAgentProviderConfig {
+  /** Override for the Twin backend base URL. Defaults to Twin's hosted prod deployment when omitted. */
+  baseUrl?: string | null;
+  /** When true, open an SSE stream to receive partial candidate cards as Twin's browser agent finds them. Defaults to false (sync JSON response). */
+  streaming?: boolean | null;
+}
+
+/**
  * Per-provider tuning knobs. Only the section matching the provider type is read.
  */
 export interface AgentProviderConfig {
@@ -548,6 +562,7 @@ export interface AgentProviderConfig {
   web_search?: WebSearchProviderConfig;
   apify?: ApifyProviderConfig;
   council?: CouncilProviderConfig;
+  twin_agent?: TwinAgentProviderConfig;
 }
 
 export interface AgentProviderRecord {

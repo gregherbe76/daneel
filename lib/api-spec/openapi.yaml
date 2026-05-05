@@ -2485,7 +2485,7 @@ components:
     # ── PROVIDERS ──
     ProviderType:
       type: string
-      enum: [native_openai, custom_webhook, twin_webhook, github, web_search, apify, council]
+      enum: [native_openai, custom_webhook, twin_webhook, github, web_search, apify, council, twin_agent]
 
     WorkflowStepName:
       type: string
@@ -2589,6 +2589,22 @@ components:
           nullable: true
           description: Override for the Council backend base URL. Defaults to Council's hosted prod deployment when omitted.
 
+    TwinAgentProviderConfig:
+      type: object
+      description: |
+        Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.
+        The Twin API key flows through the existing `apiKeyPlaceholder` field
+        on the provider record (it is sent as `Authorization: Bearer <key>`).
+      properties:
+        baseUrl:
+          type: string
+          nullable: true
+          description: Override for the Twin backend base URL. Defaults to Twin's hosted prod deployment when omitted.
+        streaming:
+          type: boolean
+          nullable: true
+          description: When true, open an SSE stream to receive partial candidate cards as Twin's browser agent finds them. Defaults to false (sync JSON response).
+
     AgentProviderConfig:
       type: object
       description: Per-provider tuning knobs. Only the section matching the provider type is read.
@@ -2601,6 +2617,8 @@ components:
           $ref: "#/components/schemas/ApifyProviderConfig"
         council:
           $ref: "#/components/schemas/CouncilProviderConfig"
+        twin_agent:
+          $ref: "#/components/schemas/TwinAgentProviderConfig"
 
     AgentProviderRecord:
       type: object

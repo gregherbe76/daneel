@@ -45,7 +45,7 @@ export const CATEGORIES: CategoryMeta[] = [
   },
 ];
 
-export type Badge = "a-player" | "free" | "byo-key";
+export type Badge = "a-player" | "free" | "byo-key" | "twin";
 
 export type StubProvider = {
   kind: "stub";
@@ -59,7 +59,15 @@ export type StubProvider = {
   logoMark: string;
 };
 
-export type ConnectProviderType = "custom_webhook" | "serpapi" | "apify" | "github";
+export type ConnectProviderType =
+  | "custom_webhook"
+  | "serpapi"
+  | "apify"
+  | "github"
+  | "twin_agent";
+
+/** Twin's brand yellow — used as the marketplace card accent and badge fill. */
+export const TWIN_YELLOW = "#FEDA3D";
 
 export type ConnectProvider = {
   kind: "connect";
@@ -148,6 +156,20 @@ export const CATALOG: CatalogEntry[] = [
     badges: ["free", "byo-key"],
     connectType: "serpapi",
     logoMark: "Sp",
+  },
+  {
+    kind: "connect",
+    id: "twin-agent-browser",
+    name: "Twin Agent Browser",
+    category: "sourcing",
+    oneLiner:
+      "Let a Twin agent explore the open web in a real browser to find candidates — no JD or example list required.",
+    pricing: "Twin subscription — paste your Twin API key",
+    badges: ["twin"],
+    connectType: "twin_agent",
+    helper:
+      "Streams partial candidate cards as Twin's browser agent finds them. Quota-gated by your Twin plan.",
+    logoMark: "Tw",
   },
   {
     kind: "connect",

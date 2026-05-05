@@ -848,6 +848,8 @@ export async function runWorkflowEngine(
               ? "Web Search"
               : sourcingProvider.type === "apify"
               ? "Apify"
+              : sourcingProvider.type === "twin_agent"
+              ? "Twin Agent Browser"
               : SOURCE_TWIN;
           try {
             await runSourcing(runId, jobId, effectiveJob, insight, realSourceTag, sourcingProvider);

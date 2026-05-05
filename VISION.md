@@ -40,25 +40,27 @@ end-to-end without paying for anything beyond their own LLM keys.
   runtime to plug their own sourcing, scoring, or deliberation models
   into without rebuilding the orchestration layer.
 
-## The Four-Tool Funnel
+## The Five-Tool Funnel
 
-Daneel is the engine. On top of it, four commercial provider products
+Daneel is the engine. On top of it, five commercial provider products
 plug in via the standard provider interface to cover the full hiring
 funnel:
 
 1. **A-Player Scout*** — sourcing from a job description.
 2. **Extend*** — sourcing by extending a small set of example
    "look-alike" profiles.
-3. **CodeMatch*** — GitHub-based technical evaluation of engineers.
-4. **Council*** — multi-LLM deliberation for final hiring decisions.
+3. **Twin Agent Browser*** — sourcing by letting an agent explore the
+   open web in a real browser, no JD or example list required.
+4. **CodeMatch*** — GitHub-based technical evaluation of engineers.
+5. **Council*** — multi-LLM deliberation for final hiring decisions.
 
 Each tool is an optional drop-in. Daneel itself never requires any of
 them to function.
 
 ## Commercial Disclosure
 
-The four tools marked with an asterisk above (**A-Player Scout**,
-**Extend**, **CodeMatch**, **Council**) are commercial offerings from
+The five tools marked with an asterisk above (**A-Player Scout**,
+**Extend**, **Twin Agent Browser**, **CodeMatch**, **Council**) are commercial offerings from
 the project maintainer, **Greg Herbé / A-Player**. They are paid,
 hosted services that integrate with Daneel through the same public
 provider interface that any third-party developer can use.

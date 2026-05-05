@@ -48,6 +48,21 @@ export type WebSearchProviderConfig = {
   excludeSites?: string[] | null;
 };
 
+export type TwinAgentProviderConfig = {
+  /**
+   * Override for the Twin backend base URL. Defaults to Twin's hosted prod
+   * deployment when omitted. The API key flows through the existing
+   * `apiKeyEncryptedPlaceholder` column on the provider row.
+   */
+  baseUrl?: string | null;
+  /**
+   * If true, the provider opens an SSE stream to receive partial candidate
+   * cards as Twin's browser agent finds them. If false, the provider blocks
+   * on a single JSON response. Defaults to false (sync) when omitted.
+   */
+  streaming?: boolean | null;
+};
+
 export type CouncilProviderConfig = {
   /**
    * Override for the Council backend base URL. Defaults to Council's prod
@@ -62,6 +77,7 @@ export type AgentProviderConfig = {
   web_search?: WebSearchProviderConfig;
   apify?: ApifyProviderConfig;
   council?: CouncilProviderConfig;
+  twin_agent?: TwinAgentProviderConfig;
 };
 
 export const providerTypeEnum = pgEnum("provider_type", [
@@ -72,6 +88,7 @@ export const providerTypeEnum = pgEnum("provider_type", [
   "web_search",
   "apify",
   "council",
+  "twin_agent",
 ]);
 
 export const workflowStepEnum = pgEnum("workflow_step", [
