@@ -49,6 +49,7 @@ function ColorField({
   // times — fall back to the template default while the text input is empty
   // or partially typed, so the swatch never goes blank.
   const HEX = /^#[0-9a-fA-F]{6}$/;
+  const isInvalid = value !== "" && !HEX.test(value);
   const swatchValue = HEX.test(value) ? value : fallback;
   return (
     <div className="space-y-2">
@@ -68,10 +69,19 @@ function ColorField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={fallback}
+          aria-invalid={isInvalid}
           className="font-mono uppercase"
           maxLength={7}
         />
       </div>
+      {isInvalid && (
+        <p
+          data-testid={`${testId}-error`}
+          className="text-xs text-destructive"
+        >
+          Enter a valid hex color like #7C5CFF.
+        </p>
+      )}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{helper}</span>
         {value && (
@@ -98,14 +108,24 @@ function ColorPreview({
   primary,
   accent,
   productName,
+  fallbackPrimary,
+  fallbackAccent,
 }: {
   primary: string;
   accent: string;
   productName: string;
+  /**
+   * The hex to render when `primary` is empty OR an invalid hex string —
+   * typically the most recent saved color. This way typing a half-formed
+   * or invalid value does NOT yank the preview back to the template
+   * default and does not let the bad string bleed into the rendered swatch.
+   */
+  fallbackPrimary: string;
+  fallbackAccent: string;
 }) {
   const HEX = /^#[0-9a-fA-F]{6}$/;
-  const primaryHex = HEX.test(primary) ? primary : defaultBranding.colors.primary;
-  const accentHex = HEX.test(accent) ? accent : defaultBranding.colors.accent;
+  const primaryHex = HEX.test(primary) ? primary : fallbackPrimary;
+  const accentHex = HEX.test(accent) ? accent : fallbackAccent;
   return (
     <div
       className="rounded-md border border-border bg-muted/30 p-4 space-y-3"
@@ -512,6 +532,12 @@ export default function BrandingSettingsPage() {
               primary={colorPrimary}
               accent={colorAccent}
               productName={productName || defaultBranding.productName}
+              fallbackPrimary={
+                data?.colorPrimary || defaultBranding.colors.primary
+              }
+              fallbackAccent={
+                data?.colorAccent || defaultBranding.colors.accent
+              }
             />
           </div>
 
