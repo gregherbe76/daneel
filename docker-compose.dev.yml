@@ -1,0 +1,23 @@
+# Contributor / build-from-source override for the Daneel stack.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# This rebuilds the `api` and `web` images locally from your working tree
+# instead of pulling the published GHCR images. Use this when you are
+# changing application code and want your changes baked into the containers.
+
+services:
+  api:
+    image: daneel-api:dev
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile.api
+      pull: true
+
+  web:
+    image: daneel-web:dev
+    build:
+      context: .
+      dockerfile: artifacts/recruiting-os/Dockerfile.web
+      pull: true

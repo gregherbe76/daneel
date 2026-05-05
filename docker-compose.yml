@@ -1,8 +1,14 @@
 # One-command local stack for Daneel / HiringAI.
 #
-# Usage:
+# Usage (uses prebuilt images from GHCR — near-instant first boot):
 #   cp .env.example .env
 #   docker compose up
+#
+# To build the images from source instead (for contributors changing code):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#
+# Image tag override (defaults to `latest`):
+#   IMAGE_TAG=v0.4.0 docker compose up
 #
 # Services:
 #   db    — Postgres 16  (host port 5432)
@@ -35,9 +41,7 @@ services:
       retries: 20
 
   api:
-    build:
-      context: .
-      dockerfile: artifacts/api-server/Dockerfile.api
+    image: ghcr.io/gregherbe76/daneel-api:${IMAGE_TAG:-latest}
     restart: unless-stopped
     networks: [daneel]
     depends_on:
@@ -63,9 +67,7 @@ services:
       start_period: 60s
 
   web:
-    build:
-      context: .
-      dockerfile: artifacts/recruiting-os/Dockerfile.web
+    image: ghcr.io/gregherbe76/daneel-web:${IMAGE_TAG:-latest}
     restart: unless-stopped
     networks: [daneel]
     depends_on:

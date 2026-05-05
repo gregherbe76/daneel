@@ -127,6 +127,18 @@ cp .env.example .env
 docker compose up
 ```
 
+By default this **pulls prebuilt images** from the GitHub Container Registry
+(`ghcr.io/gregherbe76/daneel-api` and `ghcr.io/gregherbe76/daneel-web`), so
+first boot is a quick image download instead of a multi-minute build from
+source. CI publishes new `latest` images on every push to `main` and tagged
+releases on every `v*` git tag.
+
+To pin a specific release:
+
+```
+IMAGE_TAG=v0.4.0 docker compose up
+```
+
 This brings up Postgres, the API server, and the frontend in a single command,
 pushes the database schema, and seeds a small demo dataset (a couple of jobs,
 a few candidates, sample applications). Re-running `docker compose up` is safe
@@ -139,6 +151,19 @@ Once everything is healthy:
 - Postgres: `localhost:5432` (user/password/db all `daneel`)
 
 To stop and wipe the database volume: `docker compose down -v`.
+
+#### Building from source (contributors)
+
+If you are changing application code and want your local changes baked into
+the containers, use the dev override which rebuilds the `api` and `web`
+images from your working tree instead of pulling from GHCR:
+
+```
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+The first build can take several minutes (full `pnpm install` + Vite build +
+esbuild bundle); subsequent rebuilds are cached.
 
 ---
 
