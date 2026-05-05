@@ -39,6 +39,8 @@ import { CandidateNotesPanel } from "@/components/candidate-notes-panel";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
 import { EmailSourceBadge } from "@/components/email-source-badge";
 import { EmailStatusHistoryCard } from "@/components/email-status-history-card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CouncilTab } from "@/components/council/council-tab";
 
 function formatRelativeTime(input: string | Date): string {
   const ts = typeof input === "string" ? new Date(input).getTime() : input.getTime();
@@ -240,53 +242,104 @@ export default function CandidateDetailPage() {
         </div>
       </div>
 
-      {candidate.summary && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Summary</CardTitle></CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
-              {candidate.summary}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="council">Council</TabsTrigger>
+        </TabsList>
 
-      {candidate.skills && candidate.skills.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Skills</CardTitle></CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-1.5">
-              {candidate.skills.map((s) => (
-                <Badge key={s} variant="outline" className="bg-background">{s}</Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+        <TabsContent value="overview" className="space-y-6">
+          {candidate.summary && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Summary</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                  {candidate.summary}
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
-      <EmailStatusHistoryCard
-        candidateEmail={candidate.email}
-        rows={emailHistory}
-      />
+          {candidate.skills && candidate.skills.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm">Skills</CardTitle></CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-1.5">
+                  {candidate.skills.map((s) => (
+                    <Badge key={s} variant="outline" className="bg-background">{s}</Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-      {/* Notes & comments scoped to a job */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Notes &amp; team discussion</CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
-            Notes and comments are scoped to one job at a time so each role keeps its own conversation.
-          </p>
-        </CardHeader>
-        <CardContent>
+          <EmailStatusHistoryCard
+            candidateEmail={candidate.email}
+            rows={emailHistory}
+          />
+
+          {/* Notes & comments scoped to a job */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Notes &amp; team discussion</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Notes and comments are scoped to one job at a time so each role keeps its own conversation.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {(jobs ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">
+                  Create a job first to start a discussion about this candidate.
+                </p>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                      Discussing for which role?
+                    </label>
+                    <Select
+                      value={String(activeJobId)}
+                      onValueChange={(v) => setSelectedJobId(parseInt(v, 10))}
+                    >
+                      <SelectTrigger className="max-w-md">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(jobs ?? []).map((j) => (
+                          <SelectItem key={j.id} value={String(j.id)}>
+                            {j.title} · {j.location}
+                            {appJobIds.has(j.id) ? " (applied)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {activeJobId > 0 && (
+                    <CandidateNotesPanel
+                      candidateId={candidateId}
+                      jobId={activeJobId}
+                    />
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="council" className="space-y-4">
           {(jobs ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground italic">
-              Create a job first to start a discussion about this candidate.
-            </p>
+            <Card>
+              <CardContent className="py-6">
+                <p className="text-sm text-muted-foreground italic text-center">
+                  Create a job first — Council deliberations are always scoped to a (candidate, job) pair.
+                </p>
+              </CardContent>
+            </Card>
           ) : (
             <>
-              <div className="mb-4">
+              <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-                  Discussing for which role?
+                  Deliberating for which role?
                 </label>
                 <Select
                   value={String(activeJobId)}
@@ -306,15 +359,16 @@ export default function CandidateDetailPage() {
                 </Select>
               </div>
               {activeJobId > 0 && (
-                <CandidateNotesPanel
+                <CouncilTab
                   candidateId={candidateId}
                   jobId={activeJobId}
+                  jobTitle={(jobs ?? []).find((j) => j.id === activeJobId)?.title}
                 />
               )}
             </>
           )}
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

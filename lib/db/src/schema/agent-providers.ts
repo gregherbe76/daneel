@@ -30,9 +30,19 @@ export type WebSearchProviderConfig = {
   excludeSites?: string[] | null;
 };
 
+export type CouncilProviderConfig = {
+  /**
+   * Override for the Council backend base URL. Defaults to Council's prod
+   * deployment when omitted. The API key flows through the existing
+   * `apiKeyEncryptedPlaceholder` column on the provider row.
+   */
+  baseUrl?: string | null;
+};
+
 export type AgentProviderConfig = {
   github?: GithubProviderConfig;
   web_search?: WebSearchProviderConfig;
+  council?: CouncilProviderConfig;
 };
 
 export const providerTypeEnum = pgEnum("provider_type", [
@@ -41,6 +51,7 @@ export const providerTypeEnum = pgEnum("provider_type", [
   "twin_webhook",
   "github",
   "web_search",
+  "council",
 ]);
 
 export const workflowStepEnum = pgEnum("workflow_step", [
@@ -50,6 +61,7 @@ export const workflowStepEnum = pgEnum("workflow_step", [
   "sourcing_later",
   "sourcing",
   "enrichment",
+  "decision",
 ]);
 
 export const agentProvidersTable = pgTable("agent_providers", {

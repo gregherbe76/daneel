@@ -7,7 +7,7 @@ import {
   UpsertProviderStepSettingBody,
   PreviewGithubQueryBody,
 } from "@workspace/api-zod";
-import { providerFromRow } from "./workflows/providers";
+import { providerFromRow, decisionProviderFromRow } from "./workflows/providers";
 import { GithubSourcingProvider } from "./workflows/providers/github";
 import { logger } from "../lib/logger";
 
@@ -218,7 +218,7 @@ router.post("/providers/:id/test", async (req, res) => {
 
   const start = Date.now();
   try {
-    const provider = providerFromRow(row);
+    const provider = row.type === "council" ? decisionProviderFromRow(row) : providerFromRow(row);
     const result = await provider.validateConnection();
     const latencyMs = Date.now() - start;
     res.json({ ...result, latencyMs });

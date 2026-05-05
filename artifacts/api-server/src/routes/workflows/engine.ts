@@ -13,7 +13,9 @@ import type { VariantCriteria, DataMode, ScoringWeights } from "@workspace/db";
 import { eq, ne, and, inArray } from "drizzle-orm";
 import { logger } from "../../lib/logger";
 import { validateEmail } from "../../lib/email-validation";
-import { resolveProvider, resolveSourcingProvider, resolveEnrichmentProvider } from "./providers";
+import { resolveProvider, resolveSourcingProvider, resolveEnrichmentProvider, resolveDecisionProvider } from "./providers";
+import { DecisionQuotaExceededError } from "./providers/decision-interface";
+import { deliberationsTable } from "@workspace/db";
 import type { JobInsightResult, CandidateMatchResult, ShortlistResult } from "./engine-types";
 import type { AgentProvider, SourcingCandidate, SourcingStats, SourcingRunResult, EnrichmentResult, EnrichmentCandidate } from "./providers";
 
@@ -672,6 +674,105 @@ async function runShortlist(
   }
 }
 
+// ── STEP 4 (optional): Decision (multi-pole deliberation) ─────────────────────
+
+async function runDecisionStep(
+  runId: number,
+  jobId: number,
+  job: { title: string; description: string; location?: string; seniority?: string; mustHaveSkills?: string[] },
+  evaluations: Array<{ candidateId: number; candidateName: string; score: number }>,
+  candidates: Array<typeof candidatesTable.$inferSelect>,
+): Promise<void> {
+  const provider = await resolveDecisionProvider();
+  if (!provider) {
+    // No decision provider configured — silently skip; this step is opt-in.
+    return;
+  }
+
+  const top5 = [...evaluations].sort((a, b) => b.score - a.score).slice(0, 5);
+  if (top5.length === 0) return;
+
+  await logStep(runId, "decision", "running", {
+    candidateCount: top5.length,
+    provider: provider.name,
+  });
+
+  const candidateMap = new Map(candidates.map((c) => [c.id, c]));
+  let succeeded = 0;
+  let failed = 0;
+  let quotaHit = false;
+
+  for (const evalRow of top5) {
+    const candidate = candidateMap.get(evalRow.candidateId);
+    if (!candidate) continue;
+
+    const [delibRow] = await db
+      .insert(deliberationsTable)
+      .values({
+        candidateId: candidate.id,
+        jobId,
+        runId,
+        stage: "Screening",
+        status: "running",
+      })
+      .returning();
+
+    try {
+      const result = await provider.deliberate({
+        candidate: {
+          id: candidate.id,
+          name: candidate.name,
+          email: candidate.email ?? null,
+          headline: candidate.headline ?? null,
+          summary: candidate.summary ?? null,
+          skills: (candidate.skills ?? []) as string[],
+          linkedIn: candidate.linkedIn ?? null,
+          githubUrl: candidate.githubUrl ?? null,
+          location: candidate.location ?? null,
+          currentCompany: candidate.currentCompany ?? null,
+        },
+        jd: {
+          id: jobId,
+          title: job.title,
+          description: job.description,
+          seniority: job.seniority ?? null,
+          mustHaveSkills: (job.mustHaveSkills ?? []) as string[],
+          location: job.location ?? null,
+        },
+        stage: "Screening",
+      });
+      await db
+        .update(deliberationsTable)
+        .set({ status: "completed", result, updatedAt: new Date() })
+        .where(eq(deliberationsTable.id, delibRow.id));
+      succeeded++;
+    } catch (err) {
+      const isQuota = err instanceof DecisionQuotaExceededError;
+      if (isQuota) quotaHit = true;
+      const message = err instanceof Error ? err.message : String(err);
+      await db
+        .update(deliberationsTable)
+        .set({ status: "failed", error: message, updatedAt: new Date() })
+        .where(eq(deliberationsTable.id, delibRow.id));
+      logger.warn(
+        { runId, candidateId: candidate.id, quota: isQuota, err },
+        "Council deliberation failed",
+      );
+      failed++;
+      // On quota, stop the rest of the batch — every subsequent call would also 402.
+      if (isQuota) break;
+    }
+  }
+
+  await logStep(
+    runId,
+    "decision",
+    "completed",
+    { candidateCount: top5.length, provider: provider.name },
+    { succeeded, failed, quotaHit },
+  );
+}
+
 // ── MAIN RUNNER ───────────────────────────────────────────────────────────────
 
 export async function runWorkflowEngine(
@@ -884,6 +985,10 @@ export async function runWorkflowEngine(
 
       if (evalWithNames.length > 0) {
         await runShortlist(runId, jobId, effectiveJob, insight, evalWithNames);
+
+        // Step 4 (optional): Decision — multi-pole deliberation per shortlisted candidate.
+        // Skipped silently when no decision provider is configured.
+        await runDecisionStep(runId, jobId, effectiveJob, evalWithNames, matchingCandidates);
       }
     }
 

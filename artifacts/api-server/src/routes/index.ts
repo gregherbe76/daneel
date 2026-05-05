@@ -12,6 +12,7 @@ import settingsRouter from "./settings";
 import emailStatusChangesRouter from "./email-status-changes";
 import brandingRouter from "./branding";
 import storageRouter from "./storage";
+import deliberationsRouter from "./deliberations";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(settingsRouter);
 router.use(emailStatusChangesRouter);
 router.use(brandingRouter);
 router.use(storageRouter);
+router.use(deliberationsRouter);
 
 export default router;

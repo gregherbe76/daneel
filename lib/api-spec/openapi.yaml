@@ -34,6 +34,8 @@ tags:
     description: Runtime-editable global product branding (product name, company name, logo URL)
   - name: storage
     description: Object storage upload and serving endpoints.
+  - name: deliberations
+    description: Council multi-pole deliberations on (candidate, job) pairs.
 paths:
   /healthz:
     get:
@@ -771,6 +773,88 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProviderStepSettingWithProvider"
+
+  # ── DELIBERATIONS (Council) ───────────────────────────────────────────────
+  /deliberations:
+    post:
+      operationId: createDeliberation
+      tags: [deliberations]
+      summary: Run an ad-hoc Council deliberation for a (candidate, job) pair
+      description: >
+        Triggers a single Council deliberation outside of a workflow run. Used by
+        the Council tab on the candidate detail page. Returns 402 with a
+        structured `code: "QUOTA_EXCEEDED"` body when the recruiter has hit
+        their Council plan quota.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDeliberationBody"
+      responses:
+        "201":
+          description: Deliberation completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliberationRecord"
+        "400":
+          description: No Council provider configured / wrong provider type
+        "402":
+          description: Council plan quota exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliberationQuotaError"
+        "404":
+          description: Candidate, job, or provider not found
+
+  /deliberations/{id}:
+    get:
+      operationId: getDeliberation
+      tags: [deliberations]
+      summary: Get one deliberation by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deliberation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliberationRecord"
+        "404":
+          description: Not found
+
+  /candidates/{id}/deliberations:
+    get:
+      operationId: listCandidateDeliberations
+      tags: [deliberations]
+      summary: List deliberations for a candidate (optionally filtered by job)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: jobId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deliberations (newest first)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DeliberationRecord"
 
   /settings/email-revalidation:
     get:
@@ -1951,11 +2035,11 @@ components:
     # ── PROVIDERS ──
     ProviderType:
       type: string
-      enum: [native_openai, custom_webhook, twin_webhook, github, web_search]
+      enum: [native_openai, custom_webhook, twin_webhook, github, web_search, council]
 
     WorkflowStepName:
       type: string
-      enum: [job_understanding, candidate_matching, shortlist_generation, sourcing_later, sourcing, enrichment]
+      enum: [job_understanding, candidate_matching, shortlist_generation, sourcing_later, sourcing, enrichment, decision]
 
     GithubProviderConfig:
       type: object
@@ -2009,6 +2093,18 @@ components:
           nullable: true
           description: Domains/paths excluded via `-site:` operators (e.g. "pinterest.com").
 
+    CouncilProviderConfig:
+      type: object
+      description: |
+        Recruiter-tunable knobs for the Council decision provider. The Council
+        API key flows through the existing `apiKeyPlaceholder` field on the
+        provider record (it is sent as `Authorization: Bearer <key>`).
+      properties:
+        baseUrl:
+          type: string
+          nullable: true
+          description: Override for the Council backend base URL. Defaults to Council's hosted prod deployment when omitted.
+
     AgentProviderConfig:
       type: object
       description: Per-provider tuning knobs. Only the section matching the provider type is read.
@@ -2017,6 +2113,8 @@ components:
           $ref: "#/components/schemas/GithubProviderConfig"
         web_search:
           $ref: "#/components/schemas/WebSearchProviderConfig"
+        council:
+          $ref: "#/components/schemas/CouncilProviderConfig"
 
     AgentProviderRecord:
       type: object
@@ -2163,6 +2261,139 @@ components:
         provider:
           $ref: "#/components/schemas/AgentProviderRecord"
       required: [id, workflowStep, providerId, enabled, provider]
+
+    # ── DELIBERATIONS ──
+    DeliberationStage:
+      type: string
+      description: Application-stage context for a deliberation. Free-text on the server; kept loose so adding pipeline stages doesn't ripple.
+      enum: [Sourced, Screening, Interview, Offer, Hired]
+
+    DeliberationStatus:
+      type: string
+      enum: [pending, running, completed, failed]
+
+    DeliberationPole:
+      type: object
+      description: One pole's verdict in a Council deliberation. Council deliberates with 15 named poles.
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        verdict:
+          type: string
+        signal:
+          type: number
+          description: Numeric activation signal (0..1) used to drive the boardroom visualisation.
+        reasoning:
+          type: string
+      required: [id, name, verdict, signal, reasoning]
+
+    DeliberationOrientation:
+      type: object
+      properties:
+        title:
+          type: string
+        detail:
+          type: string
+      required: [title, detail]
+
+    DeliberationResultPayload:
+      type: object
+      description: Structured payload returned by Council's deliberate API.
+      properties:
+        convergence:
+          type: object
+          properties:
+            summary:
+              type: string
+            verdict:
+              type: string
+          required: [summary, verdict]
+        divergence:
+          type: object
+          properties:
+            summary:
+              type: string
+            axes:
+              type: array
+              items:
+                type: string
+          required: [summary, axes]
+        orientations:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeliberationOrientation"
+        poles:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeliberationPole"
+      required: [convergence, divergence, orientations, poles]
+
+    DeliberationRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        candidateId:
+          type: integer
+        jobId:
+          type: integer
+        runId:
+          type: integer
+          nullable: true
+        stage:
+          type: string
+        status:
+          $ref: "#/components/schemas/DeliberationStatus"
+        result:
+          allOf:
+            - $ref: "#/components/schemas/DeliberationResultPayload"
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, candidateId, jobId, stage, status, createdAt, updatedAt]
+
+    CreateDeliberationBody:
+      type: object
+      properties:
+        candidateId:
+          type: integer
+        jobId:
+          type: integer
+        stage:
+          allOf:
+            - $ref: "#/components/schemas/DeliberationStage"
+          nullable: true
+          description: Optional. Defaults to the candidate's current application stage on the job, or "Screening".
+        providerId:
+          type: integer
+          nullable: true
+          description: Optional. Override the council provider used for this run.
+      required: [candidateId, jobId]
+
+    DeliberationQuotaError:
+      type: object
+      description: Body returned when Council signals a 402 (plan quota reached).
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum: [QUOTA_EXCEEDED]
+        upgradeUrl:
+          type: string
+          nullable: true
+        deliberationId:
+          type: integer
+      required: [error, code, deliberationId]
 
     UpsertStepSettingBody:
       type: object

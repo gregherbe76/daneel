@@ -64,20 +64,25 @@ import {
   Globe,
   Eye,
   Search,
+  Scale,
 } from "lucide-react";
 import { SettingsTabs } from "@/components/settings-tabs";
 import { track as trackTelemetry } from "@/lib/telemetry";
 
 // ── types ────────────────────────────────────────────────────────────────────
 
-type ProviderType = "native_openai" | "custom_webhook" | "twin_webhook" | "github" | "web_search";
+type ProviderType = "native_openai" | "custom_webhook" | "twin_webhook" | "github" | "web_search" | "council";
 type WorkflowStep =
   | "job_understanding"
   | "candidate_matching"
   | "shortlist_generation"
   | "sourcing_later"
   | "sourcing"
-  | "enrichment";
+  | "enrichment"
+  | "decision";
+
+/** Provider types eligible for the optional `decision` workflow step. */
+const DECISION_PROVIDER_TYPES: ReadonlySet<ProviderType> = new Set(["council"]);
 
 interface Provider {
   id: number;
@@ -89,6 +94,7 @@ interface Provider {
   config?: {
     github?: GithubProviderConfig | null;
     web_search?: WebSearchProviderConfig | null;
+    council?: CouncilProviderConfig | null;
   } | null;
   enabled: boolean;
   createdAt: string;
@@ -101,6 +107,7 @@ const WORKFLOW_STEPS: { key: WorkflowStep; label: string; description: string; c
   { key: "shortlist_generation", label: "Shortlist", description: "Ranks the strongest candidates and writes a hiring summary you can share" },
   { key: "sourcing", label: "Sourcing", description: "Brings new candidates into the pipeline before screening. Twin uses POST /workflow/sourcing" },
   { key: "enrichment", label: "Enrichment", description: "Fills in missing details on each candidate (skills, headline, summary) before scoring. Twin uses POST /workflow/enrichment" },
+  { key: "decision", label: "Decision (Council)", description: "Optional final-mile multi-pole deliberation on shortlisted candidates. Only Council providers can be assigned here." },
   { key: "sourcing_later", label: "Sourcing (future)", description: "Proactive outreach and external sourcing (coming soon)", comingSoon: true },
 ];
 
@@ -110,6 +117,7 @@ const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
   twin_webhook: "Twin Webhook",
   github: "GitHub Agent",
   web_search: "Web Search",
+  council: "Council",
 };
 
 const PROVIDER_TYPE_ICONS: Record<ProviderType, React.ComponentType<{ className?: string }>> = {
@@ -118,13 +126,14 @@ const PROVIDER_TYPE_ICONS: Record<ProviderType, React.ComponentType<{ className?
   twin_webhook: Zap,
   github: Github,
   web_search: Globe,
+  council: Scale,
 };
 
 // ── form schema ──────────────────────────────────────────────────────────────
 
 const providerSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  type: z.enum(["native_openai", "custom_webhook", "twin_webhook", "github", "web_search"]),
+  type: z.enum(["native_openai", "custom_webhook", "twin_webhook", "github", "web_search", "council"]),
   baseUrl: z.string().optional(),
   webhookUrl: z.string().optional(),
   apiKeyPlaceholder: z.string().optional(),
@@ -156,6 +165,10 @@ interface WebSearchProviderConfig {
   extraKeywords?: string | null;
   targetSites?: string[] | null;
   excludeSites?: string[] | null;
+}
+
+interface CouncilProviderConfig {
+  baseUrl?: string | null;
 }
 
 /** Split a comma/space/newline-separated free-text field into a clean array. */
@@ -329,7 +342,13 @@ function StepAssignmentRow({
   const [saving, setSaving] = useState(false);
 
   const currentProviderId = currentSetting?.providerId;
-  const enabledProviders = providers.filter((p) => p.enabled);
+  // For the decision step, only council-typed providers are valid. For every
+  // other step, council providers are excluded so they can't be misassigned.
+  const enabledProviders = providers.filter((p) => {
+    if (!p.enabled) return false;
+    if (step.key === "decision") return DECISION_PROVIDER_TYPES.has(p.type);
+    return !DECISION_PROVIDER_TYPES.has(p.type);
+  });
 
   async function handleChange(providerId: string) {
     setSaving(true);
@@ -361,7 +380,9 @@ function StepAssignmentRow({
         {step.comingSoon ? (
           <p className="text-xs text-muted-foreground italic">Coming soon</p>
         ) : enabledProviders.length === 0 ? (
-          <p className="text-xs text-muted-foreground italic">No enabled providers</p>
+          <p className="text-xs text-muted-foreground italic">
+            {step.key === "decision" ? "No Council providers configured" : "No enabled providers"}
+          </p>
         ) : (
           <Select
             value={currentProviderId?.toString() ?? ""}
@@ -601,7 +622,11 @@ function ProviderDialog({
   const providerType = watch("type");
 
   async function onSubmit(values: ProviderFormValues) {
-    let config: { github?: GithubProviderConfig; web_search?: WebSearchProviderConfig } | null = null;
+    let config: { github?: GithubProviderConfig; web_search?: WebSearchProviderConfig; council?: CouncilProviderConfig } | null = null;
+    if (values.type === "council") {
+      const baseUrl = values.baseUrl?.trim();
+      if (baseUrl) config = { council: { baseUrl } };
+    }
     if (values.type === "github") {
       const parseInt0 = (v?: string) => {
         const n = parseInt((v ?? "").trim(), 10);
@@ -712,9 +737,50 @@ function ProviderDialog({
                     <span className="text-xs text-muted-foreground">Source real LinkedIn / GitHub / personal-site profiles via Google (SerpAPI)</span>
                   </span>
                 </SelectItem>
+                <SelectItem value="council">
+                  <span className="flex flex-col">
+                    <span className="font-medium">Council (Decision)</span>
+                    <span className="text-xs text-muted-foreground">15-pole multi-agent deliberation. Only valid for the Decision step.</span>
+                  </span>
+                </SelectItem>
               </SelectContent>
             </Select>
+            {providerType === "council" && (
+              <p className="text-xs text-muted-foreground">
+                Council providers can only be assigned to the <strong>Decision</strong> step.
+              </p>
+            )}
           </div>
+
+          {providerType === "council" && (
+            <>
+              <div className="rounded-md bg-muted/50 border border-border p-3 text-sm text-muted-foreground">
+                Council deliberates with 15 named poles and returns a structured verdict (convergence, divergence, orientations). Pricing is enforced by Council itself — quota-exceeded responses are surfaced as an upgrade CTA in the Council tab on the candidate page.
+              </div>
+              <div className="space-y-1.5">
+                <Label>API Key</Label>
+                <Input
+                  {...register("apiKeyPlaceholder")}
+                  type="password"
+                  placeholder="sk-council-..."
+                  autoComplete="new-password"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Paste from Council → Settings → API Keys. Sent as <code className="text-xs">Authorization: Bearer …</code>; never exposed to the frontend.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Base URL (optional)</Label>
+                <Input
+                  {...register("baseUrl")}
+                  placeholder="https://council.replit.app"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Override only if you self-host Council. Leave blank to use the hosted prod deployment.
+                </p>
+              </div>
+            </>
+          )}
 
           {providerType === "custom_webhook" && (
             <div className="space-y-1.5">

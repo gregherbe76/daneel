@@ -1428,6 +1428,7 @@ export const ListProvidersResponseItem = zod.object({
     "twin_webhook",
     "github",
     "web_search",
+    "council",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -1502,6 +1503,19 @@ export const ListProvidersResponseItem = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
         ),
+      council: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Council backend base URL. Defaults to Council's hosted prod deployment when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -1524,6 +1538,7 @@ export const CreateProviderBody = zod.object({
     "twin_webhook",
     "github",
     "web_search",
+    "council",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -1598,6 +1613,19 @@ export const CreateProviderBody = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
         ),
+      council: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Council backend base URL. Defaults to Council's hosted prod deployment when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -1622,6 +1650,7 @@ export const GetProviderResponse = zod.object({
     "twin_webhook",
     "github",
     "web_search",
+    "council",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -1695,6 +1724,19 @@ export const GetProviderResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
+        ),
+      council: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Council backend base URL. Defaults to Council's hosted prod deployment when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -1721,6 +1763,7 @@ export const UpdateProviderBody = zod.object({
     "twin_webhook",
     "github",
     "web_search",
+    "council",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -1795,6 +1838,19 @@ export const UpdateProviderBody = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
         ),
+      council: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Council backend base URL. Defaults to Council's hosted prod deployment when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -1812,6 +1868,7 @@ export const UpdateProviderResponse = zod.object({
     "twin_webhook",
     "github",
     "web_search",
+    "council",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -1885,6 +1942,19 @@ export const UpdateProviderResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
+        ),
+      council: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Council backend base URL. Defaults to Council's hosted prod deployment when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -1923,6 +1993,7 @@ export const ToggleProviderResponse = zod.object({
     "twin_webhook",
     "github",
     "web_search",
+    "council",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -1996,6 +2067,19 @@ export const ToggleProviderResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
+        ),
+      council: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Council backend base URL. Defaults to Council's hosted prod deployment when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -2125,6 +2209,7 @@ export const ListProviderStepSettingsResponseItem = zod.object({
     "sourcing_later",
     "sourcing",
     "enrichment",
+    "decision",
   ]),
   providerId: zod.number(),
   enabled: zod.boolean(),
@@ -2137,6 +2222,7 @@ export const ListProviderStepSettingsResponseItem = zod.object({
       "twin_webhook",
       "github",
       "web_search",
+      "council",
     ]),
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
@@ -2210,6 +2296,19 @@ export const ListProviderStepSettingsResponseItem = zod.object({
           .optional()
           .describe(
             "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
+          ),
+        council: zod
+          .object({
+            baseUrl: zod
+              .string()
+              .nullish()
+              .describe(
+                "Override for the Council backend base URL. Defaults to Council's hosted prod deployment when omitted.",
+              ),
+          })
+          .optional()
+          .describe(
+            "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
           ),
       })
       .describe(
@@ -2236,6 +2335,7 @@ export const UpsertProviderStepSettingBody = zod.object({
     "sourcing_later",
     "sourcing",
     "enrichment",
+    "decision",
   ]),
   providerId: zod.number(),
   enabled: zod.boolean(),
@@ -2250,6 +2350,7 @@ export const UpsertProviderStepSettingResponse = zod.object({
     "sourcing_later",
     "sourcing",
     "enrichment",
+    "decision",
   ]),
   providerId: zod.number(),
   enabled: zod.boolean(),
@@ -2262,6 +2363,7 @@ export const UpsertProviderStepSettingResponse = zod.object({
       "twin_webhook",
       "github",
       "web_search",
+      "council",
     ]),
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
@@ -2336,6 +2438,19 @@ export const UpsertProviderStepSettingResponse = zod.object({
           .describe(
             "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
           ),
+        council: zod
+          .object({
+            baseUrl: zod
+              .string()
+              .nullish()
+              .describe(
+                "Override for the Council backend base URL. Defaults to Council's hosted prod deployment when omitted.",
+              ),
+          })
+          .optional()
+          .describe(
+            "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
+          ),
       })
       .describe(
         "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -2346,6 +2461,146 @@ export const UpsertProviderStepSettingResponse = zod.object({
     updatedAt: zod.coerce.date(),
   }),
 });
+
+/**
+ * Triggers a single Council deliberation outside of a workflow run. Used by the Council tab on the candidate detail page. Returns 402 with a structured `code: "QUOTA_EXCEEDED"` body when the recruiter has hit their Council plan quota.
+
+ * @summary Run an ad-hoc Council deliberation for a (candidate, job) pair
+ */
+export const CreateDeliberationBody = zod.object({
+  candidateId: zod.number(),
+  jobId: zod.number(),
+  stage: zod
+    .enum(["Sourced", "Screening", "Interview", "Offer", "Hired"])
+    .describe(
+      "Application-stage context for a deliberation. Free-text on the server; kept loose so adding pipeline stages doesn't ripple.",
+    )
+    .nullish()
+    .describe(
+      'Optional. Defaults to the candidate\'s current application stage on the job, or \"Screening\".',
+    ),
+  providerId: zod
+    .number()
+    .nullish()
+    .describe("Optional. Override the council provider used for this run."),
+});
+
+/**
+ * @summary Get one deliberation by id
+ */
+export const GetDeliberationParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetDeliberationResponse = zod.object({
+  id: zod.number(),
+  candidateId: zod.number(),
+  jobId: zod.number(),
+  runId: zod.number().nullish(),
+  stage: zod.string(),
+  status: zod.enum(["pending", "running", "completed", "failed"]),
+  result: zod
+    .object({
+      convergence: zod.object({
+        summary: zod.string(),
+        verdict: zod.string(),
+      }),
+      divergence: zod.object({
+        summary: zod.string(),
+        axes: zod.array(zod.string()),
+      }),
+      orientations: zod.array(
+        zod.object({
+          title: zod.string(),
+          detail: zod.string(),
+        }),
+      ),
+      poles: zod.array(
+        zod
+          .object({
+            id: zod.string(),
+            name: zod.string(),
+            verdict: zod.string(),
+            signal: zod
+              .number()
+              .describe(
+                "Numeric activation signal (0..1) used to drive the boardroom visualisation.",
+              ),
+            reasoning: zod.string(),
+          })
+          .describe(
+            "One pole's verdict in a Council deliberation. Council deliberates with 15 named poles.",
+          ),
+      ),
+    })
+    .describe("Structured payload returned by Council's deliberate API.")
+    .nullish(),
+  error: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List deliberations for a candidate (optionally filtered by job)
+ */
+export const ListCandidateDeliberationsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListCandidateDeliberationsQueryParams = zod.object({
+  jobId: zod.coerce.number().optional(),
+});
+
+export const ListCandidateDeliberationsResponseItem = zod.object({
+  id: zod.number(),
+  candidateId: zod.number(),
+  jobId: zod.number(),
+  runId: zod.number().nullish(),
+  stage: zod.string(),
+  status: zod.enum(["pending", "running", "completed", "failed"]),
+  result: zod
+    .object({
+      convergence: zod.object({
+        summary: zod.string(),
+        verdict: zod.string(),
+      }),
+      divergence: zod.object({
+        summary: zod.string(),
+        axes: zod.array(zod.string()),
+      }),
+      orientations: zod.array(
+        zod.object({
+          title: zod.string(),
+          detail: zod.string(),
+        }),
+      ),
+      poles: zod.array(
+        zod
+          .object({
+            id: zod.string(),
+            name: zod.string(),
+            verdict: zod.string(),
+            signal: zod
+              .number()
+              .describe(
+                "Numeric activation signal (0..1) used to drive the boardroom visualisation.",
+              ),
+            reasoning: zod.string(),
+          })
+          .describe(
+            "One pole's verdict in a Council deliberation. Council deliberates with 15 named poles.",
+          ),
+      ),
+    })
+    .describe("Structured payload returned by Council's deliberate API.")
+    .nullish(),
+  error: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListCandidateDeliberationsResponse = zod.array(
+  ListCandidateDeliberationsResponseItem,
+);
 
 /**
  * @summary Get the current email re-validation scheduler settings

@@ -33,6 +33,8 @@ import { CustomWebhookProvider } from "./custom-webhook";
 import { TwinWebhookProvider } from "./twin-webhook";
 import { GithubSourcingProvider } from "./github";
 import { WebSearchSourcingProvider } from "./web-search";
+import { CouncilProvider } from "./council";
+import type { DecisionProvider } from "./decision-interface";
 import { logger } from "../../../lib/logger";
 
 /**
@@ -66,9 +68,76 @@ function buildProvider(row: typeof agentProvidersTable.$inferSelect): AgentProvi
       return new GithubSourcingProvider(row.id, row.name, row.config?.github ?? null);
     case "web_search":
       return new WebSearchSourcingProvider(row.id, row.name, row.config?.web_search ?? null);
+    case "council":
+      throw new Error(
+        `Provider "${row.name}" is a Council decision provider — use buildDecisionProvider() / resolveDecisionProvider() instead. ` +
+          `Council can only be assigned to the "decision" workflow step.`,
+      );
     default:
       throw new Error(`Unknown provider type: ${row.type}`);
   }
+}
+
+/**
+ * Construct a decision-step provider instance from a DB row. Kept separate
+ * from `buildProvider` so the type system can enforce that decision providers
+ * (Council today) are only assigned to the `decision` workflow step.
+ */
+function buildDecisionProvider(row: typeof agentProvidersTable.$inferSelect): DecisionProvider {
+  switch (row.type) {
+    case "council":
+      return new CouncilProvider(
+        row.id,
+        row.name,
+        row.apiKeyEncryptedPlaceholder ?? undefined,
+        row.config?.council ?? null,
+      );
+    default:
+      throw new Error(
+        `Provider type "${row.type}" cannot be assigned to the decision step. Only Council is supported today.`,
+      );
+  }
+}
+
+/**
+ * Resolve the provider for the optional decision step. Returns null when no
+ * provider is configured — the engine treats that as "skip the decision step
+ * entirely". There is no native fallback by design.
+ */
+export async function resolveDecisionProvider(): Promise<DecisionProvider | null> {
+  try {
+    const [setting] = await db
+      .select()
+      .from(workflowProviderSettingsTable)
+      .where(eq(workflowProviderSettingsTable.workflowStep, "decision"))
+      .limit(1);
+
+    if (!setting || !setting.enabled) return null;
+
+    const [providerRow] = await db
+      .select()
+      .from(agentProvidersTable)
+      .where(eq(agentProvidersTable.id, setting.providerId))
+      .limit(1);
+
+    if (!providerRow || !providerRow.enabled) {
+      logger.warn(
+        { step: "decision", providerId: setting.providerId },
+        "Decision provider not found or disabled — skipping decision step",
+      );
+      return null;
+    }
+
+    return buildDecisionProvider(providerRow);
+  } catch (err) {
+    logger.error({ step: "decision", err }, "Failed to resolve decision provider — skipping decision step");
+    return null;
+  }
+}
+
+/** Build a decision provider instance from a row, used by ad-hoc routes. */
+export function decisionProviderFromRow(row: typeof agentProvidersTable.$inferSelect): DecisionProvider {
+  return buildDecisionProvider(row);
 }
 
 /**

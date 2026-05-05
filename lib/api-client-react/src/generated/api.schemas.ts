@@ -402,6 +402,7 @@ export const ProviderType = {
   twin_webhook: "twin_webhook",
   github: "github",
   web_search: "web_search",
+  council: "council",
 } as const;
 
 export type WorkflowStepName =
@@ -414,6 +415,7 @@ export const WorkflowStepName = {
   sourcing_later: "sourcing_later",
   sourcing: "sourcing",
   enrichment: "enrichment",
+  decision: "decision",
 } as const;
 
 /**
@@ -449,11 +451,23 @@ export interface WebSearchProviderConfig {
 }
 
 /**
+ * Recruiter-tunable knobs for the Council decision provider. The Council
+API key flows through the existing `apiKeyPlaceholder` field on the
+provider record (it is sent as `Authorization: Bearer <key>`).
+
+ */
+export interface CouncilProviderConfig {
+  /** Override for the Council backend base URL. Defaults to Council's hosted prod deployment when omitted. */
+  baseUrl?: string | null;
+}
+
+/**
  * Per-provider tuning knobs. Only the section matching the provider type is read.
  */
 export interface AgentProviderConfig {
   github?: GithubProviderConfig;
   web_search?: WebSearchProviderConfig;
+  council?: CouncilProviderConfig;
 }
 
 export interface AgentProviderRecord {
@@ -526,6 +540,106 @@ export interface ProviderStepSettingWithProvider {
   providerId: number;
   enabled: boolean;
   provider: AgentProviderRecord;
+}
+
+/**
+ * Application-stage context for a deliberation. Free-text on the server; kept loose so adding pipeline stages doesn't ripple.
+ */
+export type DeliberationStage =
+  (typeof DeliberationStage)[keyof typeof DeliberationStage];
+
+export const DeliberationStage = {
+  Sourced: "Sourced",
+  Screening: "Screening",
+  Interview: "Interview",
+  Offer: "Offer",
+  Hired: "Hired",
+} as const;
+
+export type DeliberationStatus =
+  (typeof DeliberationStatus)[keyof typeof DeliberationStatus];
+
+export const DeliberationStatus = {
+  pending: "pending",
+  running: "running",
+  completed: "completed",
+  failed: "failed",
+} as const;
+
+/**
+ * One pole's verdict in a Council deliberation. Council deliberates with 15 named poles.
+ */
+export interface DeliberationPole {
+  id: string;
+  name: string;
+  verdict: string;
+  /** Numeric activation signal (0..1) used to drive the boardroom visualisation. */
+  signal: number;
+  reasoning: string;
+}
+
+export interface DeliberationOrientation {
+  title: string;
+  detail: string;
+}
+
+export type DeliberationResultPayloadConvergence = {
+  summary: string;
+  verdict: string;
+};
+
+export type DeliberationResultPayloadDivergence = {
+  summary: string;
+  axes: string[];
+};
+
+/**
+ * Structured payload returned by Council's deliberate API.
+ */
+export interface DeliberationResultPayload {
+  convergence: DeliberationResultPayloadConvergence;
+  divergence: DeliberationResultPayloadDivergence;
+  orientations: DeliberationOrientation[];
+  poles: DeliberationPole[];
+}
+
+export interface DeliberationRecord {
+  id: number;
+  candidateId: number;
+  jobId: number;
+  runId?: number | null;
+  stage: string;
+  status: DeliberationStatus;
+  result?: DeliberationResultPayload | null;
+  error?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDeliberationBody {
+  candidateId: number;
+  jobId: number;
+  /** Optional. Defaults to the candidate's current application stage on the job, or "Screening". */
+  stage?: DeliberationStage | null;
+  /** Optional. Override the council provider used for this run. */
+  providerId?: number | null;
+}
+
+export type DeliberationQuotaErrorCode =
+  (typeof DeliberationQuotaErrorCode)[keyof typeof DeliberationQuotaErrorCode];
+
+export const DeliberationQuotaErrorCode = {
+  QUOTA_EXCEEDED: "QUOTA_EXCEEDED",
+} as const;
+
+/**
+ * Body returned when Council signals a 402 (plan quota reached).
+ */
+export interface DeliberationQuotaError {
+  error: string;
+  code: DeliberationQuotaErrorCode;
+  upgradeUrl?: string | null;
+  deliberationId: number;
 }
 
 export interface UpsertStepSettingBody {
@@ -1004,6 +1118,10 @@ export interface UploadUrlResponse {
   objectPath: string;
   metadata?: UploadUrlRequest;
 }
+
+export type ListCandidateDeliberationsParams = {
+  jobId?: number;
+};
 
 export type ListCandidateNotesParams = {
   jobId?: number;

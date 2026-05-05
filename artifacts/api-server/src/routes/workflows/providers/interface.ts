@@ -15,7 +15,8 @@ export type WorkflowStep =
   | "shortlist_generation"   // Summarises the top-5 candidates for the hiring manager
   | "sourcing_later"         // Reserved — not yet implemented
   | "sourcing"               // Generates or retrieves candidate profiles
-  | "enrichment";            // Enriches existing profiles with additional signals
+  | "enrichment"             // Enriches existing profiles with additional signals
+  | "decision";              // Optional final-mile multi-pole deliberation (e.g. Council)
 
 /**
  * Input passed to every provider.run() call.

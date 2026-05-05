@@ -8,4 +8,20 @@ export { CustomWebhookProvider } from "./custom-webhook";
 export { TwinWebhookProvider } from "./twin-webhook";
 export { GithubSourcingProvider } from "./github";
 export { WebSearchSourcingProvider } from "./web-search";
-export { resolveProvider, resolveSourcingProvider, resolveEnrichmentProvider, providerFromRow } from "./registry";
+export { CouncilProvider } from "./council";
+export type {
+  DecisionProvider,
+  DeliberateInput,
+  DeliberationStage,
+  DeliberationCandidateInput,
+  DeliberationJobInput,
+} from "./decision-interface";
+export { DecisionQuotaExceededError } from "./decision-interface";
+export {
+  resolveProvider,
+  resolveSourcingProvider,
+  resolveEnrichmentProvider,
+  resolveDecisionProvider,
+  providerFromRow,
+  decisionProviderFromRow,
+} from "./registry";
