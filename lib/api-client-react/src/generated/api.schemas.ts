@@ -391,7 +391,10 @@ export interface EmailStatusChange {
   previousReason?: string | null;
   newReason?: string | null;
   changedAt: string;
+  /** When the recruiter dismissed/marked this regression as read in the inbox. */
   notifiedAt?: string | null;
+  /** When an outbound notification (email and/or Slack) was successfully dispatched for this regression. */
+  notificationSentAt?: string | null;
 }
 
 export type ProviderType = (typeof ProviderType)[keyof typeof ProviderType];

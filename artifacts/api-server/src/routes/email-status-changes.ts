@@ -23,6 +23,7 @@ const SELECT_COLUMNS = {
   newReason: emailStatusChangesTable.newReason,
   changedAt: emailStatusChangesTable.changedAt,
   notifiedAt: emailStatusChangesTable.notifiedAt,
+  notificationSentAt: emailStatusChangesTable.notificationSentAt,
 };
 
 router.get("/email-status-changes", async (req, res) => {

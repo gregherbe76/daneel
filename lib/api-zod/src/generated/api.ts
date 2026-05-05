@@ -3777,7 +3777,18 @@ export const ListEmailStatusChangesResponseItem = zod
     previousReason: zod.string().nullish(),
     newReason: zod.string().nullish(),
     changedAt: zod.coerce.date(),
-    notifiedAt: zod.coerce.date().nullish(),
+    notifiedAt: zod.coerce
+      .date()
+      .nullish()
+      .describe(
+        "When the recruiter dismissed\/marked this regression as read in the inbox.",
+      ),
+    notificationSentAt: zod.coerce
+      .date()
+      .nullish()
+      .describe(
+        "When an outbound notification (email and\/or Slack) was successfully dispatched for this regression.",
+      ),
   })
   .describe(
     "A regression in a candidate's email validation status — surfaced in the recruiter inbox so a previously verified address can't silently go bad.",
@@ -3804,7 +3815,18 @@ export const MarkEmailStatusChangeReadResponse = zod
     previousReason: zod.string().nullish(),
     newReason: zod.string().nullish(),
     changedAt: zod.coerce.date(),
-    notifiedAt: zod.coerce.date().nullish(),
+    notifiedAt: zod.coerce
+      .date()
+      .nullish()
+      .describe(
+        "When the recruiter dismissed\/marked this regression as read in the inbox.",
+      ),
+    notificationSentAt: zod.coerce
+      .date()
+      .nullish()
+      .describe(
+        "When an outbound notification (email and\/or Slack) was successfully dispatched for this regression.",
+      ),
   })
   .describe(
     "A regression in a candidate's email validation status — surfaced in the recruiter inbox so a previously verified address can't silently go bad.",

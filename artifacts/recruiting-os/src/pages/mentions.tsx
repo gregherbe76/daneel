@@ -11,7 +11,7 @@ import {
 } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AtSign, MessageSquare, Loader2, CheckCheck, MailWarning, X } from "lucide-react";
+import { AtSign, MessageSquare, Loader2, CheckCheck, MailWarning, X, Send } from "lucide-react";
 import { CommentBody } from "@/components/comment-body";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
 import {
@@ -160,12 +160,22 @@ export default function MentionsPage() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="text-sm flex items-center justify-between gap-4 flex-wrap">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <EmailValidationBadge status={r.previousStatus} />
                         <span className="text-muted-foreground">→</span>
                         <EmailValidationBadge status={r.newStatus} reason={r.newReason} />
                         {r.newReason && (
                           <span className="text-xs text-muted-foreground">— {r.newReason}</span>
+                        )}
+                        {r.notificationSentAt && (
+                          <span
+                            className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5"
+                            title={new Date(toIso(r.notificationSentAt)).toLocaleString()}
+                            data-testid={`regression-notified-${r.id}`}
+                          >
+                            <Send className="h-3 w-3" />
+                            Notified {timeAgo(toIso(r.notificationSentAt))}
+                          </span>
                         )}
                       </div>
                       <Button

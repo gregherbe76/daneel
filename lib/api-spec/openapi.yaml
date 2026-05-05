@@ -2142,6 +2142,12 @@ components:
           type: string
           format: date-time
           nullable: true
+          description: When the recruiter dismissed/marked this regression as read in the inbox.
+        notificationSentAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When an outbound notification (email and/or Slack) was successfully dispatched for this regression.
       required:
         - id
         - candidateId
