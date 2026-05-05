@@ -1,4 +1,5 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import type { JobRunSummary, SourcingStats, VariantCriteria } from "@workspace/api-client-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -196,24 +197,85 @@ export function CompareRuns({ runs }: { runs: JobRunSummary[] }) {
     [runs],
   );
 
-  const [aId, setAId] = useState<number | null>(null);
-  const [bId, setBId] = useState<number | null>(null);
-  // Run C is optional — null means "hide that column".
-  const [cId, setCId] = useState<number | null>(null);
+  const search = useSearch();
+  const [location, navigate] = useLocation();
 
-  // Default to the three most recent sourcing runs (or two if only two exist),
-  // but only after the data arrives. Don't lock the user out of deselecting
-  // later.
+  const parseRunId = (raw: string | null): number | null => {
+    if (raw == null) return null;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const params = useMemo(() => new URLSearchParams(search), [search]);
+  const urlAId = parseRunId(params.get("compareA"));
+  const urlBId = parseRunId(params.get("compareB"));
+  // Run C is optional — null means "hide that column".
+  const urlCId = parseRunId(params.get("compareC"));
+
+  const updateCompareParams = (
+    nextA: number | null,
+    nextB: number | null,
+    nextC: number | null,
+  ) => {
+    const parsed = new URLSearchParams(search);
+    if (nextA != null) parsed.set("compareA", String(nextA));
+    else parsed.delete("compareA");
+    if (nextB != null) parsed.set("compareB", String(nextB));
+    else parsed.delete("compareB");
+    if (nextC != null) parsed.set("compareC", String(nextC));
+    else parsed.delete("compareC");
+    const qs = parsed.toString();
+    navigate(`${location}${qs ? `?${qs}` : ""}`, { replace: true });
+  };
+
+  // Default to the three most recent sourcing runs (or two if only two
+  // exist) when the URL doesn't already pin a valid A/B selection. Also
+  // normalises stale/invalid IDs in the URL (e.g. shared link points at a
+  // deleted run) so the panel never gets stuck blank. Run C stays null
+  // unless the URL explicitly opts in or there are 3+ runs available.
   useEffect(() => {
     if (sourcingRuns.length < 2) return;
-    setAId((prev) => prev ?? sourcingRuns[0].id);
-    setBId((prev) => prev ?? sourcingRuns[1].id);
-    if (sourcingRuns.length >= 3) {
-      setCId((prev) => prev ?? sourcingRuns[2].id);
+    const validIds = new Set(sourcingRuns.map((r) => r.id));
+    const validA = urlAId != null && validIds.has(urlAId) ? urlAId : null;
+    const validB = urlBId != null && validIds.has(urlBId) ? urlBId : null;
+    const validC = urlCId != null && validIds.has(urlCId) ? urlCId : null;
+    // If A and B are already a valid pair, leave C untouched (whether the
+    // URL set it or the user deselected it).
+    if (validA != null && validB != null && validA !== validB) {
+      if (validC !== urlCId || validA !== urlAId || validB !== urlBId) {
+        updateCompareParams(validA, validB, validC);
+      }
+      return;
     }
+    const fallbackA = validA ?? sourcingRuns[0].id;
+    const fallbackB =
+      validB ?? (sourcingRuns[1].id !== fallbackA ? sourcingRuns[1].id : sourcingRuns[0].id);
+    // Only auto-fill C when the URL hasn't been touched at all (no
+    // compareA / compareB / compareC present) and there are 3+ runs.
+    const urlUntouched = urlAId == null && urlBId == null && urlCId == null;
+    const fallbackC =
+      validC ??
+      (urlUntouched && sourcingRuns.length >= 3
+        ? sourcingRuns[2].id
+        : null);
+    if (
+      fallbackA !== urlAId ||
+      fallbackB !== urlBId ||
+      fallbackC !== urlCId
+    ) {
+      updateCompareParams(fallbackA, fallbackB, fallbackC);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourcingRuns]);
 
   if (sourcingRuns.length < 2) return null;
+
+  const aId = urlAId;
+  const bId = urlBId;
+  const cId = urlCId;
+  const setAId = (next: number | null) => updateCompareParams(next, bId, cId);
+  const setBId = (next: number | null) => updateCompareParams(aId, next, cId);
+  const setCId = (next: number | null) => updateCompareParams(aId, bId, next);
 
   const runA = sourcingRuns.find((r) => r.id === aId) ?? null;
   const runB = sourcingRuns.find((r) => r.id === bId) ?? null;
