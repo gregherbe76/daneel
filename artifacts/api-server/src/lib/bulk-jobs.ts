@@ -541,3 +541,21 @@ export function stopBulkJobsWorker(): void {
     timer = undefined;
   }
 }
+
+/**
+ * Internal helpers exposed for unit tests in `bulk-jobs.test.ts`. Not part of
+ * the runtime API; do not import from production code.
+ */
+export const __testInternals = {
+  processChunk,
+  runJob,
+  CHUNK_SIZE,
+  resetWorkerState() {
+    stopped = false;
+    running = false;
+    if (timer) {
+      clearTimeout(timer);
+      timer = undefined;
+    }
+  },
+};
