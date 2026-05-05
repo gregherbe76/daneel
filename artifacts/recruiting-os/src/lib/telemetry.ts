@@ -1,7 +1,7 @@
 // Opt-in PostHog telemetry wrapper.
 //
 // IMPORTANT — DO NOT EXTEND THE EVENT PAYLOAD SHAPE.
-// Only the five events declared in `TelemetryEvent` are allowed, and only the
+// Only the six events declared in `TelemetryEvent` are allowed, and only the
 // fields declared in `TelemetryProps` may be sent. No candidate data, no JD
 // content, no email, no name, no free-text. If you need a new event, update
 // /docs/TELEMETRY.md first and add it explicitly to the union below.
@@ -13,7 +13,8 @@ export type TelemetryEvent =
   | "workflow_completed"
   | "provider_card_viewed"
   | "provider_connect_clicked"
-  | "provider_connected";
+  | "provider_connected"
+  | "providers_marketplace_opened";
 
 export interface TelemetryProps {
   provider?: string;
@@ -137,7 +138,7 @@ export function setConsent(granted: boolean): void {
 }
 
 /**
- * Emits one of the five allow-listed events. No-ops in dev, without consent,
+ * Emits one of the six allow-listed events. No-ops in dev, without consent,
  * without a configured key, or before initialization.
  *
  * DO NOT pass fields outside `TelemetryProps` — see the comment at the top of

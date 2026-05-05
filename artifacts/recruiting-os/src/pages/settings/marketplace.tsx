@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   useListProviders,
@@ -32,6 +32,7 @@ import {
   type StubProvider,
 } from "./marketplace/catalog";
 import { CheckCircle2, Loader2, Sparkles, AlertTriangle, KeyRound } from "lucide-react";
+import { track as trackTelemetry } from "@/lib/telemetry";
 
 type ProviderRecord = {
   id: number;
@@ -452,6 +453,12 @@ export default function MarketplacePage() {
   const [activeCategory, setActiveCategory] = useState<ProviderCategory | "all">("all");
   const [stubOpen, setStubOpen] = useState<StubProvider | null>(null);
   const [connectOpen, setConnectOpen] = useState<ConnectProvider | null>(null);
+
+  // Fire `providers_marketplace_opened` once per visit to the marketplace
+  // screen (one event per mount, not per re-render or category switch).
+  useEffect(() => {
+    trackTelemetry("providers_marketplace_opened");
+  }, []);
 
   const providersTyped = providers as ProviderRecord[];
   const visible =

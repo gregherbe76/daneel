@@ -7,12 +7,13 @@ consent banner (or flips the toggle in Settings → Telemetry).
 
 ## What we collect
 
-Exactly five events. Nothing else is sent.
+Exactly six events. Nothing else is sent.
 
 | Event | When it fires | Fields |
 |---|---|---|
 | `workflow_started` | A workflow run is triggered from the UI | `workflow_step?`, `timestamp`, anonymous `distinct_id` |
 | `workflow_completed` | A previously started workflow run is observed as completed | `workflow_step?`, `timestamp`, anonymous `distinct_id` |
+| `providers_marketplace_opened` | The provider marketplace screen is opened (once per visit / mount of `/settings/marketplace`, which `/settings/providers` redirects to) | `timestamp`, anonymous `distinct_id` |
 | `provider_card_viewed` | A provider card becomes visible on the providers screen | `provider`, `timestamp`, anonymous `distinct_id` |
 | `provider_connect_clicked` | The "Test Connection" / connect CTA is clicked on a provider card | `provider`, `timestamp`, anonymous `distinct_id` |
 | `provider_connected` | A connection attempt succeeds | `provider`, `timestamp`, anonymous `distinct_id` |
@@ -73,7 +74,8 @@ telemetry is **fully disabled** regardless of consent state:
    (or whatever `VITE_POSTHOG_HOST` is set to).
 4. Click **Yes** on the consent banner. The PostHog SDK is fetched and an
    `/e/` capture request appears.
-5. Trigger a workflow or visit `/settings/providers`. You should see the
+5. Trigger a workflow or visit `/settings/marketplace` (the legacy
+   `/settings/providers` URL redirects here). You should see the
    matching event in the network tab.
 6. Go to **Settings → Telemetry**, turn the toggle off. No further `/e/`
    requests should be sent.
