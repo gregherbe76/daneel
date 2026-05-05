@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   getBulkCandidateJob,
   listActiveBulkCandidateJobs,
+  cancelBulkCandidateJob,
   type BulkCandidateJob,
   getListCandidatesQueryKey,
   getListApplicationsQueryKey,
@@ -10,7 +11,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, X, Download, AlertCircle } from "lucide-react";
+import { Loader2, X, Download, AlertCircle, Ban } from "lucide-react";
 
 /**
  * Bulk-action background jobs survive a browser refresh because the server
@@ -155,7 +156,12 @@ function useJobPoller(
         const job = await getBulkCandidateJob(id);
         if (cancelled) return;
         onUpdate(job);
-        if (job.status === "completed" || job.status === "failed") return;
+        if (
+          job.status === "completed" ||
+          job.status === "failed" ||
+          job.status === "canceled"
+        )
+          return;
       } catch {
         // Network blip — try again next tick.
       }
@@ -173,12 +179,35 @@ function TrackedJobCard({ id }: { id: number }) {
   const queryClient = useQueryClient();
   const [job, setJob] = useState<BulkCandidateJob | null>(null);
   const [finalized, setFinalized] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   useJobPoller(id, setJob);
 
+  const onCancelClick = async () => {
+    if (!job || cancelling) return;
+    setCancelling(true);
+    try {
+      const updated = await cancelBulkCandidateJob(job.id);
+      setJob(updated);
+    } catch {
+      toast({
+        title: "Could not cancel job",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   useEffect(() => {
     if (!job || finalized) return;
-    if (job.status !== "completed" && job.status !== "failed") return;
+    if (
+      job.status !== "completed" &&
+      job.status !== "failed" &&
+      job.status !== "canceled"
+    )
+      return;
     setFinalized(true);
 
     const alreadyShown = state.completedShown.includes(job.id);
@@ -190,6 +219,19 @@ function TrackedJobCard({ id }: { id: number }) {
           title: `${actionLabel(job.action)} failed`,
           description: job.errorMessage ?? "Please try again.",
           variant: "destructive",
+        });
+      }
+      return;
+    }
+
+    if (job.status === "canceled") {
+      if (!alreadyShown) {
+        toast({
+          title: `${actionLabel(job.action)} canceled`,
+          description:
+            job.processed + job.skipped > 0
+              ? `Stopped after ${job.processed} processed${job.skipped > 0 ? `, ${job.skipped} skipped` : ""}.`
+              : "No items were processed.",
         });
       }
       return;
@@ -225,7 +267,11 @@ function TrackedJobCard({ id }: { id: number }) {
   }, [job, finalized, queryClient]);
 
   if (!job) return null;
-  if (job.status === "completed" || job.status === "failed") {
+  if (
+    job.status === "completed" ||
+    job.status === "failed" ||
+    job.status === "canceled"
+  ) {
     // Auto-dismiss after the toast fires; the close button below also works.
     return (
       <div
@@ -234,6 +280,8 @@ function TrackedJobCard({ id }: { id: number }) {
       >
         {job.status === "failed" ? (
           <AlertCircle className="h-4 w-4 text-destructive" />
+        ) : job.status === "canceled" ? (
+          <Ban className="h-4 w-4 text-muted-foreground" />
         ) : job.action === "export-csv" && job.csv ? (
           <Download className="h-4 w-4 text-muted-foreground" />
         ) : null}
@@ -241,7 +289,9 @@ function TrackedJobCard({ id }: { id: number }) {
           <div className="font-medium">
             {job.status === "failed"
               ? `${actionLabel(job.action)} failed`
-              : `${actionLabel(job.action)} — done`}
+              : job.status === "canceled"
+                ? `${actionLabel(job.action)} canceled`
+                : `${actionLabel(job.action)} — done`}
           </div>
           <div className="text-muted-foreground">
             {job.processed} / {job.total}
@@ -299,6 +349,19 @@ function TrackedJobCard({ id }: { id: number }) {
           {job.skipped > 0 ? ` · ${job.skipped} skipped` : ""}
         </span>
         <span>{job.status === "pending" ? "Queued" : "Running"}</span>
+      </div>
+      <div className="mt-2 flex justify-end">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 px-2 text-[11px]"
+          onClick={onCancelClick}
+          disabled={cancelling}
+          data-testid={`bulk-job-cancel-${job.id}`}
+        >
+          <Ban className="mr-1 h-3 w-3" />
+          {cancelling ? "Cancelling…" : "Cancel"}
+        </Button>
       </div>
     </div>
   );

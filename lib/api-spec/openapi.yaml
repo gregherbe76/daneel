@@ -373,6 +373,35 @@ paths:
         "404":
           description: Not found
 
+  /candidates/bulk-jobs/{id}/cancel:
+    post:
+      operationId: cancelBulkCandidateJob
+      tags: [candidates]
+      summary: Cancel a still-running background bulk-action job
+      description: >
+        Flips the job's status to `canceled`. The in-process worker checks the
+        row's status between chunks, so further chunks will not be processed.
+        Whatever the worker had already done (`processed` / `skipped` counts,
+        partial CSV / per-id results) is preserved on the row so the recruiter
+        can see how far the partial run got. Jobs that are already in a
+        terminal state (`completed`, `failed`, `canceled`) are returned
+        unchanged.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Job canceled (or already in a terminal state)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkCandidateJob"
+        "404":
+          description: Not found
+
   /candidates/restore:
     post:
       operationId: restoreCandidateBatch
@@ -1872,7 +1901,7 @@ components:
 
     BulkCandidateJobStatus:
       type: string
-      enum: [pending, running, completed, failed]
+      enum: [pending, running, completed, failed, canceled]
 
     BulkCandidateJob:
       type: object

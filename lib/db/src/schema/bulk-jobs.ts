@@ -25,7 +25,16 @@ export const bulkJobsTable = pgTable("bulk_jobs", {
   processed: integer("processed").notNull().default(0),
   /** Number of ids the worker considered "skipped" (not found, no email, etc.). */
   skipped: integer("skipped").notNull().default(0),
-  /** pending → running → completed | failed | canceled. */
+  /**
+   * pending → running → completed | failed | canceled.
+   *
+   * `canceled` is set when a recruiter clicks "Cancel" on the floating bulk
+   * progress card while the worker is still mid-run. The worker checks the
+   * current row's `status` between chunks and stops scheduling new chunks if
+   * it has flipped to `canceled`. Whatever counts (`processed` / `skipped`)
+   * the worker had accumulated up to that point are preserved so the
+   * recruiter can see exactly how far the partial run got.
+   */
   status: text("status").notNull().default("pending"),
   /**
    * Action-specific result blob, written when the job completes. For

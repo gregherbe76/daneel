@@ -1501,6 +1501,92 @@ export function useGetBulkCandidateJob<
 }
 
 /**
+ * Flips the job's status to `canceled`. The in-process worker checks the row's status between chunks, so further chunks will not be processed. Whatever the worker had already done (`processed` / `skipped` counts, partial CSV / per-id results) is preserved on the row so the recruiter can see how far the partial run got. Jobs that are already in a terminal state (`completed`, `failed`, `canceled`) are returned unchanged.
+
+ * @summary Cancel a still-running background bulk-action job
+ */
+export const getCancelBulkCandidateJobUrl = (id: number) => {
+  return `/api/candidates/bulk-jobs/${id}/cancel`;
+};
+
+export const cancelBulkCandidateJob = async (
+  id: number,
+  options?: RequestInit,
+): Promise<BulkCandidateJob> => {
+  return customFetch<BulkCandidateJob>(getCancelBulkCandidateJobUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getCancelBulkCandidateJobMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelBulkCandidateJob>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof cancelBulkCandidateJob>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["cancelBulkCandidateJob"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof cancelBulkCandidateJob>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return cancelBulkCandidateJob(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CancelBulkCandidateJobMutationResult = NonNullable<
+  Awaited<ReturnType<typeof cancelBulkCandidateJob>>
+>;
+
+export type CancelBulkCandidateJobMutationError = ErrorType<void>;
+
+/**
+ * @summary Cancel a still-running background bulk-action job
+ */
+export const useCancelBulkCandidateJob = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof cancelBulkCandidateJob>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof cancelBulkCandidateJob>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getCancelBulkCandidateJobMutationOptions(options));
+};
+
+/**
  * Backs the "Undo" toast surfaced after a bulk delete. Restores every candidate that was soft-deleted as part of the given `deletionBatchId`, provided they have not yet been hard-deleted by the trash sweeper.
 
  * @summary Restore a soft-deleted batch of candidates

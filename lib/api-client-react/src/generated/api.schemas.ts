@@ -253,6 +253,7 @@ export const BulkCandidateJobStatus = {
   running: "running",
   completed: "completed",
   failed: "failed",
+  canceled: "canceled",
 } as const;
 
 export type BulkCandidateJobPayload = { [key: string]: unknown } | null;

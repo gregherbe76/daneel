@@ -21,6 +21,7 @@ import {
   enqueueBulkJob,
   getBulkJob,
   listActiveBulkJobs,
+  cancelBulkJob,
   type BulkJobAction,
 } from "../lib/bulk-jobs";
 import type { BulkJob } from "@workspace/db";
@@ -66,7 +67,12 @@ function serializeBulkJob(job: BulkJob) {
   return {
     id: job.id,
     action: job.action as BulkJobAction,
-    status: job.status as "pending" | "running" | "completed" | "failed",
+    status: job.status as
+      | "pending"
+      | "running"
+      | "completed"
+      | "failed"
+      | "canceled",
     total: job.total,
     processed: job.processed,
     skipped: job.skipped,
@@ -109,6 +115,18 @@ router.get("/candidates/bulk-jobs", async (_req, res) => {
 router.get("/candidates/bulk-jobs/:id", async (req, res) => {
   const { id } = GetBulkCandidateJobParams.parse({ id: Number(req.params.id) });
   const job = await getBulkJob(id);
+  if (!job) {
+    res.status(404).json({ error: "Bulk job not found" });
+    return;
+  }
+  res.json(serializeBulkJob(job));
+});
+
+router.post("/candidates/bulk-jobs/:id/cancel", async (req, res) => {
+  // Re-using GetBulkCandidateJobParams for the path-id shape — same `{id}`
+  // contract, no need for a parallel zod schema.
+  const { id } = GetBulkCandidateJobParams.parse({ id: Number(req.params.id) });
+  const job = await cancelBulkJob(id);
   if (!job) {
     res.status(404).json({ error: "Bulk job not found" });
     return;

@@ -269,10 +269,58 @@ async function processChunk(job: BulkJob, chunk: number[]): Promise<{
   };
 }
 
+/**
+ * Mark a still-running (or pending) job as canceled. The worker checks the
+ * row's status between chunks, so any chunks that have not yet started will
+ * not be processed. Whatever the worker had already done up to this point
+ * (`processed` / `skipped` counts and any partial CSV / per-id results
+ * persisted on the row) is preserved.
+ *
+ * Already-terminal jobs are returned unchanged — the recruiter cancelling a
+ * run that just completed shouldn't get a confusing error.
+ */
+export async function cancelBulkJob(id: number): Promise<BulkJob | null> {
+  // Atomic guarded transition: only flip non-terminal rows to `canceled`.
+  // Doing this as a single UPDATE prevents a race where the worker finishes
+  // (and writes `completed`/`failed`) between us reading the row and writing
+  // it back — the contract is that a job already in a terminal state is
+  // returned unchanged.
+  const [updated] = await db
+    .update(bulkJobsTable)
+    .set({
+      status: "canceled",
+      finishedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(bulkJobsTable.id, id),
+        inArray(bulkJobsTable.status, ["pending", "running"]),
+      ),
+    )
+    .returning();
+  if (updated) return updated;
+  // Either the row doesn't exist, or it is already terminal — re-read and
+  // return whatever's there (null = 404).
+  return getBulkJob(id);
+}
+
+async function isJobCanceled(id: number): Promise<boolean> {
+  const [row] = await db
+    .select({ status: bulkJobsTable.status })
+    .from(bulkJobsTable)
+    .where(eq(bulkJobsTable.id, id));
+  return row?.status === "canceled";
+}
+
 async function runJob(job: BulkJob): Promise<void> {
-  // Move pending → running and stamp the start time. If we're resuming a job
-  // that was already running before a restart, leave startedAt alone.
-  await db
+  // Atomic pending → running transition. If the recruiter cancelled the job
+  // in the window between us picking it off the queue and writing `running`
+  // here, the guarded UPDATE will affect zero rows and we bail out without
+  // overwriting `canceled`. This is critical for destructive actions (bulk
+  // delete) where silently continuing after a cancel would be a data-loss
+  // event.
+  const claimed = await db
     .update(bulkJobsTable)
     .set({
       status: "running",
@@ -280,7 +328,20 @@ async function runJob(job: BulkJob): Promise<void> {
       updatedAt: new Date(),
       errorMessage: null,
     })
-    .where(eq(bulkJobsTable.id, job.id));
+    .where(
+      and(
+        eq(bulkJobsTable.id, job.id),
+        inArray(bulkJobsTable.status, ["pending", "running"]),
+      ),
+    )
+    .returning({ id: bulkJobsTable.id });
+  if (claimed.length === 0) {
+    logger.info(
+      { jobId: job.id },
+      "Bulk job no longer claimable (canceled before start); skipping",
+    );
+    return;
+  }
 
   let processed = job.processed;
   let skipped = job.skipped;
@@ -299,6 +360,18 @@ async function runJob(job: BulkJob): Promise<void> {
 
   try {
     while (processed + skipped < job.total) {
+      // Cancellation check between chunks: a recruiter clicking "Cancel" on
+      // the floating progress card flips the row's status to `canceled`. We
+      // re-read the status here so the worker stops scheduling new chunks
+      // and leaves the partial counts intact.
+      if (await isJobCanceled(job.id)) {
+        logger.info(
+          { jobId: job.id, processed, skipped, total: job.total },
+          "Bulk job canceled mid-run; stopping further chunks",
+        );
+        return;
+      }
+
       const offset = processed + skipped;
       const chunk = job.ids.slice(offset, offset + CHUNK_SIZE);
       if (chunk.length === 0) break;
@@ -339,6 +412,10 @@ async function runJob(job: BulkJob): Promise<void> {
           ? { results: recheckResults }
           : null;
 
+    // Guard the terminal write with `status='running'` so a recruiter who
+    // cancelled the job mid-chunk (after we'd passed the in-loop check but
+    // before this update lands) doesn't get their `canceled` row overwritten
+    // by `completed`. Same idea for the failure path below.
     await db
       .update(bulkJobsTable)
       .set({
@@ -349,7 +426,12 @@ async function runJob(job: BulkJob): Promise<void> {
         finishedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(bulkJobsTable.id, job.id));
+      .where(
+        and(
+          eq(bulkJobsTable.id, job.id),
+          eq(bulkJobsTable.status, "running"),
+        ),
+      );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error({ jobId: job.id, err: message }, "Bulk job failed");
@@ -363,7 +445,12 @@ async function runJob(job: BulkJob): Promise<void> {
         finishedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(bulkJobsTable.id, job.id));
+      .where(
+        and(
+          eq(bulkJobsTable.id, job.id),
+          eq(bulkJobsTable.status, "running"),
+        ),
+      );
   }
 }
 

@@ -692,7 +692,7 @@ export const EnqueueBulkCandidateJobBody = zod.object({
 export const ListActiveBulkCandidateJobsResponseItem = zod.object({
   id: zod.number(),
   action: zod.enum(["delete", "recheck-email", "move-stage", "export-csv"]),
-  status: zod.enum(["pending", "running", "completed", "failed"]),
+  status: zod.enum(["pending", "running", "completed", "failed", "canceled"]),
   total: zod.number(),
   processed: zod.number(),
   skipped: zod.number(),
@@ -738,7 +738,52 @@ export const GetBulkCandidateJobParams = zod.object({
 export const GetBulkCandidateJobResponse = zod.object({
   id: zod.number(),
   action: zod.enum(["delete", "recheck-email", "move-stage", "export-csv"]),
-  status: zod.enum(["pending", "running", "completed", "failed"]),
+  status: zod.enum(["pending", "running", "completed", "failed", "canceled"]),
+  total: zod.number(),
+  processed: zod.number(),
+  skipped: zod.number(),
+  payload: zod.record(zod.string(), zod.unknown()).nullish(),
+  csv: zod
+    .string()
+    .nullish()
+    .describe("Populated once `action=export-csv` reaches `completed`."),
+  results: zod
+    .array(
+      zod.object({
+        id: zod.number(),
+        status: zod.enum([
+          "valid",
+          "invalid",
+          "risky",
+          "unchecked",
+          "skipped",
+          "error",
+        ]),
+        reason: zod.string().nullish(),
+      }),
+    )
+    .nullish()
+    .describe("Populated once `action=recheck-email` reaches `completed`."),
+  errorMessage: zod.string().nullish(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+  startedAt: zod.coerce.date().nullish(),
+  finishedAt: zod.coerce.date().nullish(),
+});
+
+/**
+ * Flips the job's status to `canceled`. The in-process worker checks the row's status between chunks, so further chunks will not be processed. Whatever the worker had already done (`processed` / `skipped` counts, partial CSV / per-id results) is preserved on the row so the recruiter can see how far the partial run got. Jobs that are already in a terminal state (`completed`, `failed`, `canceled`) are returned unchanged.
+
+ * @summary Cancel a still-running background bulk-action job
+ */
+export const CancelBulkCandidateJobParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const CancelBulkCandidateJobResponse = zod.object({
+  id: zod.number(),
+  action: zod.enum(["delete", "recheck-email", "move-stage", "export-csv"]),
+  status: zod.enum(["pending", "running", "completed", "failed", "canceled"]),
   total: zod.number(),
   processed: zod.number(),
   skipped: zod.number(),
