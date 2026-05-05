@@ -128,6 +128,29 @@ export class ObjectStorageService {
     });
   }
 
+  /**
+   * Best-effort delete of an object-storage entity referenced by a
+   * `/objects/...` path. Returns true if a file was deleted, false if it
+   * didn't exist or the path wasn't an object-entity path. Never throws on
+   * not-found — callers shouldn't have their save fail just because the
+   * old logo was already gone.
+   */
+  async deleteObjectEntity(objectPath: string): Promise<boolean> {
+    if (!objectPath || !objectPath.startsWith("/objects/")) {
+      return false;
+    }
+    try {
+      const file = await this.getObjectEntityFile(objectPath);
+      await file.delete({ ignoreNotFound: true });
+      return true;
+    } catch (err) {
+      if (err instanceof ObjectNotFoundError) {
+        return false;
+      }
+      throw err;
+    }
+  }
+
   async getObjectEntityFile(objectPath: string): Promise<File> {
     if (!objectPath.startsWith("/objects/")) {
       throw new ObjectNotFoundError();

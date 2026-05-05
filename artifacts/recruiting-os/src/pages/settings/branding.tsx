@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { branding as defaultBranding } from "@workspace/branding";
-import { Loader2, Image as ImageIcon, Upload } from "lucide-react";
+import { Loader2, Image as ImageIcon, Upload, Trash2 } from "lucide-react";
 
 const ACCEPTED_LOGO_TYPES = ["image/png", "image/jpeg", "image/svg+xml"];
 const MAX_LOGO_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -241,6 +241,26 @@ export default function BrandingSettingsPage() {
     setter("");
   }
 
+  async function onRemoveLogo() {
+    // Persist a cleared logo immediately. The server deletes the previous
+    // object from storage when it sees logoUrl change to null.
+    try {
+      await update.mutateAsync({ data: { logoUrl: "" } });
+      setLogoUrl("");
+      qc.invalidateQueries({ queryKey: getGetBrandingSettingsQueryKey() });
+      toast({
+        title: "Logo removed",
+        description: "Reports and the app will fall back to the default logo.",
+      });
+    } catch (err) {
+      toast({
+        title: "Failed to remove logo",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }
+
   async function onLogoFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     // Reset the input so the same file can be re-picked after an error.
@@ -446,9 +466,21 @@ export default function BrandingSettingsPage() {
                     <ImageIcon className="h-5 w-5" />
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="flex-1 text-xs text-muted-foreground">
                   Preview — this is what your PDF report cover will load.
                 </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-remove-logo"
+                  disabled={update.isPending || isUploading}
+                  onClick={onRemoveLogo}
+                  className="gap-1.5"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Remove logo
+                </Button>
               </div>
             )}
           </div>

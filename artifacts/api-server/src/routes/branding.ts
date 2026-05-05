@@ -4,6 +4,9 @@ import { eq } from "drizzle-orm";
 import { branding as defaultBranding } from "@workspace/branding";
 import { UpdateBrandingSettingsBody } from "@workspace/api-zod";
 import { assertSafeLogoUrlShape, UrlNotAllowedError } from "../lib/safe-fetch";
+import { ObjectStorageService } from "../lib/objectStorage";
+
+const objectStorageService = new ObjectStorageService();
 
 const router = Router();
 
@@ -97,6 +100,24 @@ router.put("/branding", async (req, res) => {
       "colorAccent",
     ] as const) {
       if (values[k] !== undefined) update[k] = values[k];
+    }
+    // If the logo is being changed (replaced with a new one or cleared) and
+    // the previous value pointed at an object-storage entity we own, delete
+    // the old file so storage doesn't accumulate orphaned uploads.
+    if (
+      values.logoUrl !== undefined &&
+      typeof existing.logoUrl === "string" &&
+      existing.logoUrl.startsWith("/objects/") &&
+      existing.logoUrl !== values.logoUrl
+    ) {
+      try {
+        await objectStorageService.deleteObjectEntity(existing.logoUrl);
+      } catch (err) {
+        req.log.warn(
+          { err, prevLogoUrl: existing.logoUrl },
+          "Failed to delete previous logo from object storage",
+        );
+      }
     }
     await db
       .update(brandingSettingsTable)
