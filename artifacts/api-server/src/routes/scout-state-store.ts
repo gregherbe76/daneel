@@ -15,6 +15,17 @@ import { db, scoutConnectStatesTable } from "@workspace/db";
 const STATE_TTL_MS = 10 * 60 * 1000;
 const REPLAY_KEEP_MS = 60 * 1000;
 
+/**
+ * Per-state options captured at issuance time and surfaced back to the
+ * callback handler. Currently only carries the recruiter's auto-assign
+ * preference (toggleable from the marketplace card before they click
+ * "Connect Scout"), but kept as an open shape so future preferences
+ * (e.g. opt-in flags for additional steps) can ride along.
+ */
+export type ScoutStateOptions = {
+  autoAssignSteps?: boolean;
+};
+
 async function cleanup(now: number): Promise<void> {
   const expiredCutoff = new Date(now - STATE_TTL_MS);
   const usedCutoff = new Date(now - REPLAY_KEEP_MS);
@@ -31,16 +42,18 @@ async function cleanup(now: number): Promise<void> {
     );
 }
 
-export async function issueScoutState(): Promise<string> {
+export async function issueScoutState(
+  options: ScoutStateOptions = {},
+): Promise<string> {
   const now = Date.now();
   await cleanup(now);
   const state = randomBytes(32).toString("hex");
-  await db.insert(scoutConnectStatesTable).values({ state });
+  await db.insert(scoutConnectStatesTable).values({ state, options });
   return state;
 }
 
 export type ConsumeResult =
-  | { ok: true }
+  | { ok: true; options: ScoutStateOptions }
   | { ok: false; reason: "missing" | "expired" | "replayed" };
 
 export async function consumeScoutState(state: string): Promise<ConsumeResult> {
@@ -74,7 +87,7 @@ export async function consumeScoutState(state: string): Promise<ConsumeResult> {
     )
     .returning({ state: scoutConnectStatesTable.state });
   if (updated.length === 0) return { ok: false, reason: "replayed" };
-  return { ok: true };
+  return { ok: true, options: entry.options ?? {} };
 }
 
 /** Test-only: wipe the store between cases. */

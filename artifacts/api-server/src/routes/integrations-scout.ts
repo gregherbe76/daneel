@@ -72,16 +72,37 @@ export async function exchangeScoutToken(
 }
 
 /**
+ * Workflow steps the Scout integration is currently capable of powering.
+ * Surfaced to the marketplace card on the frontend (so recruiters can see
+ * what will be wired up before they click Connect) and to the auto-assign
+ * logic below. Keep in sync with the marketplace card metadata in
+ * `artifacts/recruiting-os/src/pages/settings/providers.tsx`.
+ */
+export const SCOUT_POWERED_STEPS = ["sourcing"] as const;
+export type ScoutPoweredStep = (typeof SCOUT_POWERED_STEPS)[number];
+
+/**
  * Create or update the "A-Player Scout" provider row with the freshly-exchanged
- * credentials, then auto-assign it to the `sourcing` workflow step **only when
- * no sourcing provider is configured yet** — pre-existing assignments are left
- * untouched so a recruiter who already wired up another provider isn't
- * silently overridden.
+ * credentials, then (when `autoAssign` is true and no provider is yet wired
+ * for a step Scout can power) assign Scout to that step. Pre-existing
+ * assignments are left untouched so a recruiter who already wired up another
+ * provider isn't silently overridden.
+ *
+ * Returns the list of workflow steps Scout was actually wired to during this
+ * call so the callback page can surface "Wired up: Sourcing" in the post-
+ * connect toast.
  */
 export async function persistScoutProvider(
   baseUrl: string,
   apiKey: string,
-): Promise<{ providerId: number; assignedSourcing: boolean }> {
+  opts: { autoAssign?: boolean } = {},
+): Promise<{
+  providerId: number;
+  assignedSteps: ScoutPoweredStep[];
+  /** @deprecated Use `assignedSteps.includes("sourcing")` instead. */
+  assignedSourcing: boolean;
+}> {
+  const autoAssign = opts.autoAssign ?? true;
   const existing = await db
     .select()
     .from(agentProvidersTable)
@@ -118,23 +139,30 @@ export async function persistScoutProvider(
     providerId = created!.id;
   }
 
-  const sourcing = await db
-    .select()
-    .from(workflowProviderSettingsTable)
-    .where(eq(workflowProviderSettingsTable.workflowStep, "sourcing"))
-    .limit(1);
-
-  let assignedSourcing = false;
-  if (sourcing.length === 0) {
-    await db.insert(workflowProviderSettingsTable).values({
-      workflowStep: "sourcing",
-      providerId,
-      enabled: true,
-    });
-    assignedSourcing = true;
+  const assignedSteps: ScoutPoweredStep[] = [];
+  if (autoAssign) {
+    for (const step of SCOUT_POWERED_STEPS) {
+      const existingForStep = await db
+        .select()
+        .from(workflowProviderSettingsTable)
+        .where(eq(workflowProviderSettingsTable.workflowStep, step))
+        .limit(1);
+      if (existingForStep.length === 0) {
+        await db.insert(workflowProviderSettingsTable).values({
+          workflowStep: step,
+          providerId,
+          enabled: true,
+        });
+        assignedSteps.push(step);
+      }
+    }
   }
 
-  return { providerId, assignedSourcing };
+  return {
+    providerId,
+    assignedSteps,
+    assignedSourcing: assignedSteps.includes("sourcing"),
+  };
 }
 
 function escapeHtml(s: string): string {
@@ -153,6 +181,7 @@ function escapeHtml(s: string): string {
 function renderCallbackHtml(payload: {
   ok: boolean;
   error?: string | null;
+  assignedSteps?: ScoutPoweredStep[];
 }): string {
   const message = payload.ok
     ? "You're connected to A-Player Scout. You can close this tab."
@@ -161,6 +190,7 @@ function renderCallbackHtml(payload: {
   const inline = JSON.stringify({
     ok: payload.ok,
     error: payload.error ?? null,
+    assignedSteps: payload.assignedSteps ?? [],
   });
   return `<!doctype html>
 <html lang="en"><head>
@@ -208,6 +238,13 @@ const router = Router();
  * frontend should `window.open()`. The frontend never assembles this URL
  * itself so we can keep base-URL configuration entirely server-side.
  */
+const StateRequestBodySchema = z
+  .object({
+    autoAssignSteps: z.boolean().optional(),
+  })
+  .partial()
+  .optional();
+
 router.post("/integrations/scout/state", async (req, res) => {
   const proto = (req.get("x-forwarded-proto") ?? req.protocol) as string;
   const host = req.get("host");
@@ -215,8 +252,15 @@ router.post("/integrations/scout/state", async (req, res) => {
     res.status(500).json({ error: "Cannot resolve callback host" });
     return;
   }
+  const parsedBody = StateRequestBodySchema.safeParse(req.body);
+  // Default to auto-assigning when the recruiter didn't say otherwise so the
+  // existing zero-config flow keeps working.
+  const autoAssignSteps =
+    parsedBody.success && parsedBody.data?.autoAssignSteps === false
+      ? false
+      : true;
   const callbackUrl = `${proto}://${host}/api/integrations/scout/callback`;
-  const state = await issueScoutState();
+  const state = await issueScoutState({ autoAssignSteps });
   const connectBase = scoutBaseUrl().replace(/\/$/, "");
   const connectUrl =
     `${connectBase}/connect?return_to=${encodeURIComponent(callbackUrl)}` +
@@ -268,8 +312,13 @@ router.get("/integrations/scout/callback", async (req, res) => {
   }
   try {
     const creds = await exchangeScoutToken(token);
-    await persistScoutProvider(creds.baseUrl, creds.apiKey);
-    res.status(200).send(renderCallbackHtml({ ok: true }));
+    const autoAssign = stateCheck.options.autoAssignSteps !== false;
+    const { assignedSteps } = await persistScoutProvider(
+      creds.baseUrl,
+      creds.apiKey,
+      { autoAssign },
+    );
+    res.status(200).send(renderCallbackHtml({ ok: true, assignedSteps }));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error({ err }, "Scout callback exchange/persist failed");

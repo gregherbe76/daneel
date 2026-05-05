@@ -1028,11 +1028,25 @@ function ProviderDialog({
 
 const SCOUT_PROVIDER_NAME = "A-Player Scout";
 
+/**
+ * Workflow steps each first-party marketplace integration is currently capable
+ * of powering. Surfaced on the marketplace card so recruiters can see what
+ * will be wired up before clicking Connect, and used to drive the auto-assign
+ * opt-out toggle. Server-side mirror lives at
+ * `artifacts/api-server/src/routes/integrations-scout.ts:SCOUT_POWERED_STEPS`.
+ */
+const SCOUT_POWERED_STEPS: WorkflowStep[] = ["sourcing"];
+
+function stepLabel(step: WorkflowStep): string {
+  return WORKFLOW_STEPS.find((s) => s.key === step)?.label ?? step;
+}
+
 function ScoutMarketplaceCard({ providers }: { providers: Provider[] }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [waiting, setWaiting] = useState(false);
+  const [autoAssign, setAutoAssign] = useState(true);
   const issueState = useIssueScoutConnectState();
   const disconnect = useDisconnectScout();
   const testConn = useTestProviderConnection();
@@ -1077,14 +1091,25 @@ function ScoutMarketplaceCard({ providers }: { providers: Provider[] }) {
   // three and dedupe by simply re-fetching the providers list on any signal.
   useEffect(() => {
     if (!waiting) return;
-    function onSuccess(payload: { ok: boolean; error?: string | null }) {
+    function onSuccess(payload: {
+      ok: boolean;
+      error?: string | null;
+      assignedSteps?: string[];
+    }) {
       setWaiting(false);
       qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
       qc.invalidateQueries({ queryKey: getListProviderStepSettingsQueryKey() });
       if (payload.ok) {
+        const steps = (payload.assignedSteps ?? []).filter(
+          (s): s is WorkflowStep => SCOUT_POWERED_STEPS.includes(s as WorkflowStep),
+        );
+        const description =
+          steps.length > 0
+            ? `Wired up: ${steps.map(stepLabel).join(", ")}.`
+            : "No workflow steps were auto-assigned. Wire Scout up from Workflow Step Assignments below.";
         toast({
           title: "Connected to A-Player Scout",
-          description: "Scout is now wired up as a sourcing provider.",
+          description,
         });
       } else {
         toast({
@@ -1111,10 +1136,19 @@ function ScoutMarketplaceCard({ providers }: { providers: Provider[] }) {
     }
     function onMessage(e: MessageEvent) {
       const data = e.data as
-        | { source?: string; ok?: boolean; error?: string | null }
+        | {
+            source?: string;
+            ok?: boolean;
+            error?: string | null;
+            assignedSteps?: string[];
+          }
         | undefined;
       if (!data || data.source !== "daneel-scout-connect") return;
-      onSuccess({ ok: !!data.ok, error: data.error ?? null });
+      onSuccess({
+        ok: !!data.ok,
+        error: data.error ?? null,
+        assignedSteps: data.assignedSteps ?? [],
+      });
     }
     window.addEventListener("storage", onStorage);
     window.addEventListener("message", onMessage);
@@ -1127,7 +1161,9 @@ function ScoutMarketplaceCard({ providers }: { providers: Provider[] }) {
 
   async function handleConnect() {
     try {
-      const res = (await issueState.mutateAsync()) as {
+      const res = (await issueState.mutateAsync({
+        data: { autoAssignSteps: autoAssign },
+      })) as {
         connectUrl: string;
         state: string;
       };
@@ -1173,7 +1209,6 @@ function ScoutMarketplaceCard({ providers }: { providers: Provider[] }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-foreground">A-Player Scout</span>
-            <Badge variant="secondary" className="text-xs">Sourcing</Badge>
             {connected ? (
               <Badge variant="outline" className="text-xs gap-1 border-green-500/40 text-green-700">
                 <CheckCircle className="h-3 w-3" />
@@ -1199,6 +1234,32 @@ function ScoutMarketplaceCard({ providers }: { providers: Provider[] }) {
             JD-driven candidate sourcing. Connect once and Scout becomes your
             sourcing step — no API key paste required.
           </p>
+          <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-muted-foreground">
+              {connected ? "Powers" : "Will power"}:
+            </span>
+            {SCOUT_POWERED_STEPS.map((step) => (
+              <Badge key={step} variant="secondary" className="text-xs">
+                {stepLabel(step)}
+              </Badge>
+            ))}
+          </div>
+          {!connected && (
+            <label className="mt-3 flex items-start gap-2 text-xs cursor-pointer select-none">
+              <Switch
+                checked={autoAssign}
+                onCheckedChange={setAutoAssign}
+                disabled={issueState.isPending || waiting}
+                aria-label="Auto-assign workflow steps when connecting"
+              />
+              <span className="text-muted-foreground leading-tight">
+                Auto-assign these workflow steps on connect.{" "}
+                <span className="text-foreground/70">
+                  Steps already wired to another provider stay untouched.
+                </span>
+              </span>
+            </label>
+          )}
           {waiting && (
             <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
               <Loader2 className="h-3 w-3 animate-spin" />

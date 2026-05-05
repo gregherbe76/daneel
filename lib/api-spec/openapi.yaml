@@ -1026,6 +1026,14 @@ paths:
         Returns a one-time CSRF `state` token plus the absolute Scout Connect
         URL the frontend should open in a new tab. The state expires after
         ~10 minutes and can only be consumed once by the callback handler.
+        The optional request body lets the recruiter opt out of auto-wiring
+        Scout into the workflow steps it can power; defaults to opting in.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueScoutConnectStateBody"
       responses:
         "200":
           description: State minted
@@ -2787,6 +2795,21 @@ components:
         deliberationId:
           type: integer
       required: [error, code, deliberationId]
+
+    IssueScoutConnectStateBody:
+      type: object
+      description: >
+        Optional preferences captured at state-issuance time and surfaced back
+        to the callback handler when Scout redirects the recruiter back.
+      properties:
+        autoAssignSteps:
+          type: boolean
+          description: >
+            When true (default), the callback handler will wire Scout into
+            any workflow steps it can power that do not yet have a provider
+            assigned. When false, the recruiter must wire Scout up manually
+            from the Workflow Step Assignments table.
+      required: []
 
     ScoutConnectStateResponse:
       type: object

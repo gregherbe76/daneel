@@ -2767,10 +2767,23 @@ export const ListCandidateDeliberationsResponse = zod.array(
 );
 
 /**
- * Returns a one-time CSRF `state` token plus the absolute Scout Connect URL the frontend should open in a new tab. The state expires after ~10 minutes and can only be consumed once by the callback handler.
+ * Returns a one-time CSRF `state` token plus the absolute Scout Connect URL the frontend should open in a new tab. The state expires after ~10 minutes and can only be consumed once by the callback handler. The optional request body lets the recruiter opt out of auto-wiring Scout into the workflow steps it can power; defaults to opting in.
 
  * @summary Mint a single-use CSRF state for the Scout Connect redirect flow
  */
+export const IssueScoutConnectStateBody = zod
+  .object({
+    autoAssignSteps: zod
+      .boolean()
+      .optional()
+      .describe(
+        "When true (default), the callback handler will wire Scout into any workflow steps it can power that do not yet have a provider assigned. When false, the recruiter must wire Scout up manually from the Workflow Step Assignments table.\n",
+      ),
+  })
+  .describe(
+    "Optional preferences captured at state-issuance time and surfaced back to the callback handler when Scout redirects the recruiter back.\n",
+  );
+
 export const IssueScoutConnectStateResponse = zod
   .object({
     state: zod

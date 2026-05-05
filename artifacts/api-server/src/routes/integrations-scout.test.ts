@@ -108,10 +108,18 @@ describe("scout state store", () => {
 
   it("consumes a fresh state once and rejects replays", async () => {
     const s = await issueScoutState();
-    expect(await consumeScoutState(s)).toEqual({ ok: true });
+    expect(await consumeScoutState(s)).toEqual({ ok: true, options: {} });
     expect(await consumeScoutState(s)).toEqual({
       ok: false,
       reason: "replayed",
+    });
+  });
+
+  it("round-trips per-state options to the consumer", async () => {
+    const s = await issueScoutState({ autoAssignSteps: false });
+    expect(await consumeScoutState(s)).toEqual({
+      ok: true,
+      options: { autoAssignSteps: false },
     });
   });
 
@@ -138,7 +146,7 @@ describe("scout state store", () => {
     // reload's consume call would have returned `missing`.
     vi.resetModules();
     const fresh = await import("./scout-state-store");
-    expect(await fresh.consumeScoutState(s)).toEqual({ ok: true });
+    expect(await fresh.consumeScoutState(s)).toEqual({ ok: true, options: {} });
     // And replay protection still works against the re-imported module too.
     expect(await fresh.consumeScoutState(s)).toEqual({
       ok: false,
@@ -169,6 +177,63 @@ describe("POST /api/integrations/scout/state", () => {
     expect(res.body.connectUrl).toMatch(
       /^https:\/\/staging\.scout\.example\.com\/connect\?/,
     );
+  });
+
+  it("captures autoAssignSteps=false from the request body and threads it to the callback", async () => {
+    const issued = await call("POST", "/api/integrations/scout/state", {
+      autoAssignSteps: false,
+    });
+    expect(issued.status).toBe(200);
+    const state = issued.body.state as string;
+
+    _setScoutFetchForTest(async () =>
+      new Response(
+        JSON.stringify({
+          apiKey: "k",
+          baseUrl: "https://twin.example.com",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const cb = await call(
+      "GET",
+      `/api/integrations/scout/callback?token=tok&state=${state}`,
+    );
+    expect(cb.status).toBe(200);
+    // Auto-assign was opted out, so no sourcing assignment should exist.
+    const settings = await db
+      .select()
+      .from(workflowProviderSettingsTable)
+      .where(eq(workflowProviderSettingsTable.workflowStep, "sourcing"));
+    expect(settings).toHaveLength(0);
+    // And the callback HTML carries an empty assignedSteps payload.
+    expect(cb.text).toMatch(/"assignedSteps":\s*\[\]/);
+  });
+
+  it("auto-assigns when no autoAssign preference is sent and surfaces assignedSteps in the callback HTML", async () => {
+    const issued = await call("POST", "/api/integrations/scout/state");
+    const state = issued.body.state as string;
+
+    _setScoutFetchForTest(async () =>
+      new Response(
+        JSON.stringify({
+          apiKey: "k",
+          baseUrl: "https://twin.example.com",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const cb = await call(
+      "GET",
+      `/api/integrations/scout/callback?token=tok&state=${state}`,
+    );
+    expect(cb.status).toBe(200);
+    expect(cb.text).toContain('"assignedSteps":["sourcing"]');
+    const [setting] = await db
+      .select()
+      .from(workflowProviderSettingsTable)
+      .where(eq(workflowProviderSettingsTable.workflowStep, "sourcing"));
+    expect(setting).toBeDefined();
   });
 });
 
@@ -224,7 +289,7 @@ describe("GET /api/integrations/scout/callback", () => {
 
   it("rejects a replayed state", async () => {
     const state = await issueScoutState();
-    expect(await consumeScoutState(state)).toEqual({ ok: true }); // first use
+    expect(await consumeScoutState(state)).toEqual({ ok: true, options: {} }); // first use
     const res = await call(
       "GET",
       `/api/integrations/scout/callback?token=tok&state=${state}`,
@@ -360,11 +425,27 @@ describe("persistScoutProvider auto-assigns sourcing", () => {
   it("auto-assigns sourcing when no setting exists", async () => {
     const result = await persistScoutProvider("https://twin.example.com", "k");
     expect(result.assignedSourcing).toBe(true);
+    expect(result.assignedSteps).toEqual(["sourcing"]);
     const [setting] = await db
       .select()
       .from(workflowProviderSettingsTable)
       .where(eq(workflowProviderSettingsTable.workflowStep, "sourcing"));
     expect(setting?.providerId).toBe(result.providerId);
+  });
+
+  it("respects autoAssign=false and skips wiring sourcing", async () => {
+    const result = await persistScoutProvider(
+      "https://twin.example.com",
+      "k",
+      { autoAssign: false },
+    );
+    expect(result.assignedSteps).toEqual([]);
+    expect(result.assignedSourcing).toBe(false);
+    const settings = await db
+      .select()
+      .from(workflowProviderSettingsTable)
+      .where(eq(workflowProviderSettingsTable.workflowStep, "sourcing"));
+    expect(settings).toHaveLength(0);
   });
 
   it("does NOT touch sourcing when a setting already exists", async () => {

@@ -700,6 +700,16 @@ export interface DeliberationQuotaError {
 }
 
 /**
+ * Optional preferences captured at state-issuance time and surfaced back to the callback handler when Scout redirects the recruiter back.
+
+ */
+export interface IssueScoutConnectStateBody {
+  /** When true (default), the callback handler will wire Scout into any workflow steps it can power that do not yet have a provider assigned. When false, the recruiter must wire Scout up manually from the Workflow Step Assignments table.
+   */
+  autoAssignSteps?: boolean;
+}
+
+/**
  * Response from the Scout Connect state-issuance endpoint.
  */
 export interface ScoutConnectStateResponse {

@@ -52,6 +52,7 @@ import type {
   HiringReport,
   ImproveAndRerunBody,
   ImproveAndRerunResult,
+  IssueScoutConnectStateBody,
   Job,
   JobRunSummary,
   JobWorkflowResult,
@@ -4201,7 +4202,7 @@ export function useListCandidateDeliberations<
 }
 
 /**
- * Returns a one-time CSRF `state` token plus the absolute Scout Connect URL the frontend should open in a new tab. The state expires after ~10 minutes and can only be consumed once by the callback handler.
+ * Returns a one-time CSRF `state` token plus the absolute Scout Connect URL the frontend should open in a new tab. The state expires after ~10 minutes and can only be consumed once by the callback handler. The optional request body lets the recruiter opt out of auto-wiring Scout into the workflow steps it can power; defaults to opting in.
 
  * @summary Mint a single-use CSRF state for the Scout Connect redirect flow
  */
@@ -4210,6 +4211,7 @@ export const getIssueScoutConnectStateUrl = () => {
 };
 
 export const issueScoutConnectState = async (
+  issueScoutConnectStateBody?: IssueScoutConnectStateBody,
   options?: RequestInit,
 ): Promise<ScoutConnectStateResponse> => {
   return customFetch<ScoutConnectStateResponse>(
@@ -4217,6 +4219,8 @@ export const issueScoutConnectState = async (
     {
       ...options,
       method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(issueScoutConnectStateBody),
     },
   );
 };
@@ -4228,14 +4232,14 @@ export const getIssueScoutConnectStateMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof issueScoutConnectState>>,
     TError,
-    void,
+    { data: BodyType<IssueScoutConnectStateBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof issueScoutConnectState>>,
   TError,
-  void,
+  { data: BodyType<IssueScoutConnectStateBody> },
   TContext
 > => {
   const mutationKey = ["issueScoutConnectState"];
@@ -4249,9 +4253,11 @@ export const getIssueScoutConnectStateMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof issueScoutConnectState>>,
-    void
-  > = () => {
-    return issueScoutConnectState(requestOptions);
+    { data: BodyType<IssueScoutConnectStateBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return issueScoutConnectState(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -4260,7 +4266,8 @@ export const getIssueScoutConnectStateMutationOptions = <
 export type IssueScoutConnectStateMutationResult = NonNullable<
   Awaited<ReturnType<typeof issueScoutConnectState>>
 >;
-
+export type IssueScoutConnectStateMutationBody =
+  BodyType<IssueScoutConnectStateBody>;
 export type IssueScoutConnectStateMutationError = ErrorType<unknown>;
 
 /**
@@ -4273,14 +4280,14 @@ export const useIssueScoutConnectState = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof issueScoutConnectState>>,
     TError,
-    void,
+    { data: BodyType<IssueScoutConnectStateBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof issueScoutConnectState>>,
   TError,
-  void,
+  { data: BodyType<IssueScoutConnectStateBody> },
   TContext
 > => {
   return useMutation(getIssueScoutConnectStateMutationOptions(options));
