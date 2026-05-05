@@ -4,7 +4,9 @@
 FROM node:20-bookworm-slim AS base
 ENV PNPM_HOME=/root/.local/share/pnpm
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+# Pre-provision the exact pnpm version pinned in the root package.json so the
+# entrypoint never has to fetch pnpm over the network on first boot.
+RUN corepack enable && corepack prepare pnpm@10.26.1 --activate
 WORKDIR /app
 
 FROM base AS builder

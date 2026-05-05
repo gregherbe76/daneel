@@ -63,8 +63,11 @@ services:
         - "node -e \"fetch('http://localhost:3000/api/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""
       interval: 10s
       timeout: 5s
-      retries: 20
-      start_period: 60s
+      retries: 30
+      # First boot has to run drizzle-kit push + idempotent demo seed before
+      # the server starts listening, which can easily take >60s on slower
+      # hosts. Give it room so the api isn't marked unhealthy prematurely.
+      start_period: 180s
 
   web:
     image: ghcr.io/gregherbe76/daneel-web:${IMAGE_TAG:-latest}
