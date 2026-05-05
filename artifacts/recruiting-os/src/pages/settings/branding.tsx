@@ -88,6 +88,87 @@ function ColorField({
   );
 }
 
+/**
+ * Live preview panel that renders sample UI surfaces (CTA button, sidebar
+ * active chip, report cover swatch) using whatever colors the user has typed
+ * — without touching the global CSS variables, so the rest of the app keeps
+ * its currently-saved theme until the user clicks Save.
+ */
+function ColorPreview({
+  primary,
+  accent,
+  productName,
+}: {
+  primary: string;
+  accent: string;
+  productName: string;
+}) {
+  const HEX = /^#[0-9a-fA-F]{6}$/;
+  const primaryHex = HEX.test(primary) ? primary : defaultBranding.colors.primary;
+  const accentHex = HEX.test(accent) ? accent : defaultBranding.colors.accent;
+  return (
+    <div
+      className="rounded-md border border-border bg-muted/30 p-4 space-y-3"
+      data-testid="color-preview"
+    >
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Preview</h2>
+        <span className="text-xs text-muted-foreground">
+          Updates live — click Save to apply across the app.
+        </span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Primary CTA */}
+        <div className="flex flex-col items-start gap-2 rounded border border-border bg-background p-3">
+          <span className="text-xs text-muted-foreground">Primary CTA</span>
+          <button
+            type="button"
+            disabled
+            data-testid="preview-primary-button"
+            style={{ backgroundColor: primaryHex, color: "#ffffff" }}
+            className="rounded px-3 py-1.5 text-sm font-medium shadow-sm"
+          >
+            Create job
+          </button>
+        </div>
+
+        {/* Sidebar accent chip */}
+        <div className="flex flex-col items-start gap-2 rounded border border-border bg-background p-3">
+          <span className="text-xs text-muted-foreground">Sidebar item</span>
+          <div
+            data-testid="preview-accent-chip"
+            style={{ backgroundColor: accentHex, color: "#ffffff" }}
+            className="rounded-md px-3 py-1.5 text-sm font-medium"
+          >
+            Pipeline
+          </div>
+        </div>
+
+        {/* Report cover swatch */}
+        <div className="flex flex-col items-start gap-2 rounded border border-border bg-background p-3">
+          <span className="text-xs text-muted-foreground">Report cover</span>
+          <div
+            data-testid="preview-report-cover"
+            className="w-full rounded border border-border overflow-hidden"
+          >
+            <div
+              style={{ backgroundColor: primaryHex }}
+              className="h-6 w-full"
+            />
+            <div className="px-2 py-1.5">
+              <div className="text-xs font-semibold truncate">{productName}</div>
+              <div
+                style={{ backgroundColor: accentHex }}
+                className="mt-1 h-1 w-10 rounded"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function BrandingSettingsPage() {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -372,26 +453,33 @@ export default function BrandingSettingsPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <ColorField
-              id="colorPrimary"
-              label="Primary color"
-              testId="input-color-primary"
-              helper="Used for primary CTAs, focus rings, and report headings."
-              value={colorPrimary}
-              onChange={setColorPrimary}
-              fallback={defaultBranding.colors.primary}
-              onClear={() => setColorPrimary("")}
-            />
-            <ColorField
-              id="colorAccent"
-              label="Accent color"
-              testId="input-color-accent"
-              helper="Used for the sidebar active item and secondary highlights."
-              value={colorAccent}
-              onChange={setColorAccent}
-              fallback={defaultBranding.colors.accent}
-              onClear={() => setColorAccent("")}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              <ColorField
+                id="colorPrimary"
+                label="Primary color"
+                testId="input-color-primary"
+                helper="Used for primary CTAs, focus rings, and report headings."
+                value={colorPrimary}
+                onChange={setColorPrimary}
+                fallback={defaultBranding.colors.primary}
+                onClear={() => setColorPrimary("")}
+              />
+              <ColorField
+                id="colorAccent"
+                label="Accent color"
+                testId="input-color-accent"
+                helper="Used for the sidebar active item and secondary highlights."
+                value={colorAccent}
+                onChange={setColorAccent}
+                fallback={defaultBranding.colors.accent}
+                onClear={() => setColorAccent("")}
+              />
+            </div>
+            <ColorPreview
+              primary={colorPrimary}
+              accent={colorAccent}
+              productName={productName || defaultBranding.productName}
             />
           </div>
 
