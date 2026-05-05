@@ -82,12 +82,12 @@ async function cleanupScoutProvider(): Promise<void> {
     .where(eq(workflowProviderSettingsTable.workflowStep, "sourcing"));
 }
 
-beforeEach(() => {
-  _resetScoutStateStore();
+beforeEach(async () => {
+  await _resetScoutStateStore();
 });
 
 afterEach(async () => {
-  _resetScoutStateStore();
+  await _resetScoutStateStore();
   _setScoutFetchForTest(null);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -95,30 +95,51 @@ afterEach(async () => {
 });
 
 describe("scout state store", () => {
-  it("issues unique tokens", () => {
-    const a = issueScoutState();
-    const b = issueScoutState();
+  it("issues unique tokens", async () => {
+    const a = await issueScoutState();
+    const b = await issueScoutState();
     expect(a).not.toBe(b);
     expect(a).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("consumes a fresh state once and rejects replays", () => {
-    const s = issueScoutState();
-    expect(consumeScoutState(s)).toEqual({ ok: true });
-    expect(consumeScoutState(s)).toEqual({ ok: false, reason: "replayed" });
+  it("consumes a fresh state once and rejects replays", async () => {
+    const s = await issueScoutState();
+    expect(await consumeScoutState(s)).toEqual({ ok: true });
+    expect(await consumeScoutState(s)).toEqual({
+      ok: false,
+      reason: "replayed",
+    });
   });
 
-  it("rejects unknown states as missing", () => {
-    expect(consumeScoutState("not-a-real-state")).toEqual({
+  it("rejects unknown states as missing", async () => {
+    expect(await consumeScoutState("not-a-real-state")).toEqual({
       ok: false,
       reason: "missing",
     });
   });
 
-  it("rejects expired states", () => {
-    const s = issueScoutState();
-    expect(_ageScoutState(s, 11 * 60 * 1000)).toBe(true);
-    expect(consumeScoutState(s)).toEqual({ ok: false, reason: "expired" });
+  it("rejects expired states", async () => {
+    const s = await issueScoutState();
+    expect(await _ageScoutState(s, 11 * 60 * 1000)).toBe(true);
+    expect(await consumeScoutState(s)).toEqual({
+      ok: false,
+      reason: "expired",
+    });
+  });
+
+  it("survives an API server restart mid-flow (fresh module instance can still consume the state)", async () => {
+    const s = await issueScoutState();
+    // Simulate a process restart by dropping the cached module and re-importing.
+    // With the previous in-memory Map this would have lost the state and the
+    // reload's consume call would have returned `missing`.
+    vi.resetModules();
+    const fresh = await import("./scout-state-store");
+    expect(await fresh.consumeScoutState(s)).toEqual({ ok: true });
+    // And replay protection still works against the re-imported module too.
+    expect(await fresh.consumeScoutState(s)).toEqual({
+      ok: false,
+      reason: "replayed",
+    });
   });
 });
 
@@ -149,7 +170,7 @@ describe("POST /api/integrations/scout/state", () => {
 
 describe("GET /api/integrations/scout/callback", () => {
   it("happy path: exchanges the token and stores the provider", async () => {
-    const state = issueScoutState();
+    const state = await issueScoutState();
     _setScoutFetchForTest(async () =>
       new Response(
         JSON.stringify({
@@ -194,8 +215,8 @@ describe("GET /api/integrations/scout/callback", () => {
   });
 
   it("rejects a replayed state", async () => {
-    const state = issueScoutState();
-    expect(consumeScoutState(state)).toEqual({ ok: true }); // first use
+    const state = await issueScoutState();
+    expect(await consumeScoutState(state)).toEqual({ ok: true }); // first use
     const res = await call(
       "GET",
       `/api/integrations/scout/callback?token=tok&state=${state}`,
@@ -205,8 +226,8 @@ describe("GET /api/integrations/scout/callback", () => {
   });
 
   it("rejects an expired state", async () => {
-    const state = issueScoutState();
-    _ageScoutState(state, 11 * 60 * 1000);
+    const state = await issueScoutState();
+    await _ageScoutState(state, 11 * 60 * 1000);
     const res = await call(
       "GET",
       `/api/integrations/scout/callback?token=tok&state=${state}`,
@@ -225,21 +246,21 @@ describe("GET /api/integrations/scout/callback", () => {
   });
 
   it("retires the state on an error redirect so it cannot be reused", async () => {
-    const state = issueScoutState();
+    const state = await issueScoutState();
     const errRes = await call(
       "GET",
       `/api/integrations/scout/callback?error=user_denied&state=${state}`,
     );
     expect(errRes.status).toBe(400);
     // A second attempt with the same state must now be rejected as replayed.
-    expect(consumeScoutState(state)).toEqual({
+    expect(await consumeScoutState(state)).toEqual({
       ok: false,
       reason: "replayed",
     });
   });
 
   it("returns 502 when the exchange endpoint fails", async () => {
-    const state = issueScoutState();
+    const state = await issueScoutState();
     _setScoutFetchForTest(async () => new Response("nope", { status: 500 }));
     const res = await call(
       "GET",
@@ -255,7 +276,7 @@ describe("GET /api/integrations/scout/callback", () => {
   });
 
   it("returns 502 when the exchange response is malformed", async () => {
-    const state = issueScoutState();
+    const state = await issueScoutState();
     _setScoutFetchForTest(
       async () =>
         new Response(JSON.stringify({ apiKey: "" }), {

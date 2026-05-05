@@ -206,7 +206,7 @@ const router = Router();
  * frontend should `window.open()`. The frontend never assembles this URL
  * itself so we can keep base-URL configuration entirely server-side.
  */
-router.post("/integrations/scout/state", (req, res) => {
+router.post("/integrations/scout/state", async (req, res) => {
   const proto = (req.get("x-forwarded-proto") ?? req.protocol) as string;
   const host = req.get("host");
   if (!host) {
@@ -214,7 +214,7 @@ router.post("/integrations/scout/state", (req, res) => {
     return;
   }
   const callbackUrl = `${proto}://${host}/api/integrations/scout/callback`;
-  const state = issueScoutState();
+  const state = await issueScoutState();
   const connectBase = scoutBaseUrl().replace(/\/$/, "");
   const connectUrl =
     `${connectBase}/connect?return_to=${encodeURIComponent(callbackUrl)}` +
@@ -240,18 +240,18 @@ router.get("/integrations/scout/callback", async (req, res) => {
   // for a given attempt, that state has served its purpose and should not
   // be reusable, even if the attempt failed.
   if (error) {
-    if (state) consumeScoutState(state);
+    if (state) await consumeScoutState(state);
     res.status(400).send(renderCallbackHtml({ ok: false, error }));
     return;
   }
   if (!token || !state) {
-    if (state) consumeScoutState(state);
+    if (state) await consumeScoutState(state);
     res
       .status(400)
       .send(renderCallbackHtml({ ok: false, error: "Missing token or state" }));
     return;
   }
-  const stateCheck = consumeScoutState(state);
+  const stateCheck = await consumeScoutState(state);
   if (!stateCheck.ok) {
     logger.warn(
       { reason: stateCheck.reason },
