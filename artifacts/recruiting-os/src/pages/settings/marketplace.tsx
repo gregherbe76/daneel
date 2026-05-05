@@ -5,13 +5,16 @@ import {
   useListProviderStepSettings,
   useCreateProvider,
   useUpdateProvider,
+  useUpsertProviderStepSetting,
   getListProvidersQueryKey,
+  getListProviderStepSettingsQueryKey,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -28,10 +31,20 @@ import {
   PHASE_COPY,
   type CatalogEntry,
   type ConnectProvider,
+  type ConnectProviderType,
   type ProviderCategory,
   type StubProvider,
 } from "./marketplace/catalog";
-import { CheckCircle2, Loader2, Sparkles, AlertTriangle, KeyRound } from "lucide-react";
+import {
+  CheckCircle2,
+  Loader2,
+  Sparkles,
+  AlertTriangle,
+  KeyRound,
+  ChevronDown,
+  ChevronRight,
+  Settings2,
+} from "lucide-react";
 import { track as trackTelemetry } from "@/lib/telemetry";
 
 type ProviderRecord = {
@@ -39,8 +52,78 @@ type ProviderRecord = {
   name: string;
   type: string;
   webhookUrl?: string | null;
+  baseUrl?: string | null;
   enabled: boolean;
+  config?: {
+    github?: GithubProviderConfig | null;
+    web_search?: WebSearchProviderConfig | null;
+  } | null;
 };
+
+interface GithubProviderConfig {
+  extraKeywords?: string | null;
+  excludeOrgs?: string | null;
+  minFollowers?: number | null;
+  minRepos?: number | null;
+  requireBio?: boolean | null;
+  activeWithinMonths?: number | null;
+}
+
+interface WebSearchProviderConfig {
+  extraKeywords?: string | null;
+  targetSites?: string[] | null;
+  excludeSites?: string[] | null;
+}
+
+type WorkflowStep =
+  | "job_understanding"
+  | "candidate_matching"
+  | "shortlist_generation"
+  | "sourcing"
+  | "enrichment";
+
+const WORKFLOW_STEP_LABELS: Record<WorkflowStep, string> = {
+  job_understanding: "Job Understanding",
+  candidate_matching: "Candidate Matching",
+  shortlist_generation: "Shortlist Generation",
+  sourcing: "Sourcing",
+  enrichment: "Enrichment",
+};
+
+/**
+ * Workflow steps each marketplace provider type can power. Used to render the
+ * inline step picker on connected cards so recruiters never have to leave the
+ * marketplace to wire a connected provider into the pipeline.
+ */
+const APPLICABLE_STEPS: Record<ConnectProviderType, WorkflowStep[]> = {
+  custom_webhook: [
+    "job_understanding",
+    "candidate_matching",
+    "shortlist_generation",
+    "sourcing",
+    "enrichment",
+  ],
+  serpapi: ["sourcing"],
+  github: ["sourcing"],
+  apify: [],
+};
+
+/** Maps a marketplace connectType to the underlying provider `type` column. */
+function providerTypeFor(connectType: ConnectProviderType): string | null {
+  if (connectType === "custom_webhook") return "custom_webhook";
+  if (connectType === "serpapi") return "web_search";
+  if (connectType === "github") return "github";
+  return null; // apify has no DB-backed provider yet
+}
+
+function findProviderForEntry(
+  entry: ConnectProvider,
+  providers: ProviderRecord[],
+): ProviderRecord | null {
+  const type = providerTypeFor(entry.connectType);
+  if (!type) return null;
+  return providers.find((p) => p.type === type) ?? null;
+}
 
 const APIFY_LS_KEY = "hiringai.apifyKey";
 
@@ -60,6 +143,11 @@ function deriveState(entry: ConnectProvider, providers: ProviderRecord[]): ConnS
   }
   if (entry.connectType === "serpapi") {
     const p = providers.find((x) => x.type === "web_search");
+    if (!p) return "disconnected";
+    return p.enabled ? "connected" : "action_required";
+  }
+  if (entry.connectType === "github") {
+    const p = providers.find((x) => x.type === "github");
     if (!p) return "disconnected";
     return p.enabled ? "connected" : "action_required";
   }
@@ -185,6 +273,21 @@ function ComingSoonDialog({
   );
 }
 
+/** Parses a comma/space/newline-separated free-text field into a clean array. */
+function splitSites(input: string): string[] | null {
+  if (!input) return null;
+  const parts = input
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.length > 0 ? parts : null;
+}
+
+function parsePositiveInt(input: string): number | null {
+  const n = parseInt(input.trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 function ConnectDialog({
   entry,
   open,
@@ -205,26 +308,55 @@ function ConnectDialog({
   const [webhookUrl, setWebhookUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  // Seed inputs whenever the dialog opens for a different entry.
+  // GitHub Agent tuning
+  const [ghExtraKeywords, setGhExtraKeywords] = useState("");
+  const [ghExcludeOrgs, setGhExcludeOrgs] = useState("");
+  const [ghMinFollowers, setGhMinFollowers] = useState("");
+  const [ghMinRepos, setGhMinRepos] = useState("");
+  const [ghRequireBio, setGhRequireBio] = useState(false);
+  const [ghActiveWithinMonths, setGhActiveWithinMonths] = useState("");
+
+  // Web Search tuning
+  const [wsExtraKeywords, setWsExtraKeywords] = useState("");
+  const [wsTargetSites, setWsTargetSites] = useState("");
+  const [wsExcludeSites, setWsExcludeSites] = useState("");
+
   const existing = useMemo(() => {
     if (!entry) return null;
-    if (entry.connectType === "custom_webhook")
-      return providers.find((p) => p.type === "custom_webhook") ?? null;
-    if (entry.connectType === "serpapi")
-      return providers.find((p) => p.type === "web_search") ?? null;
-    return null;
+    return findProviderForEntry(entry, providers);
   }, [entry, providers]);
 
-  // Sync inputs when dialog opens
-  useMemo(() => {
+  // Sync inputs when dialog opens. useEffect (not useMemo) so React schedules
+  // a render after we update state — useMemo runs during render and won't
+  // commit setState reliably across opens of the same dialog instance.
+  useEffect(() => {
     if (!open || !entry) return;
+    setAdvancedOpen(false);
     if (entry.connectType === "custom_webhook") {
       setWebhookUrl(existing?.webhookUrl ?? "");
     } else if (entry.connectType === "apify") {
       setApiKey(getApifyKey());
     } else {
       setApiKey("");
+    }
+    if (entry.connectType === "github") {
+      const cfg = existing?.config?.github ?? null;
+      setGhExtraKeywords(cfg?.extraKeywords ?? "");
+      setGhExcludeOrgs(cfg?.excludeOrgs ?? "");
+      setGhMinFollowers(cfg?.minFollowers != null ? String(cfg.minFollowers) : "");
+      setGhMinRepos(cfg?.minRepos != null ? String(cfg.minRepos) : "");
+      setGhRequireBio(cfg?.requireBio === true);
+      setGhActiveWithinMonths(
+        cfg?.activeWithinMonths != null ? String(cfg.activeWithinMonths) : "",
+      );
+    }
+    if (entry.connectType === "serpapi") {
+      const cfg = existing?.config?.web_search ?? null;
+      setWsExtraKeywords(cfg?.extraKeywords ?? "");
+      setWsTargetSites(cfg?.targetSites?.join(", ") ?? "");
+      setWsExcludeSites(cfg?.excludeSites?.join(", ") ?? "");
     }
   }, [open, entry, existing]);
 
@@ -252,13 +384,22 @@ function ConnectDialog({
         await qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
         toast({ title: "Custom Webhook connected" });
       } else if (entry.connectType === "serpapi") {
+        const wsConfig: WebSearchProviderConfig = {
+          extraKeywords: wsExtraKeywords.trim() || null,
+          targetSites: splitSites(wsTargetSites),
+          excludeSites: splitSites(wsExcludeSites),
+        };
+        const hasWsConfig =
+          wsConfig.extraKeywords ||
+          (wsConfig.targetSites && wsConfig.targetSites.length > 0) ||
+          (wsConfig.excludeSites && wsConfig.excludeSites.length > 0);
         const payload = {
           name: "SerpAPI Web Search",
           type: "web_search" as const,
           webhookUrl: null,
           baseUrl: null,
           apiKeyPlaceholder: apiKey || null,
-          config: null,
+          config: hasWsConfig ? { web_search: wsConfig } : null,
           enabled: true,
         };
         if (existing) {
@@ -271,6 +412,38 @@ function ConnectDialog({
           title: "SerpAPI saved",
           description: "Set the SERPAPI_KEY env secret to enable real web sourcing.",
         });
+      } else if (entry.connectType === "github") {
+        const ghConfig: GithubProviderConfig = {
+          extraKeywords: ghExtraKeywords.trim() || null,
+          excludeOrgs: ghExcludeOrgs.trim() || null,
+          minFollowers: parsePositiveInt(ghMinFollowers),
+          minRepos: parsePositiveInt(ghMinRepos),
+          requireBio: ghRequireBio ? true : null,
+          activeWithinMonths: parsePositiveInt(ghActiveWithinMonths),
+        };
+        const hasGhConfig =
+          ghConfig.extraKeywords ||
+          ghConfig.excludeOrgs ||
+          ghConfig.minFollowers != null ||
+          ghConfig.minRepos != null ||
+          ghConfig.requireBio === true ||
+          ghConfig.activeWithinMonths != null;
+        const payload = {
+          name: "GitHub Agent",
+          type: "github" as const,
+          webhookUrl: null,
+          baseUrl: null,
+          apiKeyPlaceholder: null,
+          config: hasGhConfig ? { github: ghConfig } : null,
+          enabled: true,
+        };
+        if (existing) {
+          await update.mutateAsync({ id: existing.id, data: payload });
+        } else {
+          await create.mutateAsync({ data: payload });
+        }
+        await qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
+        toast({ title: "GitHub Agent connected" });
       } else if (entry.connectType === "apify") {
         if (apiKey) {
           window.localStorage.setItem(APIFY_LS_KEY, apiKey);
@@ -292,7 +465,10 @@ function ConnectDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md" data-testid={`connect-dialog-${entry.connectType}`}>
+      <DialogContent
+        className="max-w-md max-h-[85vh] overflow-y-auto"
+        data-testid={`connect-dialog-${entry.connectType}`}
+      >
         <DialogHeader>
           <div className="flex items-center gap-3">
             <LogoMark accent={accent} mark={entry.logoMark} />
@@ -314,28 +490,167 @@ function ConnectDialog({
               data-testid="custom-webhook-url"
             />
             <p className="text-xs text-muted-foreground">
-              Leave blank to register the provider without a target — you can wire it up later from
-              Workflow Step Assignments.
+              Leave blank to register the provider without a target — you can wire it up to a step
+              from the card below once it's connected.
             </p>
           </div>
         )}
 
         {entry.connectType === "serpapi" && (
-          <div className="space-y-2">
-            <Label htmlFor="serp-key">SerpAPI key (optional placeholder)</Label>
-            <Input
-              id="serp-key"
-              type="password"
-              placeholder="serpapi-…"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              autoComplete="new-password"
-              data-testid="serpapi-key"
-            />
-            <p className="text-xs text-muted-foreground">
-              For real sourcing, also set the <code className="text-xs">SERPAPI_KEY</code> env
-              secret on the API server.
-            </p>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="serp-key">SerpAPI key (optional placeholder)</Label>
+              <Input
+                id="serp-key"
+                type="password"
+                placeholder="serpapi-…"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                autoComplete="new-password"
+                data-testid="serpapi-key"
+              />
+              <p className="text-xs text-muted-foreground">
+                For real sourcing, also set the <code className="text-xs">SERPAPI_KEY</code> env
+                secret on the API server.
+              </p>
+            </div>
+
+            <AdvancedToggle open={advancedOpen} onToggle={setAdvancedOpen} />
+
+            {advancedOpen && (
+              <div
+                className="space-y-3 rounded-md border border-border p-3"
+                data-testid="serpapi-advanced"
+              >
+                <div className="space-y-1.5">
+                  <Label>Extra keywords</Label>
+                  <Input
+                    placeholder="e.g. remote fintech open-source"
+                    value={wsExtraKeywords}
+                    onChange={(e) => setWsExtraKeywords(e.target.value)}
+                    data-testid="ws-extra-keywords"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Free-text terms appended verbatim to every Google query.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Target sites</Label>
+                  <Input
+                    placeholder="e.g. linkedin.com/in, github.com"
+                    value={wsTargetSites}
+                    onChange={(e) => setWsTargetSites(e.target.value)}
+                    data-testid="ws-target-sites"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated. Defaults to <code className="text-xs">linkedin.com/in</code>{" "}
+                    and <code className="text-xs">github.com</code> when empty.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Exclude sites</Label>
+                  <Input
+                    placeholder="e.g. pinterest.com, slideshare.net"
+                    value={wsExcludeSites}
+                    onChange={(e) => setWsExcludeSites(e.target.value)}
+                    data-testid="ws-exclude-sites"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated domains dropped from results via{" "}
+                    <code className="text-xs">-site:</code>.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {entry.connectType === "github" && (
+          <div className="space-y-3">
+            <div className="rounded-md bg-muted/50 border border-border p-3 text-xs text-muted-foreground">
+              Sources real public GitHub users via the GitHub REST API. Set the{" "}
+              <code className="text-xs">GITHUB_TOKEN</code> secret on the API server to lift the
+              ~60 req/hour anonymous rate limit.
+            </div>
+
+            <AdvancedToggle open={advancedOpen} onToggle={setAdvancedOpen} />
+
+            {advancedOpen && (
+              <div
+                className="space-y-3 rounded-md border border-border p-3"
+                data-testid="github-advanced"
+              >
+                <div className="space-y-1.5">
+                  <Label>Extra keywords</Label>
+                  <Input
+                    placeholder="e.g. open source fintech"
+                    value={ghExtraKeywords}
+                    onChange={(e) => setGhExtraKeywords(e.target.value)}
+                    data-testid="gh-extra-keywords"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Exclude orgs / users</Label>
+                  <Input
+                    placeholder="e.g. google, microsoft, meta"
+                    value={ghExcludeOrgs}
+                    onChange={(e) => setGhExcludeOrgs(e.target.value)}
+                    data-testid="gh-exclude-orgs"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Min followers</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      placeholder="e.g. 50"
+                      value={ghMinFollowers}
+                      onChange={(e) => setGhMinFollowers(e.target.value)}
+                      data-testid="gh-min-followers"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Min public repos</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      placeholder="e.g. 5"
+                      value={ghMinRepos}
+                      onChange={(e) => setGhMinRepos(e.target.value)}
+                      data-testid="gh-min-repos"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <Label htmlFor="gh-require-bio">Require non-empty bio</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Drop candidates whose GitHub profile bio is empty.
+                    </p>
+                  </div>
+                  <Switch
+                    id="gh-require-bio"
+                    checked={ghRequireBio}
+                    onCheckedChange={setGhRequireBio}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Active within (months)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    step={1}
+                    placeholder="e.g. 6"
+                    value={ghActiveWithinMonths}
+                    onChange={(e) => setGhActiveWithinMonths(e.target.value)}
+                    data-testid="gh-active-within"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -375,6 +690,131 @@ function ConnectDialog({
   );
 }
 
+function AdvancedToggle({
+  open,
+  onToggle,
+}: {
+  open: boolean;
+  onToggle: (v: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(!open)}
+      className="flex items-center gap-1 text-xs font-medium text-foreground hover:text-primary transition-colors"
+      data-testid="advanced-toggle"
+    >
+      {open ? (
+        <ChevronDown className="h-3.5 w-3.5" />
+      ) : (
+        <ChevronRight className="h-3.5 w-3.5" />
+      )}
+      <Settings2 className="h-3.5 w-3.5" />
+      Advanced settings
+    </button>
+  );
+}
+
+/**
+ * Renders one row per applicable workflow step, letting recruiters toggle
+ * whether THIS provider runs that step. Setting `enabled:false` mirrors the
+ * legacy admin's behavior of falling back to the native default without
+ * deleting the row (no DELETE route exists for step settings).
+ */
+function StepAssignmentInline({
+  entry,
+  provider,
+}: {
+  entry: ConnectProvider;
+  provider: ProviderRecord;
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const { data: settings = [] } = useListProviderStepSettings();
+  const upsert = useUpsertProviderStepSetting();
+  const [pendingStep, setPendingStep] = useState<WorkflowStep | null>(null);
+
+  const steps = APPLICABLE_STEPS[entry.connectType];
+  if (steps.length === 0) return null;
+
+  type SettingRow = {
+    workflowStep: WorkflowStep;
+    providerId: number;
+    enabled: boolean;
+    provider?: { id: number; name: string };
+  };
+  const settingsList = settings as SettingRow[];
+
+  async function handleToggle(step: WorkflowStep, next: boolean) {
+    setPendingStep(step);
+    try {
+      await upsert.mutateAsync({
+        data: {
+          workflowStep: step,
+          providerId: provider.id,
+          enabled: next,
+        },
+      });
+      await qc.invalidateQueries({ queryKey: getListProviderStepSettingsQueryKey() });
+      toast({
+        title: next
+          ? `${entry.name} now runs ${WORKFLOW_STEP_LABELS[step]}`
+          : `${entry.name} no longer runs ${WORKFLOW_STEP_LABELS[step]}`,
+      });
+    } catch {
+      toast({ title: "Failed to update step assignment", variant: "destructive" });
+    } finally {
+      setPendingStep(null);
+    }
+  }
+
+  return (
+    <div
+      className="rounded-md border border-border bg-muted/20 p-3 space-y-2"
+      data-testid={`step-assignment-${entry.id}`}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Workflow steps
+      </p>
+      {steps.map((step) => {
+        const current = settingsList.find((s) => s.workflowStep === step);
+        const assignedToThis = current?.providerId === provider.id && current.enabled;
+        const assignedElsewhere =
+          current && current.enabled && current.providerId !== provider.id;
+        return (
+          <label
+            key={step}
+            className="flex items-center justify-between gap-2 text-xs"
+            data-testid={`step-row-${entry.id}-${step}`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <input
+                type="checkbox"
+                checked={assignedToThis}
+                disabled={pendingStep === step}
+                onChange={(e) => handleToggle(step, e.target.checked)}
+                className="h-3.5 w-3.5 cursor-pointer accent-primary"
+                data-testid={`step-checkbox-${entry.id}-${step}`}
+              />
+              <span className="font-medium text-foreground">
+                {WORKFLOW_STEP_LABELS[step]}
+              </span>
+              {assignedElsewhere && (
+                <span className="text-muted-foreground truncate">
+                  (currently: {current?.provider?.name ?? "another provider"})
+                </span>
+              )}
+            </div>
+            {pendingStep === step && (
+              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground shrink-0" />
+            )}
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProviderCard({
   entry,
   providers,
@@ -389,6 +829,8 @@ function ProviderCard({
   const cat = CATEGORIES.find((c) => c.key === entry.category)!;
   const state: ConnState =
     entry.kind === "connect" ? deriveState(entry, providers) : "disconnected";
+  const dbProvider =
+    entry.kind === "connect" ? findProviderForEntry(entry, providers) : null;
   return (
     <Card
       className="p-5 flex flex-col gap-4 border-l-4 hover:border-primary/40 transition-colors h-full"
@@ -416,7 +858,7 @@ function ProviderCard({
         <p className="text-xs text-amber-600 -mt-2">{entry.helper}</p>
       )}
 
-      <div className="mt-auto flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <span
           className="text-[10px] uppercase font-semibold tracking-wide"
           style={{ color: cat.accent }}
@@ -442,6 +884,14 @@ function ProviderCard({
           </Button>
         )}
       </div>
+
+      {entry.kind === "connect" &&
+        dbProvider &&
+        APPLICABLE_STEPS[entry.connectType].length > 0 && (
+          <div className="mt-auto">
+            <StepAssignmentInline entry={entry} provider={dbProvider} />
+          </div>
+        )}
     </Card>
   );
 }

@@ -59,7 +59,7 @@ export type StubProvider = {
   logoMark: string;
 };
 
-export type ConnectProviderType = "custom_webhook" | "serpapi" | "apify";
+export type ConnectProviderType = "custom_webhook" | "serpapi" | "apify" | "github";
 
 export type ConnectProvider = {
   kind: "connect";
@@ -148,6 +148,18 @@ export const CATALOG: CatalogEntry[] = [
     badges: ["free", "byo-key"],
     connectType: "serpapi",
     logoMark: "Sp",
+  },
+  {
+    kind: "connect",
+    id: "github-agent",
+    name: "GitHub Agent",
+    category: "sourcing",
+    oneLiner:
+      "Source real public GitHub users via the GitHub REST API — no fabricated profiles.",
+    pricing: "Free — set GITHUB_TOKEN secret for higher rate limits",
+    badges: ["free"],
+    connectType: "github",
+    logoMark: "Gh",
   },
   {
     kind: "connect",
