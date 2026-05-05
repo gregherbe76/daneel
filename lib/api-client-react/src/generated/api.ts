@@ -37,6 +37,7 @@ import type {
   CreateDeliberationBody,
   CreateJobBody,
   CreateProviderBody,
+  CreateSavedRunComparisonBody,
   DeliberationQuotaError,
   DeliberationRecord,
   DisconnectScout200,
@@ -72,6 +73,7 @@ import type {
   RestoreCandidatesByIdBody,
   RunVariantBody,
   RunWorkflowBody,
+  SavedRunComparison,
   ScoutConnectCallbackParams,
   ScoutConnectStateResponse,
   TeamMember,
@@ -654,6 +656,280 @@ export function useGetJobApplications<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary List saved Compare Runs setups for a job
+ */
+export const getListSavedRunComparisonsUrl = (jobId: number) => {
+  return `/api/jobs/${jobId}/saved-comparisons`;
+};
+
+export const listSavedRunComparisons = async (
+  jobId: number,
+  options?: RequestInit,
+): Promise<SavedRunComparison[]> => {
+  return customFetch<SavedRunComparison[]>(
+    getListSavedRunComparisonsUrl(jobId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListSavedRunComparisonsQueryKey = (jobId: number) => {
+  return [`/api/jobs/${jobId}/saved-comparisons`] as const;
+};
+
+export const getListSavedRunComparisonsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listSavedRunComparisons>>,
+  TError = ErrorType<unknown>,
+>(
+  jobId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSavedRunComparisons>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListSavedRunComparisonsQueryKey(jobId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listSavedRunComparisons>>
+  > = ({ signal }) =>
+    listSavedRunComparisons(jobId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!jobId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listSavedRunComparisons>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListSavedRunComparisonsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listSavedRunComparisons>>
+>;
+export type ListSavedRunComparisonsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List saved Compare Runs setups for a job
+ */
+
+export function useListSavedRunComparisons<
+  TData = Awaited<ReturnType<typeof listSavedRunComparisons>>,
+  TError = ErrorType<unknown>,
+>(
+  jobId: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listSavedRunComparisons>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListSavedRunComparisonsQueryOptions(jobId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Save a Compare Runs setup for a job
+ */
+export const getCreateSavedRunComparisonUrl = (jobId: number) => {
+  return `/api/jobs/${jobId}/saved-comparisons`;
+};
+
+export const createSavedRunComparison = async (
+  jobId: number,
+  createSavedRunComparisonBody: CreateSavedRunComparisonBody,
+  options?: RequestInit,
+): Promise<SavedRunComparison> => {
+  return customFetch<SavedRunComparison>(
+    getCreateSavedRunComparisonUrl(jobId),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(createSavedRunComparisonBody),
+    },
+  );
+};
+
+export const getCreateSavedRunComparisonMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createSavedRunComparison>>,
+    TError,
+    { jobId: number; data: BodyType<CreateSavedRunComparisonBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createSavedRunComparison>>,
+  TError,
+  { jobId: number; data: BodyType<CreateSavedRunComparisonBody> },
+  TContext
+> => {
+  const mutationKey = ["createSavedRunComparison"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createSavedRunComparison>>,
+    { jobId: number; data: BodyType<CreateSavedRunComparisonBody> }
+  > = (props) => {
+    const { jobId, data } = props ?? {};
+
+    return createSavedRunComparison(jobId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateSavedRunComparisonMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createSavedRunComparison>>
+>;
+export type CreateSavedRunComparisonMutationBody =
+  BodyType<CreateSavedRunComparisonBody>;
+export type CreateSavedRunComparisonMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Save a Compare Runs setup for a job
+ */
+export const useCreateSavedRunComparison = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createSavedRunComparison>>,
+    TError,
+    { jobId: number; data: BodyType<CreateSavedRunComparisonBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createSavedRunComparison>>,
+  TError,
+  { jobId: number; data: BodyType<CreateSavedRunComparisonBody> },
+  TContext
+> => {
+  return useMutation(getCreateSavedRunComparisonMutationOptions(options));
+};
+
+/**
+ * @summary Delete a saved Compare Runs setup
+ */
+export const getDeleteSavedRunComparisonUrl = (
+  jobId: number,
+  comparisonId: number,
+) => {
+  return `/api/jobs/${jobId}/saved-comparisons/${comparisonId}`;
+};
+
+export const deleteSavedRunComparison = async (
+  jobId: number,
+  comparisonId: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(
+    getDeleteSavedRunComparisonUrl(jobId, comparisonId),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getDeleteSavedRunComparisonMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteSavedRunComparison>>,
+    TError,
+    { jobId: number; comparisonId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteSavedRunComparison>>,
+  TError,
+  { jobId: number; comparisonId: number },
+  TContext
+> => {
+  const mutationKey = ["deleteSavedRunComparison"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteSavedRunComparison>>,
+    { jobId: number; comparisonId: number }
+  > = (props) => {
+    const { jobId, comparisonId } = props ?? {};
+
+    return deleteSavedRunComparison(jobId, comparisonId, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteSavedRunComparisonMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteSavedRunComparison>>
+>;
+
+export type DeleteSavedRunComparisonMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a saved Compare Runs setup
+ */
+export const useDeleteSavedRunComparison = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteSavedRunComparison>>,
+    TError,
+    { jobId: number; comparisonId: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteSavedRunComparison>>,
+  TError,
+  { jobId: number; comparisonId: number },
+  TContext
+> => {
+  return useMutation(getDeleteSavedRunComparisonMutationOptions(options));
+};
 
 /**
  * @summary List all candidates

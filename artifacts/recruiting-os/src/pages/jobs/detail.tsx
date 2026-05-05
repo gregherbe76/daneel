@@ -1216,7 +1216,7 @@ export default function JobDetailPage() {
                     {/* Compare any two past sourcing runs side-by-side. Hidden
                         automatically when there aren't at least two sourcing
                         runs to compare. */}
-                    <CompareRuns runs={jobRuns ?? []} />
+                    <CompareRuns runs={jobRuns ?? []} jobId={jobId} />
 
                     {/* Job Understanding */}
                     {workflowData.insight && (

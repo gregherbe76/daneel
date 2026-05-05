@@ -163,6 +163,70 @@ paths:
                 items:
                   $ref: "#/components/schemas/ApplicationWithDetails"
 
+  /jobs/{jobId}/saved-comparisons:
+    get:
+      operationId: listSavedRunComparisons
+      tags: [jobs]
+      summary: List saved Compare Runs setups for a job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Saved comparisons for the job
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SavedRunComparison"
+    post:
+      operationId: createSavedRunComparison
+      tags: [jobs]
+      summary: Save a Compare Runs setup for a job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSavedRunComparisonBody"
+      responses:
+        "201":
+          description: Saved comparison created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedRunComparison"
+
+  /jobs/{jobId}/saved-comparisons/{comparisonId}:
+    delete:
+      operationId: deleteSavedRunComparison
+      tags: [jobs]
+      summary: Delete a saved Compare Runs setup
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: comparisonId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
   # ── CANDIDATES ────────────────────────────────────────────────────────────
   /candidates:
     get:
@@ -1665,6 +1729,42 @@ paths:
 
 components:
   schemas:
+    SavedRunComparison:
+      type: object
+      properties:
+        id:
+          type: integer
+        jobId:
+          type: integer
+        name:
+          type: string
+        runAId:
+          type: integer
+        runBId:
+          type: integer
+        runCId:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, jobId, name, runAId, runBId, createdAt]
+
+    CreateSavedRunComparisonBody:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        runAId:
+          type: integer
+        runBId:
+          type: integer
+        runCId:
+          type: integer
+          nullable: true
+      required: [name, runAId, runBId]
+
     HealthStatus:
       type: object
       properties:

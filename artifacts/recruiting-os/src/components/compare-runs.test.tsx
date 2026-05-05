@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render as rtlRender, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import type {
   JobRunSummary,
   SourcingStats,
   VariantCriteria,
 } from "@workspace/api-client-react";
 import { CompareRuns } from "./compare-runs";
+
+function render(ui: ReactElement) {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return rtlRender(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
 
 // Mirror of STAT_SPECS inside compare-runs.tsx. Kept inline (not exported from
 // the component) so this test fails loudly if the component's spec list
@@ -72,7 +81,7 @@ function deltaSpan(row: HTMLTableRowElement): HTMLElement {
 describe("CompareRuns - rendering preconditions", () => {
   it("renders nothing when there are fewer than 2 sourcing runs", () => {
     const { container } = render(
-      <CompareRuns runs={[makeRun({ id: 1, stats: fullStats(5), saved: 1 })]} />,
+      <CompareRuns runs={[makeRun({ id: 1, stats: fullStats(5), saved: 1 })]} jobId={1} />,
     );
     expect(container).toBeEmptyDOMElement();
   });
@@ -84,7 +93,7 @@ describe("CompareRuns - rendering preconditions", () => {
       runSourcing: false,
     };
     const { container } = render(
-      <CompareRuns runs={[sourcing, noSourcing]} />,
+      <CompareRuns runs={[sourcing, noSourcing]} jobId={1} />,
     );
     // Only one sourcing-bearing run remains, so the comparator collapses.
     expect(container).toBeEmptyDOMElement();
@@ -98,7 +107,7 @@ describe("CompareRuns - delta-direction logic", () => {
     () => {
       const runA = makeRun({ id: 1, stats: fullStats(10), saved: 5 });
       const runB = makeRun({ id: 2, stats: fullStats(20), saved: 10 });
-      render(<CompareRuns runs={[runA, runB]} />);
+      render(<CompareRuns runs={[runA, runB]} jobId={1} />);
 
       // Saved candidates is treated as higher-is-better. B>A → green.
       expect(deltaSpan(rowFor("Saved candidates")).className).toMatch(
@@ -128,7 +137,7 @@ describe("CompareRuns - delta-direction logic", () => {
     () => {
       const runA = makeRun({ id: 1, stats: fullStats(20), saved: 10 });
       const runB = makeRun({ id: 2, stats: fullStats(10), saved: 5 });
-      render(<CompareRuns runs={[runA, runB]} />);
+      render(<CompareRuns runs={[runA, runB]} jobId={1} />);
 
       expect(deltaSpan(rowFor("Saved candidates")).className).toMatch(
         /text-red-700/,
@@ -154,7 +163,7 @@ describe("CompareRuns - delta-direction logic", () => {
   it("renders a neutral zero (no green/red) when A and B match exactly", () => {
     const runA = makeRun({ id: 1, stats: fullStats(7), saved: 3 });
     const runB = makeRun({ id: 2, stats: fullStats(7), saved: 3 });
-    render(<CompareRuns runs={[runA, runB]} />);
+    render(<CompareRuns runs={[runA, runB]} jobId={1} />);
 
     const labels = ["Saved candidates", ...STAT_SPECS.map((s) => s.label)];
     for (const label of labels) {
@@ -170,7 +179,7 @@ describe("CompareRuns - delta-direction logic", () => {
   it("formats the delta value with sign and locale separators", () => {
     const runA = makeRun({ id: 1, stats: fullStats(1000), saved: 0 });
     const runB = makeRun({ id: 2, stats: fullStats(2500), saved: 0 });
-    render(<CompareRuns runs={[runA, runB]} />);
+    render(<CompareRuns runs={[runA, runB]} jobId={1} />);
 
     // Search hits is higher-is-better and the values are non-trivial → "+1,500".
     expect(deltaSpan(rowFor("Search hits"))).toHaveTextContent("+1,500");
@@ -201,7 +210,7 @@ describe("CompareRuns - variant criteria diffing", () => {
         focusNote: "core platform", // unchanged
       },
     });
-    render(<CompareRuns runs={[runA, runB]} />);
+    render(<CompareRuns runs={[runA, runB]} jobId={1} />);
 
     expect(rowFor("Seniority").className).not.toMatch(/bg-amber/);
     expect(rowFor("Must-have skills").className).toMatch(/bg-amber/);
@@ -228,7 +237,7 @@ describe("CompareRuns - variant criteria diffing", () => {
         saved: 1,
         variantCriteria: null,
       });
-      render(<CompareRuns runs={[runA, runB]} />);
+      render(<CompareRuns runs={[runA, runB]} jobId={1} />);
 
       expect(rowFor("Seniority").className).toMatch(/bg-amber/);
       expect(rowFor("Must-have skills").className).toMatch(/bg-amber/);
@@ -260,7 +269,7 @@ describe("CompareRuns - variant criteria diffing", () => {
           focusNote: "   ",
         },
       });
-      render(<CompareRuns runs={[runA, runB]} />);
+      render(<CompareRuns runs={[runA, runB]} jobId={1} />);
 
       expect(rowFor("Seniority").className).not.toMatch(/bg-amber/);
       expect(rowFor("Must-have skills").className).not.toMatch(/bg-amber/);
@@ -292,7 +301,7 @@ describe("CompareRuns - variant criteria diffing", () => {
           focusNote: "x",
         },
       });
-      render(<CompareRuns runs={[runA, runB]} />);
+      render(<CompareRuns runs={[runA, runB]} jobId={1} />);
 
       for (const label of [
         "Label",
@@ -339,7 +348,7 @@ describe("CompareRuns - variant criteria diffing", () => {
           focusNote: "x",
         },
       });
-      render(<CompareRuns runs={[baseline, variant]} />);
+      render(<CompareRuns runs={[baseline, variant]} jobId={1} />);
 
       // "Baseline" vs "Skill-tightened" → flagged.
       expect(rowFor("Label").className).toMatch(/bg-amber/);

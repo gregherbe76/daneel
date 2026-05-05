@@ -13,3 +13,4 @@ export * from "./notification-settings";
 export * from "./bulk-jobs";
 export * from "./deliberations";
 export * from "./scout-connect-states";
+export * from "./saved-run-comparisons";

@@ -1,7 +1,18 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useLocation, useSearch } from "wouter";
-import type { JobRunSummary, SourcingStats, VariantCriteria } from "@workspace/api-client-react";
+import {
+  useListSavedRunComparisons,
+  useCreateSavedRunComparison,
+  useDeleteSavedRunComparison,
+  getListSavedRunComparisonsQueryKey,
+  type JobRunSummary,
+  type SourcingStats,
+  type VariantCriteria,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -9,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowDown, ArrowUp, GitBranch, Minus, Zap } from "lucide-react";
+import { ArrowDown, ArrowUp, Bookmark, GitBranch, Minus, Trash2, Zap } from "lucide-react";
 
 type StatKey =
   | "searchTotalCount"
@@ -189,7 +200,13 @@ function RunPicker({
   );
 }
 
-export function CompareRuns({ runs }: { runs: JobRunSummary[] }) {
+export function CompareRuns({
+  runs,
+  jobId,
+}: {
+  runs: JobRunSummary[];
+  jobId: number;
+}) {
   // Only runs that included sourcing make sense to compare here, since the
   // whole point is comparing the filter breakdown.
   const sourcingRuns = useMemo(
@@ -268,6 +285,14 @@ export function CompareRuns({ runs }: { runs: JobRunSummary[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourcingRuns]);
 
+  // ── Saved comparison setups (hooks must run before any early return) ────
+  const qc = useQueryClient();
+  const savedQuery = useListSavedRunComparisons(jobId);
+  const createSaved = useCreateSavedRunComparison();
+  const deleteSaved = useDeleteSavedRunComparison();
+  const [showSaveForm, setShowSaveForm] = useState(false);
+  const [newName, setNewName] = useState("");
+
   if (sourcingRuns.length < 2) return null;
 
   const aId = urlAId;
@@ -304,6 +329,58 @@ export function CompareRuns({ runs }: { runs: JobRunSummary[] }) {
     (runA.id === runB.id ||
       (runC != null && (runA.id === runC.id || runB.id === runC.id)));
 
+  // ── Saved comparison setups ─────────────────────────────────────────────
+  const invalidateSaved = () =>
+    qc.invalidateQueries({
+      queryKey: getListSavedRunComparisonsQueryKey(jobId),
+    });
+
+  const validIds = useMemo(
+    () => new Set(sourcingRuns.map((r) => r.id)),
+    [sourcingRuns],
+  );
+  const canSaveCurrent =
+    !!runA && !!runB && !duplicates;
+
+  const handleSave = () => {
+    if (!canSaveCurrent || !newName.trim() || aId == null || bId == null) return;
+    createSaved.mutate(
+      {
+        jobId,
+        data: {
+          name: newName.trim(),
+          runAId: aId,
+          runBId: bId,
+          runCId: cId,
+        },
+      },
+      {
+        onSuccess: () => {
+          setNewName("");
+          setShowSaveForm(false);
+          invalidateSaved();
+        },
+      },
+    );
+  };
+
+  const handleLoadSaved = (
+    runAId: number,
+    runBId: number,
+    runCId: number | null,
+  ) => {
+    updateCompareParams(runAId, runBId, runCId);
+  };
+
+  const handleDeleteSaved = (id: number) => {
+    deleteSaved.mutate(
+      { jobId, comparisonId: id },
+      { onSuccess: invalidateSaved },
+    );
+  };
+
+  const savedComparisons = savedQuery.data ?? [];
+
   return (
     <div className="rounded-md border border-border bg-muted/10 p-4 space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -315,7 +392,105 @@ export function CompareRuns({ runs }: { runs: JobRunSummary[] }) {
             — Runs B and C are compared against it.
           </p>
         </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs"
+          disabled={!canSaveCurrent}
+          onClick={() => setShowSaveForm((v) => !v)}
+          data-testid="button-save-comparison"
+        >
+          <Bookmark className="h-3 w-3 mr-1" />
+          Save this comparison
+        </Button>
       </div>
+
+      {showSaveForm && canSaveCurrent && (
+        <div className="flex items-center gap-2 rounded-md border border-border bg-background p-2">
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder='e.g. "Q3 baseline vs loosened filters"'
+            className="h-8 text-xs"
+            data-testid="input-comparison-name"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSave();
+            }}
+          />
+          <Button
+            type="button"
+            size="sm"
+            className="h-8 text-xs"
+            disabled={!newName.trim() || createSaved.isPending}
+            onClick={handleSave}
+            data-testid="button-confirm-save-comparison"
+          >
+            Save
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 text-xs"
+            onClick={() => {
+              setShowSaveForm(false);
+              setNewName("");
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
+
+      {savedComparisons.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+            Saved comparisons
+          </p>
+          <div className="flex flex-wrap gap-1.5" data-testid="saved-comparisons-list">
+            {savedComparisons.map((s) => {
+              const isStale =
+                !validIds.has(s.runAId) ||
+                !validIds.has(s.runBId) ||
+                (s.runCId != null && !validIds.has(s.runCId));
+              return (
+                <div
+                  key={s.id}
+                  className="inline-flex items-center gap-1 rounded-full border border-border bg-background pl-2.5 pr-1 py-0.5"
+                  data-testid={`saved-comparison-${s.id}`}
+                >
+                  <button
+                    type="button"
+                    className={`text-xs ${isStale ? "text-muted-foreground line-through" : "hover:underline"}`}
+                    disabled={isStale}
+                    onClick={() =>
+                      handleLoadSaved(s.runAId, s.runBId, s.runCId ?? null)
+                    }
+                    title={
+                      isStale
+                        ? "One or more runs in this saved comparison no longer exist"
+                        : `Load: A=#${s.runAId} B=#${s.runBId}${s.runCId != null ? ` C=#${s.runCId}` : ""}`
+                    }
+                    data-testid={`button-load-comparison-${s.id}`}
+                  >
+                    {s.name}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full p-1 text-muted-foreground hover:text-red-700 hover:bg-red-500/10"
+                    onClick={() => handleDeleteSaved(s.id)}
+                    title="Delete saved comparison"
+                    data-testid={`button-delete-comparison-${s.id}`}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-3 gap-3">
         <RunPicker

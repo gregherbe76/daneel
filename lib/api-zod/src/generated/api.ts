@@ -408,6 +408,48 @@ export const GetJobApplicationsResponse = zod.array(
 );
 
 /**
+ * @summary List saved Compare Runs setups for a job
+ */
+export const ListSavedRunComparisonsParams = zod.object({
+  jobId: zod.coerce.number(),
+});
+
+export const ListSavedRunComparisonsResponseItem = zod.object({
+  id: zod.number(),
+  jobId: zod.number(),
+  name: zod.string(),
+  runAId: zod.number(),
+  runBId: zod.number(),
+  runCId: zod.number().nullish(),
+  createdAt: zod.coerce.date(),
+});
+export const ListSavedRunComparisonsResponse = zod.array(
+  ListSavedRunComparisonsResponseItem,
+);
+
+/**
+ * @summary Save a Compare Runs setup for a job
+ */
+export const CreateSavedRunComparisonParams = zod.object({
+  jobId: zod.coerce.number(),
+});
+
+export const CreateSavedRunComparisonBody = zod.object({
+  name: zod.string().min(1),
+  runAId: zod.number(),
+  runBId: zod.number(),
+  runCId: zod.number().nullish(),
+});
+
+/**
+ * @summary Delete a saved Compare Runs setup
+ */
+export const DeleteSavedRunComparisonParams = zod.object({
+  jobId: zod.coerce.number(),
+  comparisonId: zod.coerce.number(),
+});
+
+/**
  * @summary List all candidates
  */
 export const ListCandidatesResponseItem = zod.object({

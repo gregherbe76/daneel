@@ -5,6 +5,24 @@
  * HiringAI API
  * OpenAPI spec version: 0.1.0
  */
+export interface SavedRunComparison {
+  id: number;
+  jobId: number;
+  name: string;
+  runAId: number;
+  runBId: number;
+  runCId?: number | null;
+  createdAt: string;
+}
+
+export interface CreateSavedRunComparisonBody {
+  /** @minLength 1 */
+  name: string;
+  runAId: number;
+  runBId: number;
+  runCId?: number | null;
+}
+
 export interface HealthStatus {
   status: string;
 }
