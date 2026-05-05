@@ -1,0 +1,48 @@
+CONTEXT
+Phase 1 done. Now the highest-priority integration: A-Player Scout. 
+Scout's engine lives at scout.aplayer.ai. Currently no auth, no 
+persistence — searches stored in localStorage. This prompt does two 
+things in one session because they're tightly coupled.
+
+GOAL
+1. Add auth + persistence to Scout (in Scout's own Replit project — 
+   not Daneel).
+2. Wrap Scout's API as a Daneel SourcingProvider.
+
+CONSTRAINTS
+PART 1 — Scout SaaS shell (in Scout's Replit project):
+- Magic-link auth via Resend. Reuse Extend's pattern if accessible.
+- Postgres + Drizzle for users, searches, results. New schemas only — 
+  do not migrate existing localStorage data.
+- POST /api/searches creates a search; GET /api/searches lists user's 
+  searches; GET /api/searches/:id streams results via existing SSE.
+- API key auth alongside session auth — every user has an API key 
+  shown in /settings, regenerable.
+- No billing yet. Just auth + persistence.
+
+PART 2 — Daneel provider wrap (in Daneel project):
+- New file: artifacts/api-server/src/routes/workflows/providers/scout-provider.ts
+- Implements SourcingProvider interface: takes JD + filters, calls Scout's 
+  API with the user's Scout API key (stored in Daneel's provider config), 
+  streams candidates back via Daneel's own SSE.
+- Marketplace card for Scout: replace the stub with a real Connect flow. 
+  Connect = paste Scout API key from scout.aplayer.ai/settings into 
+  Daneel. (OAuth comes later.)
+- Add docs/providers/scout.md: how to connect, what it does, what it costs.
+
+CONSTRAINTS — WORK ORDER:
+- Do PART 1 fully and test before starting PART 2.
+- Do not modify Daneel's workflow engine — only add the provider file.
+- Do not add billing yet — Phase 2.4.
+
+DELIVERABLES
+1. Scout: auth + persistence shipped, deployed at scout.aplayer.ai
+2. Daneel: scout-provider.ts + marketplace card upgraded
+3. Two git commits (one per repo): 
+   - Scout: "feat: magic-link auth + search persistence"
+   - Daneel: "feat: A-Player Scout sourcing provider (Phase 2.1+2.2)"
+4. Push both.
+
+STOP. End-to-end test: in Daneel, click Connect Scout, paste API key, 
+run a sourcing step on a real JD, watch candidates stream in. If any 
+step fails, do not proceed — fix first.

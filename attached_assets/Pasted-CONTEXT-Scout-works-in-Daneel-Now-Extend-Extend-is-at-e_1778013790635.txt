@@ -1,0 +1,48 @@
+CONTEXT
+Scout works in Daneel. Now Extend. Extend is at extend.aplayer.ai (or 
+needs a domain — check NAMING.md). Extend has auth + Stripe already, 
+but three known bugs.
+
+GOAL
+1. Fix Extend's three production bugs.
+2. Wrap Extend as a Daneel SourcingProvider (pattern mode).
+3. Simplify pricing.
+
+CONSTRAINTS
+PART 1 — Bug fixes (in Extend's Replit project):
+- Bug A: Stripe pricing fails to load with "Failed to execute 'json' on 
+  Response: Unexpected token '<', '<!DOCTYPE'..." — likely an HTML error 
+  page being parsed as JSON. Add proper error handling and a fallback 
+  to test keys when live keys aren't configured.
+- Bug B: Find-Similar returns the reference profile as a result. Filter 
+  the reference profile's URL from results before returning.
+- Bug C: Magic-link sign-in returns an error screen. Reproduce, debug, 
+  fix. (You showed a screenshot in a prior Replit session — find that 
+  thread or reproduce fresh.)
+- Add PostHog session replay (free tier) to Extend so future bugs are 
+  catchable.
+
+PART 2 — Daneel provider:
+- artifacts/api-server/src/routes/workflows/providers/extend-provider.ts
+- Daneel's sourcing step gets two modes: "I have a JD" → Scout, "I have 
+  example profiles" → Extend. UI radio at workflow start.
+- Marketplace card for Extend with Connect flow (same pattern as Scout).
+
+PART 3 — Pricing simplification (in Extend):
+- Drop the $9 Starter tier.
+- Final pricing: Free (5 searches/mo) + Pro ($29/mo) + BYOK (€99/yr).
+- Match Scout's currency: USD only for Free/Pro. BYOK stays EUR (it's a 
+  power-user tier, currency is fine).
+- Migrate any existing Starter users to Pro at no charge with a courtesy 
+  email (use Resend).
+
+DELIVERABLES
+1. Three bugs fixed and verified
+2. extend-provider.ts in Daneel
+3. Pricing simplified, migration completed
+4. Three commits across two repos
+5. Push.
+
+STOP. End-to-end test: Daneel sourcing step → pick "I have example 
+profiles" → connect Extend → run → results stream in correctly. Verify 
+none of the three bugs reappear.

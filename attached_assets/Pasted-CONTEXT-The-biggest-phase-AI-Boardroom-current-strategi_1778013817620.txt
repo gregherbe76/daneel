@@ -1,0 +1,58 @@
+CONTEXT
+The biggest phase. AI Boardroom (current strategic-consultation tool) 
+pivots to Council — a hiring committee deliberation tool. The technical 
+infrastructure stays (3 LLMs, parallel pôles, consensus orchestrator). 
+The personas, prompts, input contract, and output schema all change.
+
+GOAL
+Phase 5 part 1: re-prompt all 15 pôles for hiring contexts. Define 
+Council's new input/output contract. Do NOT integrate with Daneel yet.
+
+CONSTRAINTS
+- Replace the 15 consulting personas with 15 hiring-decision personas. 
+  Suggested set:
+    1. Hiring Manager Lens
+    2. Technical Reviewer
+    3. Culture & Values Fit
+    4. Compensation & Leveling
+    5. Team Composition Impact
+    6. Risk & Red Flags
+    7. Diversity & Inclusion Lens
+    8. Long-term Trajectory
+    9. Reference Pattern Analysis
+    10. Onboarding Risk Assessment
+    11. Backup Plan / Counterfactual
+    12. Negotiation Stance
+    13. Legal & Compliance
+    14. Rejection Communication
+    15. Decision Framing
+
+- Each persona gets a prompt that takes: candidate (with all available 
+  enrichment from Daneel — Scout output, Extend match score, CodeMatch 
+  evaluation if present), JD, decision context (stage: screening / phone / 
+  onsite / offer / final). Outputs: opinion (string), confidence (0-100), 
+  flags (array).
+- Consensus orchestrator (GPT-4o) synthesizes 15 opinions into 
+  convergences / divergences / orientations specific to THIS hiring 
+  decision. Not generic.
+- Keep the multi-LLM routing (GPT-4o for strategic personas, Gemini for 
+  pattern analysis, Mistral for technical/operational). Document the 
+  routing in /docs/COUNCIL_ROUTING.md.
+- Do NOT touch Daneel yet.
+- Do NOT touch the existing strategic-consultation flow yet — fork the 
+  product. Council is a new app surface; the old Boardroom can deprecate 
+  later.
+- Update Boardroom's schema if needed but keep it backward-compatible.
+
+DELIVERABLES
+1. 15 new persona prompts in Boardroom/Council codebase
+2. New input/output contract for hiring deliberation
+3. /docs/COUNCIL_ROUTING.md
+4. New route /council/deliberate that exposes the hiring flow
+5. Manual test: deliberate on a synthetic candidate + JD, get sensible output
+6. Commit: "feat: Council hiring deliberation v1 (Phase 5.1+5.2)"
+7. Push.
+
+STOP. Show me a sample deliberation output in chat — convergences, 
+divergences, orientations on a fake candidate. Confirm it reads like 
+a real hiring committee, not generic strategy speak.

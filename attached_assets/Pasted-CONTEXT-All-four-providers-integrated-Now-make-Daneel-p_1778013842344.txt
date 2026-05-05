@@ -1,0 +1,56 @@
+CONTEXT
+All four providers integrated. Now make Daneel publicly launch-ready.
+
+GOAL
+README rewrite, live demo, OSS hygiene, documentation site, launch artifact.
+
+CONSTRAINTS
+
+PART 1 — README:
+- Daneel as hero. Tagline at top. Marketplace screenshot inline near top.
+- Sections (in this order): Tagline, What It Does (3-bullet visual), 
+  Live Demo, Quick Start (the 4-line docker compose), The Marketplace 
+  (visual + 4 ⭐ providers listed with their tagline), Architecture 
+  (clean SVG diagram, not ASCII — use the Tetris palette), Use Cases 
+  (3 personas: recruiter, agency, builder), Examples (link to 
+  examples/ folder), Roadmap (link), Commercial Disclosure, License.
+- Max 800 words of prose.
+- Replace ASCII architecture diagram with an SVG using the Tetris palette.
+
+PART 2 — Live demo:
+- Deploy a public instance at demo.daneel.dev (or daneel-demo.aplayer.ai 
+  if .dev not registered). Pre-seeded with 3 mock JDs, 50 mock candidates. 
+  All four ⭐ providers visible with "Connect to enable on your own 
+  instance" CTAs (greyed out — visitors can't actually connect, but they 
+  can see the UI).
+- Nightly cron resets demo data so it stays clean.
+- "View on GitHub" button prominent in nav.
+
+PART 3 — OSS hygiene:
+- /LICENSE (MIT, full text)
+- /CONTRIBUTING.md (how to add a provider, dev setup, PR process)
+- /CODE_OF_CONDUCT.md (Contributor Covenant 2.1)
+- /SECURITY.md (security@daneel.dev or wherever)
+- .github/ISSUE_TEMPLATE/{bug.md,feature.md,provider.md}
+- .github/workflows/ci.yml: install, lint, typecheck, build, run any 
+  existing tests on every PR.
+- Enable GitHub Discussions on the repo.
+
+PART 4 — Documentation site:
+- /docs folder rendered via Docusaurus or similar. Or — simpler — a 
+  single static page at daneel.dev/docs that links to the markdown files.
+- Pages: Getting Started, Provider Catalog (one page per ⭐ provider), 
+  Build a Custom Provider (link the existing examples/), FAQ, Roadmap.
+
+PART 5 — Launch asset:
+- 90-second Loom or screen recording: paste JD → Scout finds candidates 
+  → CodeMatch evaluates one → Council deliberates → report. Embed link 
+  in README.
+
+DELIVERABLES
+1-4 above, all in one commit per phase: 
+  "feat: launch readiness — README, demo, OSS hygiene, docs (Phase 6)"
+5. Loom URL in chat
+6. Push.
+
+STOP. Show me: README rendering on GitHub, live demo URL, Loom link.
