@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, jobsTable, DEFAULT_SCORING_WEIGHTS } from "@workspace/db";
-import { eq, sql, and, isNull } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import {
   CreateJobBody,
   UpdateJobBody,
@@ -9,7 +9,7 @@ import {
   DeleteJobParams,
   GetJobApplicationsParams,
 } from "@workspace/api-zod";
-import { applicationsTable, candidatesTable } from "@workspace/db";
+import { applicationsTable, candidatesTable, activeCandidateFilter } from "@workspace/db";
 import { hasRealSourcingProvider } from "./workflows/providers/registry";
 
 const router = Router();
@@ -112,7 +112,7 @@ router.get("/jobs/:id/applications", async (req, res) => {
     .where(
       and(
         eq(applicationsTable.jobId, id),
-        isNull(candidatesTable.deletedAt),
+        activeCandidateFilter,
       ),
     )
     .orderBy(applicationsTable.createdAt);

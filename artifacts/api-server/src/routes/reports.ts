@@ -10,6 +10,7 @@ import {
   applicationsTable,
 } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
+import { activeCandidateFilter } from "@workspace/db";
 import PDFDocument from "pdfkit";
 import { logger } from "../lib/logger";
 import { branding as defaultBranding } from "@workspace/branding";
@@ -73,7 +74,7 @@ async function buildReport(jobId: number, runId?: number) {
     db.select().from(jobInsightsTable).where(eq(jobInsightsTable.runId, run.id)).limit(1),
     db.select().from(shortlistsTable).where(eq(shortlistsTable.runId, run.id)).limit(1),
     db.select().from(aiEvaluationsTable).where(eq(aiEvaluationsTable.runId, run.id)),
-    db.select().from(candidatesTable),
+    db.select().from(candidatesTable).where(activeCandidateFilter),
   ]);
 
   if (!job[0]) return null;
@@ -82,13 +83,23 @@ async function buildReport(jobId: number, runId?: number) {
   const insight = insights[0] ?? null;
   const shortlist = shortlists[0] ?? null;
 
-  // Sort evaluations by score descending
-  const sortedEvals = [...evaluations].sort((a, b) => b.score - a.score);
-  const top5Ids = (shortlist?.rankedCandidateIds as number[] ?? sortedEvals.slice(0, 5).map((e) => e.candidateId));
+  // Drop evaluations whose candidate has been soft-deleted. We can't easily
+  // filter at the DB layer here (the candidate fetch is shared across the
+  // report payload) so we post-filter against the active-candidate map. This
+  // ensures top-5, recommendation summary, interview focus areas, and risks
+  // all ignore trashed candidates instead of surfacing them as "Unknown".
+  const activeEvaluations = evaluations.filter((e) => candidateMap.has(e.candidateId));
 
-  const top5Evals = top5Ids
+  // Sort evaluations by score descending
+  const sortedEvals = [...activeEvaluations].sort((a, b) => b.score - a.score);
+  const rankedTop5Ids = ((shortlist?.rankedCandidateIds as number[] | undefined) ?? sortedEvals.slice(0, 5).map((e) => e.candidateId))
+    // Strip out shortlist entries whose candidate has been soft-deleted so
+    // historical shortlists don't keep listing trashed people in the top-5.
+    .filter((id) => candidateMap.has(id));
+
+  const top5Evals = rankedTop5Ids
     .map((id) => sortedEvals.find((e) => e.candidateId === id))
-    .filter(Boolean);
+    .filter((e): e is NonNullable<typeof e> => !!e);
 
   const evaluationsWithCandidates = sortedEvals.map((e) => ({
     ...e,
@@ -97,15 +108,15 @@ async function buildReport(jobId: number, runId?: number) {
 
   const top5WithCandidates = top5Evals.map((e) => {
     const summary = (shortlist?.summaries as Array<{ candidateId: number; whyRelevant: string; keyRisks: string; finalRecommendation: string }> ?? [])
-      .find((s) => s.candidateId === e!.candidateId) ?? null;
-    const candidateName = candidateMap.get(e!.candidateId)?.name ?? "This candidate";
+      .find((s) => s.candidateId === e.candidateId) ?? null;
+    const candidateName = candidateMap.get(e.candidateId)?.name ?? "This candidate";
     const generatedNarrative = summary
       ? `We believe ${candidateName} is a strong fit for this role. ${summary.whyRelevant} Based on our assessment, ${summary.finalRecommendation.charAt(0).toLowerCase()}${summary.finalRecommendation.slice(1)}`
       : null;
-    const override = e!.clientFitNarrativeOverride ?? null;
+    const override = e.clientFitNarrativeOverride ?? null;
     return {
-      ...e!,
-      candidate: candidateMap.get(e!.candidateId) ?? null,
+      ...e,
+      candidate: candidateMap.get(e.candidateId) ?? null,
       summary,
       clientFitNarrative: override ?? generatedNarrative,
       clientFitNarrativeGenerated: generatedNarrative,
@@ -116,7 +127,7 @@ async function buildReport(jobId: number, runId?: number) {
   // Derive interview focus areas from top-candidate gaps + evaluation criteria
   const gapFrequency = new Map<string, number>();
   top5Evals.forEach((e) => {
-    ((e!.gaps ?? []) as string[]).forEach((g) => {
+    ((e.gaps ?? []) as string[]).forEach((g) => {
       gapFrequency.set(g, (gapFrequency.get(g) ?? 0) + 1);
     });
   });
@@ -133,7 +144,7 @@ async function buildReport(jobId: number, runId?: number) {
   // Aggregate risks from top 5
   const allRisks: string[] = [];
   top5Evals.forEach((e) => {
-    ((e!.risks ?? []) as string[]).forEach((r) => allRisks.push(r));
+    ((e.risks ?? []) as string[]).forEach((r) => allRisks.push(r));
   });
   const uniqueRisks = [...new Set(allRisks)].slice(0, 6);
 

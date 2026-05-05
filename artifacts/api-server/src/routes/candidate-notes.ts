@@ -5,6 +5,7 @@ import {
   candidateCommentsTable,
   candidatesTable,
   jobsTable,
+  activeCandidateFilter,
 } from "@workspace/db";
 import { eq, and, asc, desc, gt } from "drizzle-orm";
 import {
@@ -118,9 +119,12 @@ router.get("/team/:memberId/mentions", async (req, res) => {
   const memberId = String(req.params.memberId);
   const sinceParam = req.query.since ? new Date(String(req.query.since)) : null;
 
+  // Always exclude comments whose candidate is soft-deleted — a teammate's
+  // mention inbox should not surface conversations attached to trashed
+  // candidates that the rest of the UI has already hidden.
   const where = sinceParam
-    ? gt(candidateCommentsTable.createdAt, sinceParam)
-    : undefined;
+    ? and(gt(candidateCommentsTable.createdAt, sinceParam), activeCandidateFilter)
+    : activeCandidateFilter;
 
   const rows = await db
     .select({

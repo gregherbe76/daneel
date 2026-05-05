@@ -5,7 +5,8 @@ import {
   jobsTable,
   candidatesTable,
 } from "@workspace/db";
-import { eq, count, sql, isNull, and } from "drizzle-orm";
+import { eq, count, sql, and } from "drizzle-orm";
+import { activeCandidateFilter } from "@workspace/db";
 import {
   CreateApplicationBody,
   UpdateApplicationBody,
@@ -48,7 +49,7 @@ router.get("/applications", async (req, res) => {
       candidatesTable,
       eq(applicationsTable.candidateId, candidatesTable.id),
     )
-    .where(isNull(candidatesTable.deletedAt))
+    .where(activeCandidateFilter)
     .orderBy(applicationsTable.createdAt);
   const realSourcingAvailable = await hasRealSourcingProvider();
   res.json(rows.map((r) => toWithDetails(r, realSourcingAvailable)));
@@ -84,7 +85,7 @@ router.get("/applications/:id", async (req, res) => {
       eq(applicationsTable.candidateId, candidatesTable.id),
     )
     .where(
-      and(eq(applicationsTable.id, id), isNull(candidatesTable.deletedAt)),
+      and(eq(applicationsTable.id, id), activeCandidateFilter),
     );
   if (!rows.length) {
     res.status(404).json({ error: "Application not found" });
@@ -142,7 +143,7 @@ router.get("/pipeline/summary", async (req, res) => {
   const [totalCandidates] = await db
     .select({ count: count() })
     .from(candidatesTable)
-    .where(isNull(candidatesTable.deletedAt));
+    .where(activeCandidateFilter);
   const [totalApplications] = await db
     .select({ count: count() })
     .from(applicationsTable)
@@ -150,7 +151,7 @@ router.get("/pipeline/summary", async (req, res) => {
       candidatesTable,
       eq(applicationsTable.candidateId, candidatesTable.id),
     )
-    .where(isNull(candidatesTable.deletedAt));
+    .where(activeCandidateFilter);
 
   const stageCounts = await db
     .select({
@@ -162,7 +163,7 @@ router.get("/pipeline/summary", async (req, res) => {
       candidatesTable,
       eq(applicationsTable.candidateId, candidatesTable.id),
     )
-    .where(isNull(candidatesTable.deletedAt))
+    .where(activeCandidateFilter)
     .groupBy(applicationsTable.stage);
 
   const byStage = STAGES.map((stage) => ({

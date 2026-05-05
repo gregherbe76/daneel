@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
-import { db, candidatesTable, applicationsTable, jobsTable } from "@workspace/db";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { db, candidatesTable, applicationsTable, jobsTable, activeCandidateFilter } from "@workspace/db";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   CreateCandidateBody,
   UpdateCandidateBody,
@@ -42,7 +42,7 @@ router.get("/candidates", async (req, res) => {
   const candidates = await db
     .select()
     .from(candidatesTable)
-    .where(isNull(candidatesTable.deletedAt))
+    .where(activeCandidateFilter)
     .orderBy(candidatesTable.createdAt);
   res.json(candidates);
 });
@@ -241,7 +241,7 @@ router.get("/candidates/:id", async (req, res) => {
   const [candidate] = await db
     .select()
     .from(candidatesTable)
-    .where(and(eq(candidatesTable.id, id), isNull(candidatesTable.deletedAt)));
+    .where(and(eq(candidatesTable.id, id), activeCandidateFilter));
   if (!candidate) {
     res.status(404).json({ error: "Candidate not found" });
     return;
@@ -289,7 +289,7 @@ router.delete("/candidates/:id", async (req, res) => {
       deletionBatchId: randomUUID(),
       updatedAt: now,
     })
-    .where(and(eq(candidatesTable.id, id), isNull(candidatesTable.deletedAt)));
+    .where(and(eq(candidatesTable.id, id), activeCandidateFilter));
   res.status(204).send();
 });
 
@@ -346,7 +346,7 @@ router.post("/candidates/bulk", async (req, res) => {
       .where(
         and(
           inArray(candidatesTable.id, ids),
-          isNull(candidatesTable.deletedAt),
+          activeCandidateFilter,
         ),
       )
       .returning({ id: candidatesTable.id });

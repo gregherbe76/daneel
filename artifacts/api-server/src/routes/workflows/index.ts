@@ -7,6 +7,7 @@ import {
   jobInsightsTable,
   shortlistsTable,
   candidatesTable,
+  activeCandidateFilter,
 } from "@workspace/db";
 import { eq, desc, inArray, and } from "drizzle-orm";
 import { RunWorkflowBody } from "@workspace/api-zod";
@@ -214,15 +215,20 @@ router.get("/workflows/jobs/:jobId/latest", async (req, res) => {
       db.select().from(aiEvaluationsTable).where(eq(aiEvaluationsTable.runId, run.id)),
       db.select().from(jobInsightsTable).where(eq(jobInsightsTable.runId, run.id)).limit(1),
       db.select().from(shortlistsTable).where(eq(shortlistsTable.runId, run.id)).limit(1),
-      db.select().from(candidatesTable),
+      db.select().from(candidatesTable).where(activeCandidateFilter),
     ]);
 
   const candidateMap = new Map(candidates.map(c => [c.id, c]));
 
-  const evaluationsWithCandidates = evaluations.map(e => ({
-    ...e,
-    candidate: candidateMap.get(e.candidateId),
-  }));
+  // Drop evaluations whose candidate has been soft-deleted so the latest-run
+  // payload (and the pipeline/report views built off it) doesn't surface
+  // trashed candidates as "Unknown" rows.
+  const evaluationsWithCandidates = evaluations
+    .filter(e => candidateMap.has(e.candidateId))
+    .map(e => ({
+      ...e,
+      candidate: candidateMap.get(e.candidateId),
+    }));
 
   const sourcingLog = logs.find(l => l.step === "sourcing" && l.status === "completed");
   let sourcedCandidates: typeof candidates = [];
@@ -276,7 +282,7 @@ export async function getLowConfidenceCandidates(runId: number): Promise<{ candi
   const candidates = await db
     .select({ id: candidatesTable.id, name: candidatesTable.name })
     .from(candidatesTable)
-    .where(inArray(candidatesTable.id, lowConfIds));
+    .where(and(inArray(candidatesTable.id, lowConfIds), activeCandidateFilter));
 
   return candidates.map((c) => ({ candidateId: c.id, candidateName: c.name }));
 }

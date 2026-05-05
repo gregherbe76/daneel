@@ -8,6 +8,7 @@ import {
   jobsTable,
   candidatesTable,
   applicationsTable,
+  activeCandidateFilter,
 } from "@workspace/db";
 import type { VariantCriteria, DataMode, ScoringWeights } from "@workspace/db";
 import { eq, ne, and, inArray } from "drizzle-orm";
@@ -99,13 +100,17 @@ async function runSourcing(
     // candidates. Any one signal is enough to identify the same person:
     // GitHub-sourced rows may have no email, Web Search (LinkedIn) results
     // have only a profile URL, and imported rows may have only an email.
+    // Dedupe lookup ignores soft-deleted rows so a candidate the recruiter
+    // trashed can be re-sourced (and re-applied to the job) instead of being
+    // silently skipped against a tombstone in the trash bin.
     const existing = await db
       .select({
         email: candidatesTable.email,
         githubUrl: candidatesTable.githubUrl,
         linkedIn: candidatesTable.linkedIn,
       })
-      .from(candidatesTable);
+      .from(candidatesTable)
+      .where(activeCandidateFilter);
     const existingEmails = new Set(
       existing.map((c) => c.email?.toLowerCase()).filter((v): v is string => !!v),
     );
@@ -254,7 +259,7 @@ async function runEnrichment(
   const allCandidates = await db
     .select()
     .from(candidatesTable)
-    .where(inArray(candidatesTable.id, candidateIds));
+    .where(and(inArray(candidatesTable.id, candidateIds), activeCandidateFilter));
 
   // Filter to only candidates with sparse / placeholder profiles
   const candidates = allCandidates.filter(needsEnrichment);
@@ -543,7 +548,7 @@ async function runCandidateMatching(
         await runInlineEnrichmentForCandidates(runId, job, lowConfCandidates, enrichmentProvider);
         // Re-fetch the enriched rows so the AI sees updated profiles
         const enrichedIds = lowConfCandidates.map((c) => c.id);
-        const refreshed = await db.select().from(candidatesTable).where(inArray(candidatesTable.id, enrichedIds));
+        const refreshed = await db.select().from(candidatesTable).where(and(inArray(candidatesTable.id, enrichedIds), activeCandidateFilter));
         const refreshedMap = new Map(refreshed.map((c) => [c.id, c]));
         candidatesForMatching = candidatesForMatching.map((c) => refreshedMap.get(c.id) ?? c);
         logger.info({ runId, refreshed: refreshed.length }, "Re-fetched enriched candidates for matching");
@@ -883,7 +888,7 @@ export async function runWorkflowEngine(
             const targetCandidates = await db
               .select()
               .from(candidatesTable)
-              .where(inArray(candidatesTable.id, options.targetCandidateIds));
+              .where(and(inArray(candidatesTable.id, options.targetCandidateIds), activeCandidateFilter));
             if (targetCandidates.length > 0) {
               await logStep(runId, "enrichment", "running", {
                 candidateCount: targetCandidates.length,
@@ -932,8 +937,10 @@ export async function runWorkflowEngine(
     const [currentRun] = await db.select({ dataMode: agentRunsTable.dataMode }).from(agentRunsTable).where(eq(agentRunsTable.id, runId));
     const effectiveDataMode: DataMode = currentRun?.dataMode ?? dataMode;
 
-    // Step 2: Candidate Matching — enforce data mode separation
-    const allCandidates = await db.select().from(candidatesTable);
+    // Step 2: Candidate Matching — enforce data mode separation. Soft-deleted
+    // (trashed) candidates are excluded so a recruiter who just bulk-deleted
+    // doesn't see them re-scored and resurface in the next workflow run.
+    const allCandidates = await db.select().from(candidatesTable).where(activeCandidateFilter);
 
     let matchingCandidates: typeof allCandidates;
     if (effectiveDataMode === "real") {

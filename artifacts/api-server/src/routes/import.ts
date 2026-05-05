@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { db, candidatesTable, applicationsTable, jobsTable, agentProvidersTable } from "@workspace/db";
+import { db, candidatesTable, applicationsTable, jobsTable, agentProvidersTable, activeCandidateFilter } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { resolveSourcingProvider, providerFromRow } from "./workflows/providers";
 import type { SourcingCandidate } from "./workflows/providers/native-openai-sourcing";
@@ -424,13 +424,17 @@ router.post("/candidates/source", async (req, res) => {
   // Deduplicate against existing candidates by githubUrl OR email — either
   // signal alone is enough to identify the same person. GitHub-sourced rows
   // may have no email; legacy imports may have no github URL.
+  // Soft-deleted (trashed) rows are intentionally excluded so re-importing a
+  // candidate the recruiter just deleted produces a fresh row instead of
+  // being silently skipped as a duplicate against the tombstone.
   const existingRows = await db
     .select({
       email: candidatesTable.email,
       githubUrl: candidatesTable.githubUrl,
       linkedIn: candidatesTable.linkedIn,
     })
-    .from(candidatesTable);
+    .from(candidatesTable)
+    .where(activeCandidateFilter);
   const existingEmails = new Set(
     existingRows.map((r) => r.email?.toLowerCase()).filter((v): v is string => !!v),
   );
