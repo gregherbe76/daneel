@@ -287,6 +287,13 @@ Reports are clearly labelled. Mock data is never silently mixed with real data.
 
 ---
 
+## Telemetry
+
+The frontend ships with **opt-in, anonymous** PostHog product analytics
+(disabled in dev, no PII, GDPR-compliant). See
+[`docs/TELEMETRY.md`](docs/TELEMETRY.md) for the exact event list, payload
+fields, and how to opt out.
+
 ## License
 
 MIT
