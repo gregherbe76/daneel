@@ -642,6 +642,18 @@ export interface DeliberationQuotaError {
   deliberationId: number;
 }
 
+/**
+ * Response from the Scout Connect state-issuance endpoint.
+ */
+export interface ScoutConnectStateResponse {
+  /** Single-use CSRF token. Sent to Scout in the redirect URL and validated by the callback. */
+  state: string;
+  /** Absolute URL on Scout the frontend should open in a new tab. */
+  connectUrl: string;
+  /** Absolute URL Scout should redirect back to with `?token=…&state=…`. */
+  callbackUrl: string;
+}
+
 export interface UpsertStepSettingBody {
   workflowStep: WorkflowStepName;
   providerId: number;
@@ -1121,6 +1133,16 @@ export interface UploadUrlResponse {
 
 export type ListCandidateDeliberationsParams = {
   jobId?: number;
+};
+
+export type ScoutConnectCallbackParams = {
+  token?: string;
+  state?: string;
+  error?: string;
+};
+
+export type DisconnectScout200 = {
+  removed: boolean;
 };
 
 export type ListCandidateNotesParams = {

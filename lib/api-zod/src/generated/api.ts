@@ -2603,6 +2603,49 @@ export const ListCandidateDeliberationsResponse = zod.array(
 );
 
 /**
+ * Returns a one-time CSRF `state` token plus the absolute Scout Connect URL the frontend should open in a new tab. The state expires after ~10 minutes and can only be consumed once by the callback handler.
+
+ * @summary Mint a single-use CSRF state for the Scout Connect redirect flow
+ */
+export const IssueScoutConnectStateResponse = zod
+  .object({
+    state: zod
+      .string()
+      .describe(
+        "Single-use CSRF token. Sent to Scout in the redirect URL and validated by the callback.",
+      ),
+    connectUrl: zod
+      .string()
+      .describe("Absolute URL on Scout the frontend should open in a new tab."),
+    callbackUrl: zod
+      .string()
+      .describe(
+        "Absolute URL Scout should redirect back to with `?token=…&state=…`.",
+      ),
+  })
+  .describe("Response from the Scout Connect state-issuance endpoint.");
+
+/**
+ * Receives the redirect from Scout with `?token=…&state=…`, validates the state, exchanges the token server-side for `{apiKey, baseUrl}`, upserts the "A-Player Scout" `twin_webhook` provider, and (only if no sourcing provider was assigned yet) wires it as the sourcing step provider. Always responds with HTML — the page pings the originating tab via `BroadcastChannel` and `localStorage` then auto-closes on success.
+
+ * @summary Scout Connect redirect callback
+ */
+export const ScoutConnectCallbackQueryParams = zod.object({
+  token: zod.coerce.string().optional(),
+  state: zod.coerce.string().optional(),
+  error: zod.coerce.string().optional(),
+});
+
+/**
+ * Clears any `workflow_provider_settings` rows that reference the "A-Player Scout" provider, then deletes the provider row itself. Required because the Configured Providers DELETE route cannot remove a row that's still assigned to a workflow step (FK is `onDelete: restrict`), and Scout is auto-assigned to sourcing on first connect.
+
+ * @summary Atomically unlink and delete the Scout provider
+ */
+export const DisconnectScoutResponse = zod.object({
+  removed: zod.boolean(),
+});
+
+/**
  * @summary Get the current email re-validation scheduler settings
  */
 export const getEmailRevalidationSettingsResponseThresholdDaysMax = 365;

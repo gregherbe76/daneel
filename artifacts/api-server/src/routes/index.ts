@@ -13,6 +13,7 @@ import emailStatusChangesRouter from "./email-status-changes";
 import brandingRouter from "./branding";
 import storageRouter from "./storage";
 import deliberationsRouter from "./deliberations";
+import integrationsScoutRouter from "./integrations-scout";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(emailStatusChangesRouter);
 router.use(brandingRouter);
 router.use(storageRouter);
 router.use(deliberationsRouter);
+router.use(integrationsScoutRouter);
 
 export default router;

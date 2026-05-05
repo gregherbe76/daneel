@@ -39,6 +39,7 @@ import type {
   CreateProviderBody,
   DeliberationQuotaError,
   DeliberationRecord,
+  DisconnectScout200,
   EmailRevalidationAlertStatus,
   EmailRevalidationRun,
   EmailRevalidationSettings,
@@ -67,6 +68,8 @@ import type {
   RestoreCandidateBatchResult,
   RunVariantBody,
   RunWorkflowBody,
+  ScoutConnectCallbackParams,
+  ScoutConnectStateResponse,
   TeamMember,
   ToggleProviderBody,
   UpdateApplicationBody,
@@ -3576,6 +3579,280 @@ export function useListCandidateDeliberations<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Returns a one-time CSRF `state` token plus the absolute Scout Connect URL the frontend should open in a new tab. The state expires after ~10 minutes and can only be consumed once by the callback handler.
+
+ * @summary Mint a single-use CSRF state for the Scout Connect redirect flow
+ */
+export const getIssueScoutConnectStateUrl = () => {
+  return `/api/integrations/scout/state`;
+};
+
+export const issueScoutConnectState = async (
+  options?: RequestInit,
+): Promise<ScoutConnectStateResponse> => {
+  return customFetch<ScoutConnectStateResponse>(
+    getIssueScoutConnectStateUrl(),
+    {
+      ...options,
+      method: "POST",
+    },
+  );
+};
+
+export const getIssueScoutConnectStateMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof issueScoutConnectState>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issueScoutConnectState>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["issueScoutConnectState"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issueScoutConnectState>>,
+    void
+  > = () => {
+    return issueScoutConnectState(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IssueScoutConnectStateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof issueScoutConnectState>>
+>;
+
+export type IssueScoutConnectStateMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Mint a single-use CSRF state for the Scout Connect redirect flow
+ */
+export const useIssueScoutConnectState = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof issueScoutConnectState>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof issueScoutConnectState>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getIssueScoutConnectStateMutationOptions(options));
+};
+
+/**
+ * Receives the redirect from Scout with `?token=…&state=…`, validates the state, exchanges the token server-side for `{apiKey, baseUrl}`, upserts the "A-Player Scout" `twin_webhook` provider, and (only if no sourcing provider was assigned yet) wires it as the sourcing step provider. Always responds with HTML — the page pings the originating tab via `BroadcastChannel` and `localStorage` then auto-closes on success.
+
+ * @summary Scout Connect redirect callback
+ */
+export const getScoutConnectCallbackUrl = (
+  params?: ScoutConnectCallbackParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/integrations/scout/callback?${stringifiedParams}`
+    : `/api/integrations/scout/callback`;
+};
+
+export const scoutConnectCallback = async (
+  params?: ScoutConnectCallbackParams,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getScoutConnectCallbackUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getScoutConnectCallbackQueryKey = (
+  params?: ScoutConnectCallbackParams,
+) => {
+  return [
+    `/api/integrations/scout/callback`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getScoutConnectCallbackQueryOptions = <
+  TData = Awaited<ReturnType<typeof scoutConnectCallback>>,
+  TError = ErrorType<string>,
+>(
+  params?: ScoutConnectCallbackParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof scoutConnectCallback>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getScoutConnectCallbackQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof scoutConnectCallback>>
+  > = ({ signal }) =>
+    scoutConnectCallback(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof scoutConnectCallback>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ScoutConnectCallbackQueryResult = NonNullable<
+  Awaited<ReturnType<typeof scoutConnectCallback>>
+>;
+export type ScoutConnectCallbackQueryError = ErrorType<string>;
+
+/**
+ * @summary Scout Connect redirect callback
+ */
+
+export function useScoutConnectCallback<
+  TData = Awaited<ReturnType<typeof scoutConnectCallback>>,
+  TError = ErrorType<string>,
+>(
+  params?: ScoutConnectCallbackParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof scoutConnectCallback>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getScoutConnectCallbackQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Clears any `workflow_provider_settings` rows that reference the "A-Player Scout" provider, then deletes the provider row itself. Required because the Configured Providers DELETE route cannot remove a row that's still assigned to a workflow step (FK is `onDelete: restrict`), and Scout is auto-assigned to sourcing on first connect.
+
+ * @summary Atomically unlink and delete the Scout provider
+ */
+export const getDisconnectScoutUrl = () => {
+  return `/api/integrations/scout/connection`;
+};
+
+export const disconnectScout = async (
+  options?: RequestInit,
+): Promise<DisconnectScout200> => {
+  return customFetch<DisconnectScout200>(getDisconnectScoutUrl(), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDisconnectScoutMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof disconnectScout>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof disconnectScout>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["disconnectScout"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof disconnectScout>>,
+    void
+  > = () => {
+    return disconnectScout(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DisconnectScoutMutationResult = NonNullable<
+  Awaited<ReturnType<typeof disconnectScout>>
+>;
+
+export type DisconnectScoutMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Atomically unlink and delete the Scout provider
+ */
+export const useDisconnectScout = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof disconnectScout>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof disconnectScout>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getDisconnectScoutMutationOptions(options));
+};
 
 /**
  * @summary Get the current email re-validation scheduler settings

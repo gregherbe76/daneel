@@ -87,6 +87,95 @@ Sourcing from a job description. JD in, candidate profiles out.
   metadata in the engine were the original "Twin Scout" plumbing for
   this product.
 
+### A-Player Scout Connect (redirect-based credential exchange)
+
+To remove the friction of recruiters copy-pasting an API key into the
+Twin Webhook form, A-Player Scout connects via an OAuth-flavored
+redirect. The recruiter never sees or handles the API key. Both sides
+must implement the contract below verbatim.
+
+**Daneel-side env var**
+
+`SCOUT_CONNECT_BASE_URL` (default `https://scout.aplayer.ai`) lets the
+same code work against a Scout staging instance.
+
+**1. Outbound redirect (Daneel → Scout)**
+
+When the recruiter clicks **Connect Scout** on the marketplace card,
+Daneel mints a single-use CSRF `state` (server-side, ~10 min TTL,
+in-memory) and opens this URL in a new tab:
+
+```
+GET {SCOUT_CONNECT_BASE_URL}/connect
+    ?return_to=<absolute Daneel callback URL>
+    &state=<csrf>
+```
+
+`return_to` is always `${origin}/api/integrations/scout/callback` on
+the requesting Daneel instance. Scout MUST preserve `state` verbatim
+when redirecting back.
+
+**2. Inbound redirect (Scout → Daneel)**
+
+After Scout authenticates the recruiter, it redirects back to
+`return_to` with one of two query shapes:
+
+- Success: `?token=<one-time, short-lived>&state=<echoed CSRF>`
+- Failure: `?error=<short machine-readable code>&state=<echoed CSRF>`
+
+`token` is single-use, expires within ~5 minutes, and is validated
+exclusively via the exchange endpoint below — Daneel never inspects
+its contents.
+
+**3. Server-to-server token exchange**
+
+Daneel's callback handler validates `state` (single-use, not expired,
+not replayed), then immediately POSTs `token` to Scout:
+
+```
+POST {SCOUT_CONNECT_BASE_URL}/api/connect/exchange
+Content-Type: application/json
+
+{ "token": "<one-time token from step 2>" }
+```
+
+Scout responds with the credentials Daneel will store as a
+`twin_webhook` provider:
+
+```
+200 OK
+Content-Type: application/json
+
+{
+  "apiKey":  "<long-lived API key for this Daneel instance>",
+  "baseUrl": "<https URL Daneel hits for /workflow/sourcing etc>"
+}
+```
+
+Any non-2xx response, or a body that doesn't match the schema above,
+is surfaced to the recruiter as a 502 with a "connection failed"
+message and the provider row is NOT created.
+
+**4. Persistence on the Daneel side**
+
+On a successful exchange, Daneel:
+
+1. Upserts an `agent_providers` row named `"A-Player Scout"` with
+   `type=twin_webhook`, the returned `baseUrl`, and the returned
+   `apiKey` stored in `apiKeyEncryptedPlaceholder`.
+2. If — and only if — no row exists yet in `workflow_provider_settings`
+   for `workflow_step="sourcing"`, auto-assigns the new provider as
+   the sourcing step. Pre-existing assignments are left untouched.
+3. Renders an HTML page that pings the originating tab (via
+   `BroadcastChannel("daneel:scout-connect")`, a `localStorage`
+   `daneel.scoutConnect` write, and `window.opener.postMessage`) so
+   the marketplace card flips to **Connected** without a manual
+   refresh, then auto-closes after ~800ms.
+
+The existing manual `twin_webhook` create/edit form is left alone —
+power users and the Scout staging environment can still wire a
+provider by hand.
+
 ---
 
 ## Extend
