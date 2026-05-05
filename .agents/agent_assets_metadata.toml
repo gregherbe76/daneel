@@ -6,3 +6,9 @@ id = "Gt0tsPE7btY3R3x2e8XmS"
 uri = "file://README.md"
 type = "text"
 title = "Agentic Recruiting OS — README.md"
+
+[[outputs]]
+id = "G9i77TqQU-kGJUWujBB87"
+uri = "file://screenshots/marketplace.jpg"
+type = "image"
+title = "Provider Marketplace v1 — All four A-Player stubs visible"

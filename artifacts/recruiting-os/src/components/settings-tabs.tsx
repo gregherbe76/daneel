@@ -1,8 +1,8 @@
 import { Link, useLocation } from "wouter";
-import { Cpu, Mail, Bell, BarChart3 } from "lucide-react";
+import { Store, Mail, Bell, BarChart3 } from "lucide-react";
 
 const TABS = [
-  { href: "/settings/providers", label: "Agent Providers", icon: Cpu },
+  { href: "/settings/marketplace", label: "Marketplace", icon: Store },
   { href: "/settings/email-revalidation", label: "Email Re-checks", icon: Mail },
   { href: "/settings/notifications", label: "Notifications", icon: Bell },
   { href: "/settings/telemetry", label: "Telemetry", icon: BarChart3 },

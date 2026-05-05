@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MapPin, Loader2, Briefcase, Sparkles, Zap, FlaskConical } from "lucide-react";
+import { Plus, MapPin, Loader2, Briefcase, Sparkles, Zap, FlaskConical, Store } from "lucide-react";
 import { useUnseenRunsByJob } from "@/lib/pending-runs";
 
 export default function JobsPage() {
@@ -36,9 +36,20 @@ export default function JobsPage() {
           </div>
           <h3 className="text-lg font-semibold mb-1">Let's open your first role</h3>
           <p className="text-muted-foreground mb-4">Add a job and HiringAI will guide you all the way to a shortlist.</p>
-          <Link href="/jobs/new">
-            <Button variant="outline">Create Job</Button>
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/jobs/new">
+              <Button>Create Job</Button>
+            </Link>
+            <Link href="/settings/marketplace">
+              <Button variant="outline" className="gap-2" data-testid="empty-state-marketplace-cta">
+                <Store className="h-4 w-4" />
+                Browse the Marketplace
+              </Button>
+            </Link>
+          </div>
+          <p className="text-xs text-muted-foreground mt-4 max-w-sm">
+            Plug in sourcing, evaluation, and outreach agents before your first run.
+          </p>
         </Card>
       ) : (
         <div className="grid gap-4">

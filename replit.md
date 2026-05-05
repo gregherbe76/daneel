@@ -100,9 +100,25 @@ Results are fetched via `GET /api/workflows/jobs/:jobId/latest`.
 - `resolveProvider(step)` — looks up DB setting, falls back to native
 - `resolveSourcingProvider()` — same but defaults to NativeOpenAISourcingProvider
 
-### Settings > Agent Providers
-UI at `/settings/providers` to configure which AI provider handles each workflow step.
-Workflow steps: `job_understanding`, `candidate_matching`, `shortlist_generation`, `sourcing`.
+### Settings > Marketplace (Phase 1.3)
+UI at `/settings/marketplace` is the new funnel for discovering + connecting agents. Five
+category tabs (Sourcing/Evaluation/Enrichment/Outreach/Reports) plus an "All" view, each
+with its own accent color. Catalog lives at `pages/settings/marketplace/catalog.ts`:
+- 4 ⭐ A-Player stubs (LinkedIn Recruiter, Twin Evaluator, Clearbit, Outreach Agent) → open a
+  shared `ComingSoonDialog` with phase copy. No network calls.
+- 3 free providers (Custom Webhook, SerpAPI Web Search, Apify Scrapers) → connect via the
+  existing `useCreateProvider` / `useUpdateProvider` hooks. Apify has no engine handler yet,
+  so its key is persisted to `localStorage` (`hiringai.apifyKey`) — visible "engine integration
+  ships in a follow-up" helper text on the card.
+- Connection state pill (Connected / Action required / Disconnected) for free cards is derived
+  from `useListProviders()` (matches by `type`).
+
+Routing: `/settings`, `/settings/providers`, `/settings/agent-providers` all redirect to
+`/settings/marketplace`. The legacy provider admin still lives at `/settings/providers/legacy`
+for now (workflow step assignments, advanced GitHub/Web Search tuning).
+Sidebar + settings tab strip both point at the marketplace.
+
+Workflow steps (unchanged): `job_understanding`, `candidate_matching`, `shortlist_generation`, `sourcing`.
 
 ### Telemetry (opt-in, frontend-only)
 PostHog Cloud (EU) product analytics, **off by default**. Wrapper at

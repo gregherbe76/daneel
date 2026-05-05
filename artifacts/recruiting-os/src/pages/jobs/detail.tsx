@@ -26,7 +26,7 @@ import {
   Loader2, MapPin, Edit, User, Mail, ArrowRight, Play,
   Sparkles, ChevronDown, ChevronUp, ChevronRight, BrainCircuit, Zap,
   Building2, Github, Linkedin, AlertTriangle, FileText, GitBranch,
-  Upload, Bot, Users, Eye, Search,
+  Upload, Bot, Users, Eye, Search, FlaskConical,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";

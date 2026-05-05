@@ -21,6 +21,7 @@ import JobReportPage from "./pages/jobs/report";
 import CandidatesPage from "./pages/candidates/index";
 import CandidateDetailPage from "./pages/candidates/detail";
 import AgentProvidersPage from "./pages/settings/providers";
+import MarketplacePage from "./pages/settings/marketplace";
 import EmailRevalidationSettingsPage from "./pages/settings/email-revalidation";
 import BrandingSettingsPage from "./pages/settings/branding";
 import NotificationsSettingsPage from "./pages/settings/notifications";
@@ -44,8 +45,11 @@ function AppRoutes() {
         <Route path="/candidates/:id/edit" component={() => <div className="p-8">Candidate Edit (WIP)</div>} />
         <Route path="/pipeline" component={() => <div className="p-8">Pipeline (WIP)</div>} />
         <Route path="/mentions" component={MentionsPage} />
-        <Route path="/settings" component={() => <Redirect to="/settings/providers" />} />
-        <Route path="/settings/providers" component={AgentProvidersPage} />
+        <Route path="/settings" component={() => <Redirect to="/settings/marketplace" />} />
+        <Route path="/settings/marketplace" component={MarketplacePage} />
+        <Route path="/settings/providers" component={() => <Redirect to="/settings/marketplace" />} />
+        <Route path="/settings/agent-providers" component={() => <Redirect to="/settings/marketplace" />} />
+        <Route path="/settings/providers/legacy" component={AgentProvidersPage} />
         <Route path="/settings/email-revalidation" component={EmailRevalidationSettingsPage} />
         <Route path="/settings/branding" component={BrandingSettingsPage} />
         <Route path="/settings/notifications" component={NotificationsSettingsPage} />

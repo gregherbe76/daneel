@@ -71,7 +71,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { name: "Jobs", href: "/jobs", icon: Briefcase },
     { name: "Candidates", href: "/candidates", icon: Users },
     { name: "Inbox", href: "/mentions", icon: AtSign, badge: <InboxBadge /> },
-    { name: "Settings", href: "/settings/providers", icon: SettingsIcon, match: undefined },
+    { name: "Settings", href: "/settings/marketplace", icon: SettingsIcon, match: undefined },
   ];
 
   return (
