@@ -2436,7 +2436,7 @@ components:
     # ── PROVIDERS ──
     ProviderType:
       type: string
-      enum: [native_openai, custom_webhook, twin_webhook, github, web_search, council]
+      enum: [native_openai, custom_webhook, twin_webhook, github, web_search, apify, council]
 
     WorkflowStepName:
       type: string
@@ -2494,6 +2494,40 @@ components:
           nullable: true
           description: Domains/paths excluded via `-site:` operators (e.g. "pinterest.com").
 
+    ApifyProviderConfig:
+      type: object
+      description: Recruiter-tunable knobs for the Apify Scrapers provider.
+      properties:
+        actorId:
+          type: string
+          nullable: true
+          description: |
+            Apify actor ID (e.g. `apify/google-search-scraper`). Defaults to
+            the Google Search Scraper actor — its organic-result schema is
+            compatible with the shared `extractCandidates` extractor.
+        extraKeywords:
+          type: string
+          nullable: true
+          description: Free-text keywords appended verbatim to the constructed Boolean query.
+        targetSites:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: |
+            Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to
+            `linkedin.com/in` and `github.com` when empty/omitted.
+        excludeSites:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Domains/paths excluded via `-site:` operators.
+        resultsPerPage:
+          type: integer
+          nullable: true
+          description: Results per page to ask the actor for (caps dataset size per run).
+
     CouncilProviderConfig:
       type: object
       description: |
@@ -2514,6 +2548,8 @@ components:
           $ref: "#/components/schemas/GithubProviderConfig"
         web_search:
           $ref: "#/components/schemas/WebSearchProviderConfig"
+        apify:
+          $ref: "#/components/schemas/ApifyProviderConfig"
         council:
           $ref: "#/components/schemas/CouncilProviderConfig"
 

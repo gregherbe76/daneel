@@ -8,6 +8,7 @@ export { CustomWebhookProvider } from "./custom-webhook";
 export { TwinWebhookProvider } from "./twin-webhook";
 export { GithubSourcingProvider } from "./github";
 export { WebSearchSourcingProvider } from "./web-search";
+export { ApifySourcingProvider } from "./apify";
 export { CouncilProvider } from "./council";
 export type {
   DecisionProvider,

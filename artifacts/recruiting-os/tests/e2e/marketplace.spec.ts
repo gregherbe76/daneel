@@ -220,7 +220,7 @@ test.describe("Provider Marketplace", () => {
     await expect(page.getByTestId("connect-serpapi")).toContainText("Manage");
   });
 
-  test("Apify Scrapers flips from Disconnected to Connected after saving the local key", async ({
+  test("Apify Scrapers persists an `apify` provider and flips to Connected", async ({
     page,
   }) => {
     await page.goto("/settings/marketplace");
@@ -236,10 +236,6 @@ test.describe("Provider Marketplace", () => {
     await dialog.getByTestId("connect-save").click();
     await expect(dialog).toBeHidden();
 
-    const stored = await page.evaluate(() =>
-      window.localStorage.getItem("hiringai.apifyKey"),
-    );
-    expect(stored).toBe("apify_api_test_token");
     await expect(card).toContainText("Connected");
     await expect(page.getByTestId("connect-apify")).toContainText("Manage");
   });

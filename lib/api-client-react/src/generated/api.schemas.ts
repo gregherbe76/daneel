@@ -459,6 +459,7 @@ export const ProviderType = {
   twin_webhook: "twin_webhook",
   github: "github",
   web_search: "web_search",
+  apify: "apify",
   council: "council",
 } as const;
 
@@ -508,6 +509,27 @@ export interface WebSearchProviderConfig {
 }
 
 /**
+ * Recruiter-tunable knobs for the Apify Scrapers provider.
+ */
+export interface ApifyProviderConfig {
+  /** Apify actor ID (e.g. `apify/google-search-scraper`). Defaults to
+the Google Search Scraper actor — its organic-result schema is
+compatible with the shared `extractCandidates` extractor.
+ */
+  actorId?: string | null;
+  /** Free-text keywords appended verbatim to the constructed Boolean query. */
+  extraKeywords?: string | null;
+  /** Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to
+`linkedin.com/in` and `github.com` when empty/omitted.
+ */
+  targetSites?: string[] | null;
+  /** Domains/paths excluded via `-site:` operators. */
+  excludeSites?: string[] | null;
+  /** Results per page to ask the actor for (caps dataset size per run). */
+  resultsPerPage?: number | null;
+}
+
+/**
  * Recruiter-tunable knobs for the Council decision provider. The Council
 API key flows through the existing `apiKeyPlaceholder` field on the
 provider record (it is sent as `Authorization: Bearer <key>`).
@@ -524,6 +546,7 @@ export interface CouncilProviderConfig {
 export interface AgentProviderConfig {
   github?: GithubProviderConfig;
   web_search?: WebSearchProviderConfig;
+  apify?: ApifyProviderConfig;
   council?: CouncilProviderConfig;
 }
 

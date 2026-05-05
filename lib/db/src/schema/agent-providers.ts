@@ -18,6 +18,24 @@ export type GithubProviderConfig = {
   activeWithinMonths?: number | null;
 };
 
+export type ApifyProviderConfig = {
+  /**
+   * Apify actor ID (e.g. `apify/google-search-scraper`). The provider will
+   * call `acts/{actorId}/run-sync-get-dataset-items`. Defaults to the Google
+   * Search Scraper actor — its organic-result schema is compatible with the
+   * shared `extractCandidates` extractor.
+   */
+  actorId?: string | null;
+  /** Free-text keywords appended to the constructed Boolean query. */
+  extraKeywords?: string | null;
+  /** Sites the search should focus on. Used as `(site:a OR site:b)` filter. */
+  targetSites?: string[] | null;
+  /** Domains/paths excluded via `-site:` operators. */
+  excludeSites?: string[] | null;
+  /** Results per page to ask the actor for (cap on dataset size per run). */
+  resultsPerPage?: number | null;
+};
+
 export type WebSearchProviderConfig = {
   /** Free-text keywords appended to the constructed Boolean query. */
   extraKeywords?: string | null;
@@ -42,6 +60,7 @@ export type CouncilProviderConfig = {
 export type AgentProviderConfig = {
   github?: GithubProviderConfig;
   web_search?: WebSearchProviderConfig;
+  apify?: ApifyProviderConfig;
   council?: CouncilProviderConfig;
 };
 
@@ -51,6 +70,7 @@ export const providerTypeEnum = pgEnum("provider_type", [
   "twin_webhook",
   "github",
   "web_search",
+  "apify",
   "council",
 ]);
 

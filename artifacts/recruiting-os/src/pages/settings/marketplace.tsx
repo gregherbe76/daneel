@@ -105,7 +105,7 @@ const APPLICABLE_STEPS: Record<ConnectProviderType, WorkflowStep[]> = {
   ],
   serpapi: ["sourcing"],
   github: ["sourcing"],
-  apify: [],
+  apify: ["sourcing"],
 };
 
 /** Maps a marketplace connectType to the underlying provider `type` column. */
@@ -113,7 +113,8 @@ function providerTypeFor(connectType: ConnectProviderType): string | null {
   if (connectType === "custom_webhook") return "custom_webhook";
   if (connectType === "serpapi") return "web_search";
   if (connectType === "github") return "github";
-  return null; // apify has no DB-backed provider yet
+  if (connectType === "apify") return "apify";
+  return null;
 }
 
 function findProviderForEntry(
@@ -123,13 +124,6 @@ function findProviderForEntry(
   const type = providerTypeFor(entry.connectType);
   if (!type) return null;
   return providers.find((p) => p.type === type) ?? null;
-}
-
-const APIFY_LS_KEY = "hiringai.apifyKey";
-
-function getApifyKey(): string {
-  if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(APIFY_LS_KEY) ?? "";
 }
 
 type ConnState = "connected" | "action_required" | "disconnected";
@@ -152,7 +146,9 @@ function deriveState(entry: ConnectProvider, providers: ProviderRecord[]): ConnS
     return p.enabled ? "connected" : "action_required";
   }
   if (entry.connectType === "apify") {
-    return getApifyKey() ? "connected" : "disconnected";
+    const p = providers.find((x) => x.type === "apify");
+    if (!p) return "disconnected";
+    return p.enabled ? "connected" : "action_required";
   }
   return "disconnected";
 }
@@ -336,8 +332,6 @@ function ConnectDialog({
     setAdvancedOpen(false);
     if (entry.connectType === "custom_webhook") {
       setWebhookUrl(existing?.webhookUrl ?? "");
-    } else if (entry.connectType === "apify") {
-      setApiKey(getApifyKey());
     } else {
       setApiKey("");
     }
@@ -398,7 +392,9 @@ function ConnectDialog({
           type: "web_search" as const,
           webhookUrl: null,
           baseUrl: null,
-          apiKeyPlaceholder: apiKey || null,
+          apiKeyPlaceholder: apiKey
+            ? apiKey
+            : existing?.apiKeyPlaceholder ?? null,
           config: hasWsConfig ? { web_search: wsConfig } : null,
           enabled: true,
         };
@@ -445,14 +441,28 @@ function ConnectDialog({
         await qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
         toast({ title: "GitHub Agent connected" });
       } else if (entry.connectType === "apify") {
-        if (apiKey) {
-          window.localStorage.setItem(APIFY_LS_KEY, apiKey);
+        const payload = {
+          name: "Apify Scrapers",
+          type: "apify" as const,
+          webhookUrl: null,
+          baseUrl: null,
+          apiKeyPlaceholder: apiKey
+            ? apiKey
+            : existing?.apiKeyPlaceholder ?? null,
+          config: null,
+          enabled: true,
+        };
+        if (existing) {
+          await update.mutateAsync({ id: existing.id, data: payload });
         } else {
-          window.localStorage.removeItem(APIFY_LS_KEY);
+          await create.mutateAsync({ data: payload });
         }
+        await qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
         toast({
-          title: "Apify key saved locally",
-          description: "Engine integration ships in a follow-up.",
+          title: "Apify Scrapers connected",
+          description: apiKey
+            ? "Token saved — assign Apify to the sourcing step in Workflow Step Assignments."
+            : "Provider registered. Add an Apify token (or set APIFY_TOKEN as a project secret) to enable real sourcing.",
         });
       }
       onOpenChange(false);
@@ -655,25 +665,24 @@ function ConnectDialog({
         )}
 
         {entry.connectType === "apify" && (
-          <>
-            <div className="space-y-2">
-              <Label htmlFor="apify-key">Apify API token</Label>
-              <Input
-                id="apify-key"
-                type="password"
-                placeholder="apify_api_…"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                autoComplete="new-password"
-                data-testid="apify-key"
-              />
-            </div>
-            <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-800">
-              Engine integration is not live yet — the key is captured and stored on this device so
-              the card flips to Connected. Sourcing runs still need the workflow handler that ships
-              in a follow-up task.
-            </div>
-          </>
+          <div className="space-y-2">
+            <Label htmlFor="apify-key">Apify API token</Label>
+            <Input
+              id="apify-key"
+              type="password"
+              placeholder="apify_api_…"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              autoComplete="new-password"
+              data-testid="apify-key"
+            />
+            <p className="text-xs text-muted-foreground">
+              The token is sent to the Apify API as <code className="text-xs">Authorization: Bearer …</code>.
+              You can override it by setting the <code className="text-xs">APIFY_TOKEN</code> env
+              secret on the API server. Then assign Apify to the sourcing step in Workflow Step
+              Assignments.
+            </p>
+          </div>
         )}
 
         <DialogFooter>

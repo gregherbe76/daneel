@@ -33,6 +33,7 @@ import { CustomWebhookProvider } from "./custom-webhook";
 import { TwinWebhookProvider } from "./twin-webhook";
 import { GithubSourcingProvider } from "./github";
 import { WebSearchSourcingProvider } from "./web-search";
+import { ApifySourcingProvider } from "./apify";
 import { CouncilProvider } from "./council";
 import type { DecisionProvider } from "./decision-interface";
 import { logger } from "../../../lib/logger";
@@ -92,6 +93,13 @@ function buildProvider(row: typeof agentProvidersTable.$inferSelect): AgentProvi
       return new GithubSourcingProvider(row.id, row.name, row.config?.github ?? null);
     case "web_search":
       return new WebSearchSourcingProvider(row.id, row.name, row.config?.web_search ?? null);
+    case "apify":
+      return new ApifySourcingProvider(
+        row.id,
+        row.name,
+        row.apiKeyEncryptedPlaceholder ?? null,
+        row.config?.apify ?? null,
+      );
     case "council":
       throw new Error(
         `Provider "${row.name}" is a Council decision provider — use buildDecisionProvider() / resolveDecisionProvider() instead. ` +
@@ -175,6 +183,7 @@ const REAL_SOURCING_TYPES = new Set([
   "custom_webhook",
   "github",
   "web_search",
+  "apify",
 ]);
 
 /**
@@ -186,7 +195,7 @@ const REAL_SOURCING_TYPES = new Set([
  * be wired up correctly in every environment. Recruiters with a Twin
  * webhook can still flip the toggle manually.
  */
-const UI_DEFAULT_REAL_SOURCING_TYPES = new Set(["github", "web_search"]);
+const UI_DEFAULT_REAL_SOURCING_TYPES = new Set(["github", "web_search", "apify"]);
 
 /**
  * Returns true when the sourcing step is configured with an enabled

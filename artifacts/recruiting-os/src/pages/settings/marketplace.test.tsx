@@ -280,7 +280,7 @@ describe("MarketplacePage – free provider connect flows", () => {
     );
   });
 
-  it("Apify Scrapers flips from Disconnected to Connected after saving the local key", async () => {
+  it("Apify Scrapers persists an `apify` provider record and flips to Connected", async () => {
     renderPage();
 
     expect(statusOf("apify")).toMatch(/Disconnected/);
@@ -300,10 +300,11 @@ describe("MarketplacePage – free provider connect flows", () => {
       ).not.toBeInTheDocument(),
     );
 
-    // Apify connection state is derived from localStorage rather than the
-    // providers list — the marketplace card reads it on every render.
-    expect(window.localStorage.getItem("hiringai.apifyKey")).toBe(
-      "apify_api_test_token",
+    // Connection state now comes from the providers list — the marketplace
+    // creates a real `apify`-typed provider via the API instead of stashing
+    // the key in localStorage.
+    await waitFor(() =>
+      expect(providers.some((p) => p.type === "apify" && p.enabled)).toBe(true),
     );
     await waitFor(() => expect(statusOf("apify")).toMatch(/Connected/));
     expect(screen.getByTestId("connect-apify")).toHaveTextContent("Manage");

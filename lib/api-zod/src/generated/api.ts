@@ -1592,6 +1592,7 @@ export const ListProvidersResponseItem = zod.object({
     "twin_webhook",
     "github",
     "web_search",
+    "apify",
     "council",
   ]),
   baseUrl: zod.string().nullish(),
@@ -1667,6 +1668,39 @@ export const ListProvidersResponseItem = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
         ),
+      apify: zod
+        .object({
+          actorId: zod
+            .string()
+            .nullish()
+            .describe(
+              "Apify actor ID (e.g. `apify\/google-search-scraper`). Defaults to\nthe Google Search Scraper actor — its organic-result schema is\ncompatible with the shared `extractCandidates` extractor.\n",
+            ),
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              "Free-text keywords appended verbatim to the constructed Boolean query.",
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe("Domains\/paths excluded via `-site:` operators."),
+          resultsPerPage: zod
+            .number()
+            .nullish()
+            .describe(
+              "Results per page to ask the actor for (caps dataset size per run).",
+            ),
+        })
+        .optional()
+        .describe("Recruiter-tunable knobs for the Apify Scrapers provider."),
       council: zod
         .object({
           baseUrl: zod
@@ -1702,6 +1736,7 @@ export const CreateProviderBody = zod.object({
     "twin_webhook",
     "github",
     "web_search",
+    "apify",
     "council",
   ]),
   baseUrl: zod.string().nullish(),
@@ -1777,6 +1812,39 @@ export const CreateProviderBody = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
         ),
+      apify: zod
+        .object({
+          actorId: zod
+            .string()
+            .nullish()
+            .describe(
+              "Apify actor ID (e.g. `apify\/google-search-scraper`). Defaults to\nthe Google Search Scraper actor — its organic-result schema is\ncompatible with the shared `extractCandidates` extractor.\n",
+            ),
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              "Free-text keywords appended verbatim to the constructed Boolean query.",
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe("Domains\/paths excluded via `-site:` operators."),
+          resultsPerPage: zod
+            .number()
+            .nullish()
+            .describe(
+              "Results per page to ask the actor for (caps dataset size per run).",
+            ),
+        })
+        .optional()
+        .describe("Recruiter-tunable knobs for the Apify Scrapers provider."),
       council: zod
         .object({
           baseUrl: zod
@@ -1814,6 +1882,7 @@ export const GetProviderResponse = zod.object({
     "twin_webhook",
     "github",
     "web_search",
+    "apify",
     "council",
   ]),
   baseUrl: zod.string().nullish(),
@@ -1889,6 +1958,39 @@ export const GetProviderResponse = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
         ),
+      apify: zod
+        .object({
+          actorId: zod
+            .string()
+            .nullish()
+            .describe(
+              "Apify actor ID (e.g. `apify\/google-search-scraper`). Defaults to\nthe Google Search Scraper actor — its organic-result schema is\ncompatible with the shared `extractCandidates` extractor.\n",
+            ),
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              "Free-text keywords appended verbatim to the constructed Boolean query.",
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe("Domains\/paths excluded via `-site:` operators."),
+          resultsPerPage: zod
+            .number()
+            .nullish()
+            .describe(
+              "Results per page to ask the actor for (caps dataset size per run).",
+            ),
+        })
+        .optional()
+        .describe("Recruiter-tunable knobs for the Apify Scrapers provider."),
       council: zod
         .object({
           baseUrl: zod
@@ -1927,6 +2029,7 @@ export const UpdateProviderBody = zod.object({
     "twin_webhook",
     "github",
     "web_search",
+    "apify",
     "council",
   ]),
   baseUrl: zod.string().nullish(),
@@ -2002,6 +2105,39 @@ export const UpdateProviderBody = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
         ),
+      apify: zod
+        .object({
+          actorId: zod
+            .string()
+            .nullish()
+            .describe(
+              "Apify actor ID (e.g. `apify\/google-search-scraper`). Defaults to\nthe Google Search Scraper actor — its organic-result schema is\ncompatible with the shared `extractCandidates` extractor.\n",
+            ),
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              "Free-text keywords appended verbatim to the constructed Boolean query.",
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe("Domains\/paths excluded via `-site:` operators."),
+          resultsPerPage: zod
+            .number()
+            .nullish()
+            .describe(
+              "Results per page to ask the actor for (caps dataset size per run).",
+            ),
+        })
+        .optional()
+        .describe("Recruiter-tunable knobs for the Apify Scrapers provider."),
       council: zod
         .object({
           baseUrl: zod
@@ -2032,6 +2168,7 @@ export const UpdateProviderResponse = zod.object({
     "twin_webhook",
     "github",
     "web_search",
+    "apify",
     "council",
   ]),
   baseUrl: zod.string().nullish(),
@@ -2107,6 +2244,39 @@ export const UpdateProviderResponse = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
         ),
+      apify: zod
+        .object({
+          actorId: zod
+            .string()
+            .nullish()
+            .describe(
+              "Apify actor ID (e.g. `apify\/google-search-scraper`). Defaults to\nthe Google Search Scraper actor — its organic-result schema is\ncompatible with the shared `extractCandidates` extractor.\n",
+            ),
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              "Free-text keywords appended verbatim to the constructed Boolean query.",
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe("Domains\/paths excluded via `-site:` operators."),
+          resultsPerPage: zod
+            .number()
+            .nullish()
+            .describe(
+              "Results per page to ask the actor for (caps dataset size per run).",
+            ),
+        })
+        .optional()
+        .describe("Recruiter-tunable knobs for the Apify Scrapers provider."),
       council: zod
         .object({
           baseUrl: zod
@@ -2157,6 +2327,7 @@ export const ToggleProviderResponse = zod.object({
     "twin_webhook",
     "github",
     "web_search",
+    "apify",
     "council",
   ]),
   baseUrl: zod.string().nullish(),
@@ -2232,6 +2403,39 @@ export const ToggleProviderResponse = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
         ),
+      apify: zod
+        .object({
+          actorId: zod
+            .string()
+            .nullish()
+            .describe(
+              "Apify actor ID (e.g. `apify\/google-search-scraper`). Defaults to\nthe Google Search Scraper actor — its organic-result schema is\ncompatible with the shared `extractCandidates` extractor.\n",
+            ),
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              "Free-text keywords appended verbatim to the constructed Boolean query.",
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe("Domains\/paths excluded via `-site:` operators."),
+          resultsPerPage: zod
+            .number()
+            .nullish()
+            .describe(
+              "Results per page to ask the actor for (caps dataset size per run).",
+            ),
+        })
+        .optional()
+        .describe("Recruiter-tunable knobs for the Apify Scrapers provider."),
       council: zod
         .object({
           baseUrl: zod
@@ -2386,6 +2590,7 @@ export const ListProviderStepSettingsResponseItem = zod.object({
       "twin_webhook",
       "github",
       "web_search",
+      "apify",
       "council",
     ]),
     baseUrl: zod.string().nullish(),
@@ -2461,6 +2666,39 @@ export const ListProviderStepSettingsResponseItem = zod.object({
           .describe(
             "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
           ),
+        apify: zod
+          .object({
+            actorId: zod
+              .string()
+              .nullish()
+              .describe(
+                "Apify actor ID (e.g. `apify\/google-search-scraper`). Defaults to\nthe Google Search Scraper actor — its organic-result schema is\ncompatible with the shared `extractCandidates` extractor.\n",
+              ),
+            extraKeywords: zod
+              .string()
+              .nullish()
+              .describe(
+                "Free-text keywords appended verbatim to the constructed Boolean query.",
+              ),
+            targetSites: zod
+              .array(zod.string())
+              .nullish()
+              .describe(
+                "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+              ),
+            excludeSites: zod
+              .array(zod.string())
+              .nullish()
+              .describe("Domains\/paths excluded via `-site:` operators."),
+            resultsPerPage: zod
+              .number()
+              .nullish()
+              .describe(
+                "Results per page to ask the actor for (caps dataset size per run).",
+              ),
+          })
+          .optional()
+          .describe("Recruiter-tunable knobs for the Apify Scrapers provider."),
         council: zod
           .object({
             baseUrl: zod
@@ -2527,6 +2765,7 @@ export const UpsertProviderStepSettingResponse = zod.object({
       "twin_webhook",
       "github",
       "web_search",
+      "apify",
       "council",
     ]),
     baseUrl: zod.string().nullish(),
@@ -2602,6 +2841,39 @@ export const UpsertProviderStepSettingResponse = zod.object({
           .describe(
             "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
           ),
+        apify: zod
+          .object({
+            actorId: zod
+              .string()
+              .nullish()
+              .describe(
+                "Apify actor ID (e.g. `apify\/google-search-scraper`). Defaults to\nthe Google Search Scraper actor — its organic-result schema is\ncompatible with the shared `extractCandidates` extractor.\n",
+              ),
+            extraKeywords: zod
+              .string()
+              .nullish()
+              .describe(
+                "Free-text keywords appended verbatim to the constructed Boolean query.",
+              ),
+            targetSites: zod
+              .array(zod.string())
+              .nullish()
+              .describe(
+                "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+              ),
+            excludeSites: zod
+              .array(zod.string())
+              .nullish()
+              .describe("Domains\/paths excluded via `-site:` operators."),
+            resultsPerPage: zod
+              .number()
+              .nullish()
+              .describe(
+                "Results per page to ask the actor for (caps dataset size per run).",
+              ),
+          })
+          .optional()
+          .describe("Recruiter-tunable knobs for the Apify Scrapers provider."),
         council: zod
           .object({
             baseUrl: zod

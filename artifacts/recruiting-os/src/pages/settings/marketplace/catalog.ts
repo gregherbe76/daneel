@@ -171,8 +171,6 @@ export const CATALOG: CatalogEntry[] = [
     pricing: "Free tier on Apify — bring your own key",
     badges: ["free", "byo-key"],
     connectType: "apify",
-    helper:
-      "Key is captured and saved locally — engine integration ships in a follow-up.",
     logoMark: "Ap",
   },
 ];
