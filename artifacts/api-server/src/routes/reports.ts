@@ -27,7 +27,7 @@ const objectStorageService = new ObjectStorageService();
  *     and loaded directly from GCS, bypassing SSRF since we trust them.
  * Returns null if the logo can't be loaded — the cover just renders blank.
  */
-async function loadLogoBytes(logoUrl: string | null): Promise<Buffer | null> {
+export async function loadLogoBytes(logoUrl: string | null): Promise<Buffer | null> {
   if (!logoUrl) return null;
   if (logoUrl.startsWith("/objects/")) {
     try {

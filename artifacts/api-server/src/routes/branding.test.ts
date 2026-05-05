@@ -126,6 +126,59 @@ describe("PUT /api/branding color validation", () => {
   });
 });
 
+describe("PUT /api/branding logo URL validation", () => {
+  it("accepts an /objects/... path produced by the upload endpoint", async () => {
+    const res = await request(app)
+      .put("/api/branding")
+      .send({ logoUrl: "/objects/uploads/abc-123.png" });
+    expect(res.status).toBe(200);
+    expect(res.body.logoUrl).toBe("/objects/uploads/abc-123.png");
+  });
+
+  it("rejects http:// URLs (must be https)", async () => {
+    const res = await request(app)
+      .put("/api/branding")
+      .send({ logoUrl: "http://example.com/logo.png" });
+    expect(res.status).toBe(400);
+    expect(String(res.body.error)).toMatch(/https/i);
+  });
+
+  it("rejects URLs pointing at private/loopback IPs", async () => {
+    const res = await request(app)
+      .put("/api/branding")
+      .send({ logoUrl: "https://127.0.0.1/logo.png" });
+    expect(res.status).toBe(400);
+    expect(String(res.body.error)).toMatch(/public/i);
+  });
+
+  it("rejects garbage that isn't a URL at all", async () => {
+    const res = await request(app)
+      .put("/api/branding")
+      .send({ logoUrl: "not a url" });
+    expect(res.status).toBe(400);
+  });
+
+  it("accepts a normal public https logo URL", async () => {
+    const res = await request(app)
+      .put("/api/branding")
+      .send({ logoUrl: "https://example.com/logo.png" });
+    expect(res.status).toBe(200);
+    expect(res.body.logoUrl).toBe("https://example.com/logo.png");
+  });
+
+  it("clears the override when an empty string is sent", async () => {
+    await request(app)
+      .put("/api/branding")
+      .send({ logoUrl: "/objects/uploads/abc-123.png" });
+    const res = await request(app)
+      .put("/api/branding")
+      .send({ logoUrl: "" });
+    expect(res.status).toBe(200);
+    // Cleared rows fall back to the template default, which is non-empty.
+    expect(res.body.logoUrl).not.toBe("/objects/uploads/abc-123.png");
+  });
+});
+
 describe("GET /api/reports/job/:jobId/latest/pdf uses branding override colors", () => {
   const seededJobIds: number[] = [];
   const seededCandidateIds: number[] = [];
