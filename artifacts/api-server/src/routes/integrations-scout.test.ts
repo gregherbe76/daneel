@@ -18,6 +18,10 @@ import scoutRouter, {
   persistScoutProvider,
   _setScoutFetchForTest,
 } from "./integrations-scout";
+import {
+  decryptProviderSecret,
+  isEncryptedProviderSecret,
+} from "../lib/provider-secrets";
 
 const app = express();
 app.use(express.json());
@@ -194,7 +198,11 @@ describe("GET /api/integrations/scout/callback", () => {
       .where(eq(agentProvidersTable.name, SCOUT_PROVIDER_NAME));
     expect(row?.type).toBe("twin_webhook");
     expect(row?.baseUrl).toBe("https://twin.scout.aplayer.ai");
-    expect(row?.apiKeyEncryptedPlaceholder).toBe("scout-secret-key");
+    expect(row?.apiKeyEncryptedPlaceholder).toBeTruthy();
+    expect(isEncryptedProviderSecret(row!.apiKeyEncryptedPlaceholder!)).toBe(true);
+    expect(decryptProviderSecret(row!.apiKeyEncryptedPlaceholder!)).toBe(
+      "scout-secret-key",
+    );
     expect(row?.enabled).toBe(true);
   });
 
@@ -404,6 +412,7 @@ describe("persistScoutProvider auto-assigns sourcing", () => {
       .from(agentProvidersTable)
       .where(eq(agentProvidersTable.id, second.providerId));
     expect(row?.baseUrl).toBe("https://new.example.com");
-    expect(row?.apiKeyEncryptedPlaceholder).toBe("new");
+    expect(isEncryptedProviderSecret(row!.apiKeyEncryptedPlaceholder!)).toBe(true);
+    expect(decryptProviderSecret(row!.apiKeyEncryptedPlaceholder!)).toBe("new");
   });
 });

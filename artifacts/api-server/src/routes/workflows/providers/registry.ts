@@ -36,6 +36,29 @@ import { WebSearchSourcingProvider } from "./web-search";
 import { CouncilProvider } from "./council";
 import type { DecisionProvider } from "./decision-interface";
 import { logger } from "../../../lib/logger";
+import { decryptProviderSecret } from "../../../lib/provider-secrets";
+
+/**
+ * Strict decrypt at the runtime-dispatch boundary: a corrupt/wrong-key value
+ * here would otherwise silently drop the Authorization header and surface
+ * downstream as a confusing upstream 401. Throwing makes key misconfiguration
+ * immediately visible in workflow logs.
+ */
+function decryptApiKeyOrThrow(
+  stored: string | null | undefined,
+  providerName: string,
+): string | undefined {
+  if (stored == null || stored === "") return undefined;
+  try {
+    return decryptProviderSecret(stored);
+  } catch (err) {
+    throw new Error(
+      `Failed to decrypt API key for provider "${providerName}". ` +
+        `Check that PROVIDER_KEY_SECRET matches the value used to encrypt the row. ` +
+        `Underlying error: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
 
 /**
  * Sentinel ID used for native fallback providers that are not stored in the DB.
@@ -55,15 +78,16 @@ const NATIVE_FALLBACK_NAME = "Native OpenAI (default)";
  * When adding a new provider type, add a case here and import the class above.
  */
 function buildProvider(row: typeof agentProvidersTable.$inferSelect): AgentProvider {
+  const apiKey = decryptApiKeyOrThrow(row.apiKeyEncryptedPlaceholder, row.name);
   switch (row.type) {
     case "native_openai":
       return new NativeOpenAIProvider(row.id, row.name);
     case "custom_webhook":
       if (!row.webhookUrl) throw new Error(`Provider "${row.name}" is missing webhookUrl`);
-      return new CustomWebhookProvider(row.id, row.name, row.webhookUrl, row.apiKeyEncryptedPlaceholder ?? undefined);
+      return new CustomWebhookProvider(row.id, row.name, row.webhookUrl, apiKey);
     case "twin_webhook":
       if (!row.baseUrl) throw new Error(`Provider "${row.name}" is missing baseUrl`);
-      return new TwinWebhookProvider(row.id, row.name, row.baseUrl, row.apiKeyEncryptedPlaceholder ?? undefined);
+      return new TwinWebhookProvider(row.id, row.name, row.baseUrl, apiKey);
     case "github":
       return new GithubSourcingProvider(row.id, row.name, row.config?.github ?? null);
     case "web_search":
@@ -84,12 +108,13 @@ function buildProvider(row: typeof agentProvidersTable.$inferSelect): AgentProvi
  * (Council today) are only assigned to the `decision` workflow step.
  */
 function buildDecisionProvider(row: typeof agentProvidersTable.$inferSelect): DecisionProvider {
+  const apiKey = decryptApiKeyOrThrow(row.apiKeyEncryptedPlaceholder, row.name);
   switch (row.type) {
     case "council":
       return new CouncilProvider(
         row.id,
         row.name,
-        row.apiKeyEncryptedPlaceholder ?? undefined,
+        apiKey,
         row.config?.council ?? null,
       );
     default:

@@ -10,6 +10,26 @@ import {
 import { providerFromRow, decisionProviderFromRow } from "./workflows/providers";
 import { GithubSourcingProvider } from "./workflows/providers/github";
 import { logger } from "../lib/logger";
+import {
+  maybeDecryptProviderSecret,
+  maybeEncryptProviderSecret,
+} from "../lib/provider-secrets";
+
+/**
+ * Decrypt the credential before returning a provider row to API clients so
+ * the Settings UI can pre-populate the edit form. The column itself stays
+ * encrypted at rest.
+ */
+function decryptRowForApi<T extends { apiKeyEncryptedPlaceholder?: string | null }>(
+  row: T,
+): T {
+  return {
+    ...row,
+    apiKeyEncryptedPlaceholder: maybeDecryptProviderSecret(
+      row.apiKeyEncryptedPlaceholder,
+    ),
+  };
+}
 
 const router = Router();
 
@@ -19,7 +39,7 @@ router.get("/providers", async (_req, res) => {
     .select()
     .from(agentProvidersTable)
     .orderBy(agentProvidersTable.createdAt);
-  res.json(providers);
+  res.json(providers.map(decryptRowForApi));
 });
 
 // POST /providers
@@ -32,12 +52,12 @@ router.post("/providers", async (req, res) => {
       type: body.type,
       baseUrl: body.baseUrl ?? null,
       webhookUrl: body.webhookUrl ?? null,
-      apiKeyEncryptedPlaceholder: body.apiKeyPlaceholder ?? null,
+      apiKeyEncryptedPlaceholder: maybeEncryptProviderSecret(body.apiKeyPlaceholder),
       config: body.config ?? null,
       enabled: body.enabled ?? true,
     })
     .returning();
-  res.status(201).json(provider);
+  res.status(201).json(decryptRowForApi(provider!));
 });
 
 // GET /providers/steps  ← must be BEFORE /providers/:id
@@ -46,10 +66,13 @@ router.get("/providers/steps", async (_req, res) => {
   const providers = await db.select().from(agentProvidersTable);
   const providerMap = new Map(providers.map((p) => [p.id, p]));
 
-  const result = settings.map((s) => ({
-    ...s,
-    provider: providerMap.get(s.providerId),
-  }));
+  const result = settings.map((s) => {
+    const provider = providerMap.get(s.providerId);
+    return {
+      ...s,
+      provider: provider ? decryptRowForApi(provider) : provider,
+    };
+  });
   res.json(result);
 });
 
@@ -139,7 +162,7 @@ router.post("/providers/steps", async (req, res) => {
       .returning();
   }
 
-  res.json({ ...setting, provider });
+  res.json({ ...setting, provider: decryptRowForApi(provider) });
 });
 
 // GET /providers/:id
@@ -153,7 +176,7 @@ router.get("/providers/:id", async (req, res) => {
     res.status(404).json({ error: "Provider not found" });
     return;
   }
-  res.json(provider);
+  res.json(decryptRowForApi(provider));
 });
 
 // PUT /providers/:id
@@ -167,7 +190,7 @@ router.put("/providers/:id", async (req, res) => {
       type: body.type,
       baseUrl: body.baseUrl ?? null,
       webhookUrl: body.webhookUrl ?? null,
-      apiKeyEncryptedPlaceholder: body.apiKeyPlaceholder ?? null,
+      apiKeyEncryptedPlaceholder: maybeEncryptProviderSecret(body.apiKeyPlaceholder),
       config: body.config ?? null,
       enabled: body.enabled ?? true,
       updatedAt: new Date(),
@@ -178,7 +201,7 @@ router.put("/providers/:id", async (req, res) => {
     res.status(404).json({ error: "Provider not found" });
     return;
   }
-  res.json(provider);
+  res.json(decryptRowForApi(provider));
 });
 
 // DELETE /providers/:id

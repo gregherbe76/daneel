@@ -7,6 +7,7 @@ import {
   workflowProviderSettingsTable,
 } from "@workspace/db";
 import { logger } from "../lib/logger";
+import { encryptProviderSecret } from "../lib/provider-secrets";
 import { consumeScoutState, issueScoutState } from "./scout-state-store";
 
 /**
@@ -87,6 +88,7 @@ export async function persistScoutProvider(
     .where(eq(agentProvidersTable.name, SCOUT_PROVIDER_NAME))
     .limit(1);
 
+  const encryptedApiKey = encryptProviderSecret(apiKey);
   let providerId: number;
   if (existing.length > 0) {
     const [updated] = await db
@@ -95,7 +97,7 @@ export async function persistScoutProvider(
         type: "twin_webhook",
         baseUrl,
         webhookUrl: null,
-        apiKeyEncryptedPlaceholder: apiKey,
+        apiKeyEncryptedPlaceholder: encryptedApiKey,
         enabled: true,
         updatedAt: new Date(),
       })
@@ -109,7 +111,7 @@ export async function persistScoutProvider(
         name: SCOUT_PROVIDER_NAME,
         type: "twin_webhook",
         baseUrl,
-        apiKeyEncryptedPlaceholder: apiKey,
+        apiKeyEncryptedPlaceholder: encryptedApiKey,
         enabled: true,
       })
       .returning();
