@@ -11,6 +11,7 @@ import {
 import { validateEmail } from "./email-validation";
 import { logger } from "./logger";
 import { notifyRegression } from "./notifications";
+import { sendAlertEmail, detectAlertTransport } from "./alert-email";
 
 /**
  * Default values for the singleton settings row, seeded from env vars on first
@@ -253,13 +254,56 @@ async function maybeFireAlert(latestRun: EmailRevalidationRun): Promise<void> {
   );
 
   if (settings.alertEmail) {
-    // Actual SMTP delivery is intentionally pluggable — wire whatever transport
-    // the deployment uses here. We log explicitly so the notification is at
-    // least visible in production logs even without a transport configured.
-    logger.warn(
-      { alertEmail: settings.alertEmail, latestRunId: latestRun.id },
-      "Email re-validation alert dispatched (configure SMTP transport to deliver)",
-    );
+    const subject = `[HiringAI] Email re-validation sweep failing (${streak.length} consecutive failures)`;
+    const bodyLines = [
+      `The email re-validation sweep has failed ${streak.length} time(s) in a row, meeting the configured alert threshold of ${threshold}.`,
+      "",
+      `Latest run #${latestRun.id}:`,
+      `  errors: ${latestRun.errors}`,
+      latestRun.errorMessage
+        ? `  errorMessage: ${latestRun.errorMessage}`
+        : "  errorMessage: (none — failure inferred from per-candidate errors)",
+      "",
+      `Failure streak run ids (newest first): ${streak.map((r) => r.id).join(", ")}`,
+      "",
+      "Investigate the API server logs for stack traces. This alert will not re-fire until at least one sweep succeeds.",
+    ];
+    try {
+      const transport = await sendAlertEmail({
+        to: settings.alertEmail,
+        subject,
+        text: bodyLines.join("\n"),
+      });
+      if (transport === "none") {
+        logger.warn(
+          { alertEmail: settings.alertEmail, latestRunId: latestRun.id },
+          "Email re-validation alert NOT delivered — configure SENDGRID_API_KEY or SMTP_HOST",
+        );
+      } else {
+        logger.info(
+          {
+            alertEmail: settings.alertEmail,
+            latestRunId: latestRun.id,
+            transport,
+          },
+          "Email re-validation alert email sent",
+        );
+      }
+    } catch (err) {
+      // Per task spec: failure to send must be logged but must not break the
+      // sweep itself. The streak is already stamped with `alertedAt` above so
+      // we do NOT retry on the next sweep — that would spam an admin during
+      // an outage. The streak resets naturally once a sweep succeeds.
+      logger.error(
+        {
+          err: err instanceof Error ? err.message : String(err),
+          alertEmail: settings.alertEmail,
+          latestRunId: latestRun.id,
+          transport: detectAlertTransport(),
+        },
+        "Email re-validation alert email delivery failed",
+      );
+    }
   }
 }
 
