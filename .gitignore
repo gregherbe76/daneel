@@ -2,6 +2,8 @@
 
 # compiled output
 dist
+dist-prod-with-key
+dist-prod-no-key
 tmp
 out-tsc
 *.tsbuildinfo
