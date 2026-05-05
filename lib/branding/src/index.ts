@@ -1,12 +1,12 @@
 /**
  * Branding loader — Phase 2 of the "1 product + 3 templates" plan.
  *
- * Resolves which template (`hiringai` | `hireflow` | `shortlistpro`) the app
- * is running as, by reading either:
+ * Resolves which template the app is running as, by reading either:
  *   - `process.env.APP_TEMPLATE`           (Node — api-server)
  *   - `import.meta.env.VITE_APP_TEMPLATE`  (Vite — recruiting-os, build-time inlined)
  *
- * Defaults to `hiringai`. Unknown values fall back to `hiringai` with a warning.
+ * Currently only `hiringai` is shipped. Unknown values fall back to `hiringai`
+ * with a warning.
  *
  * The full template object is exported as `template` for new consumers.
  * For back-compat with existing consumers (`reports.ts`, `report.tsx`), we also
@@ -15,18 +15,12 @@
  */
 
 import { branding as hiringai } from "./templates/hiringai/branding";
-import { branding as hireflow } from "./templates/hireflow/branding";
-import { branding as shortlistpro } from "./templates/shortlistpro/branding";
 import { prompts as hiringaiPrompts } from "./templates/hiringai/prompts";
-import { prompts as hireflowPrompts } from "./templates/hireflow/prompts";
-import { prompts as shortlistproPrompts } from "./templates/shortlistpro/prompts";
 
-export type TemplateName = "hiringai" | "hireflow" | "shortlistpro";
+export type TemplateName = "hiringai";
 
 const TEMPLATES = {
   hiringai: { ...hiringai, prompts: hiringaiPrompts },
-  hireflow: { ...hireflow, prompts: hireflowPrompts },
-  shortlistpro: { ...shortlistpro, prompts: shortlistproPrompts },
 } as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

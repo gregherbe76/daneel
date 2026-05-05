@@ -4,7 +4,7 @@
 
 HiringAI is an open-source agentic recruiting product for founders and hiring leads. You describe the role, drop in a list of candidates, and an AI workflow scores, ranks, and shortlists them with explanations you can audit.
 
-It is built as a single coherent product on top of a reusable engine (Daneel) and ships with three brand templates (HiringAI, HireFlow, ShortlistPro) so the same engine can be re-skinned for different audiences.
+It is built as a single coherent product on top of a reusable engine (Daneel) so the engine can be re-skinned for different audiences.
 
 ## What Daneel is
 
@@ -52,15 +52,7 @@ The AI is constrained to score only on data it actually received. Missing data s
 Every workflow step (`job_understanding`, `candidate_matching`, `shortlist_generation`, `sourcing`) has a configurable provider. Out of the box: native OpenAI. Pluggable: any custom webhook, with optional twin-context metadata. Configure per-step in Settings → Agent Providers.
 
 ### Templates
-One product, three templates:
-
-| Template | Audience | Voice |
-|---|---|---|
-| **HiringAI** (default) | founders & hiring leads | direct, startup-tuned |
-| **HireFlow** | TA teams | formal, ATS / compliance |
-| **ShortlistPro** | agency recruiters | polished, client-facing |
-
-Switching is one env var (`APP_TEMPLATE` / `VITE_APP_TEMPLATE`). Each template ships its own brand colors, product name, primary user vocabulary, and full prompt pack with its own voice. The engine, schema, and JSON output contract stay identical across all three.
+The default front-end template is **HiringAI** — direct, startup-tuned copy for founders and hiring leads. Switching templates is one env var (`APP_TEMPLATE` / `VITE_APP_TEMPLATE`). Each template ships its own brand colors, product name, primary user vocabulary, and full prompt pack with its own voice. The engine, schema, and JSON output contract stay identical across templates.
 
 ## Demo flow (60 seconds)
 
@@ -70,7 +62,7 @@ Switching is one env var (`APP_TEMPLATE` / `VITE_APP_TEMPLATE`). Each template s
 4. **Show decision summary** — top-5 shortlist with Fit / Confidence / Decision scores, why-relevant, key risks, recommendation
 5. **Export PDF** — branded report, ready to share
 
-> Powered by the **Daneel** engine. Re-skinnable via **customizable templates** (HiringAI, HireFlow, ShortlistPro) — one env var swaps brand, voice, and prompt pack while the engine and data contract stay identical.
+> Powered by the **Daneel** engine. Re-skinnable via **customizable templates** — one env var swaps brand, voice, and prompt pack while the engine and data contract stay identical.
 
 ## Known limitations
 

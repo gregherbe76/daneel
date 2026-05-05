@@ -1,24 +1,12 @@
-# HireFlow
+# Daneel
 
 **The AI hiring workflow platform for teams.**
 
 Run your hiring workflows with AI. From job to shortlist, in one flow.
 
-> HireFlow is built on top of **Daneel**, an open-source agentic workflow engine.
-> HireFlow is the product. Daneel is the engine.
+> Daneel is the open-source agentic workflow engine that powers this product.
 
 Open-source · MIT licensed · production-ready starting point
-
----
-
-## Daneel powers ShortlistPro
-
-This repo ships with **ShortlistPro** — an AI-powered shortlist product for recruitment agencies — built on top of the Daneel engine.
-
-- **ShortlistPro** = the product (UI, reports, agency workflow). What recruiters see.
-- **Daneel** = the engine (workflow runtime, providers, agents). What builders fork.
-
-Think Vercel ↔ Next.js: agencies use ShortlistPro, builders extend Daneel.
 
 ---
 
@@ -165,8 +153,8 @@ To stop and wipe the database volume: `docker compose down -v`.
 ### 1. Install
 
 ```bash
-git clone https://github.com/your-org/agentic-recruiting-os
-cd agentic-recruiting-os
+git clone https://github.com/gregherbe76/daneel
+cd daneel
 pnpm install
 ```
 

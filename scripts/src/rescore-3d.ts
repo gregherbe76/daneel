@@ -144,9 +144,8 @@ Return ONLY valid JSON:
 }
 
 // ── Args ─────────────────────────────────────────────────────────────────────
-// To prevent overwriting evaluations produced under a different rubric variant
-// (e.g. the HireFlow/ShortlistPro 6-dimension rubric tracked in a separate
-// task), we REFUSE to run globally unless the caller passes one of:
+// To prevent overwriting evaluations produced under a different rubric variant,
+// we REFUSE to run globally unless the caller passes one of:
 //   --job <id>        rescope to a single job
 //   --run <id>        rescope to a single agent run
 //   --all-hiringai    explicit acknowledgement that every row in this DB is a

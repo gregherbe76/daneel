@@ -42,12 +42,9 @@ user-visible strings need to migrate.
 
 ### Dropped names — do not reintroduce
 
-The following names appeared in earlier phases of the project and have
-been **dropped**. They must not be used in new code, UI copy,
-documentation, or marketing material:
-
-- ~~**HireFlow**~~ — dropped. (Was an agency-flavored brand template.)
-- ~~**ShortlistPro**~~ — dropped. (Was a shortlist-focused brand template.)
+Earlier phases of the project explored additional agency-flavored brand
+templates. Those have been **dropped** and must not be reintroduced in
+new code, UI copy, documentation, or marketing material.
 
 The HiringAI front-end branding currently shipped on top of Daneel is
 a separate concern (UI template) and is not affected by this rename.
