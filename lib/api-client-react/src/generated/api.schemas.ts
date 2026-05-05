@@ -791,6 +791,33 @@ export interface EmailRevalidationAlertStatus {
   lastAlertedAt?: string | null;
 }
 
+export type TestNotificationChannelResultChannel =
+  (typeof TestNotificationChannelResultChannel)[keyof typeof TestNotificationChannelResultChannel];
+
+export const TestNotificationChannelResultChannel = {
+  email: "email",
+  slack: "slack",
+} as const;
+
+/**
+ * Outcome of sending a test message on a single notification channel.
+ */
+export interface TestNotificationChannelResult {
+  channel: TestNotificationChannelResultChannel;
+  /** True when the channel was enabled and a delivery was attempted. False when the channel is disabled, missing config, or the server can't actually deliver (e.g. SENDGRID_API_KEY not set). */
+  attempted: boolean;
+  /** True when the channel accepted the test message. False when delivery failed or wasn't attempted. */
+  ok: boolean;
+  /** Set when attempted=false; explains why the channel was skipped. */
+  skippedReason?: string | null;
+  /** Set when attempted=true and ok=false; carries the underlying error message. */
+  error?: string | null;
+}
+
+export interface TestNotificationResult {
+  results: TestNotificationChannelResult[];
+}
+
 /**
  * Enforces strict data separation. "real" uses only Twin-sourced or imported candidates. "mock" uses only AI-generated mock candidates. "fallback" means a real run where the Twin provider failed and native was used instead.
 

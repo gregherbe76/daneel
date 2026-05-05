@@ -110,11 +110,12 @@ function buildBody(p: RegressionPayload): string {
   return lines.join("\n");
 }
 
-async function sendSlack(
+async function sendSlackRaw(
   webhookUrl: string,
-  payload: RegressionPayload,
+  subject: string,
+  body: string,
 ): Promise<void> {
-  const text = `*${buildSubject(payload)}*\n${buildBody(payload)}`;
+  const text = `*${subject}*\n${body}`;
   const res = await fetch(webhookUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -125,9 +126,10 @@ async function sendSlack(
   }
 }
 
-async function sendEmail(
+async function sendEmailRaw(
   recipients: string[],
-  payload: RegressionPayload,
+  subject: string,
+  body: string,
 ): Promise<void> {
   const apiKey = process.env["SENDGRID_API_KEY"];
   if (!apiKey) {
@@ -141,18 +143,30 @@ async function sendEmail(
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      personalizations: [
-        { to: recipients.map((email) => ({ email })) },
-      ],
+      personalizations: [{ to: recipients.map((email) => ({ email })) }],
       from: { email: fromEmail },
-      subject: buildSubject(payload),
-      content: [{ type: "text/plain", value: buildBody(payload) }],
+      subject,
+      content: [{ type: "text/plain", value: body }],
     }),
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`SendGrid request failed: ${res.status} ${body}`);
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`SendGrid request failed: ${res.status} ${errBody}`);
   }
+}
+
+async function sendSlack(
+  webhookUrl: string,
+  payload: RegressionPayload,
+): Promise<void> {
+  await sendSlackRaw(webhookUrl, buildSubject(payload), buildBody(payload));
+}
+
+async function sendEmail(
+  recipients: string[],
+  payload: RegressionPayload,
+): Promise<void> {
+  await sendEmailRaw(recipients, buildSubject(payload), buildBody(payload));
 }
 
 /**
@@ -264,4 +278,103 @@ export async function dispatchRegressionNotification(
       );
     }
   }
+}
+
+export type TestNotificationChannel = "email" | "slack";
+
+export interface TestNotificationChannelResult {
+  channel: TestNotificationChannel;
+  attempted: boolean;
+  ok: boolean;
+  skippedReason?: string | null;
+  error?: string | null;
+}
+
+const TEST_SUBJECT = "HiringAI test notification";
+const TEST_BODY = [
+  "This is a test notification from HiringAI.",
+  "If you received this, the channel is wired up correctly and ready to deliver real email regression alerts.",
+  "",
+  "You can ignore this message — no candidate email actually changed status.",
+].join("\n");
+
+/**
+ * Send a sample message on every enabled channel. Used by the Settings UI
+ * "Send test" button to verify configuration without waiting for a real
+ * regression. Each channel is reported independently; a failure on one
+ * channel never blocks the others.
+ */
+export async function sendTestNotification(): Promise<
+  TestNotificationChannelResult[]
+> {
+  const settings = await getNotificationSettings();
+  const results: TestNotificationChannelResult[] = [];
+
+  // Slack
+  if (!settings.slackEnabled) {
+    results.push({
+      channel: "slack",
+      attempted: false,
+      ok: false,
+      skippedReason: "Slack notifications are turned off.",
+    });
+  } else if (!settings.slackWebhookUrl) {
+    results.push({
+      channel: "slack",
+      attempted: false,
+      ok: false,
+      skippedReason: "No Slack webhook URL configured.",
+    });
+  } else {
+    try {
+      await sendSlackRaw(settings.slackWebhookUrl, TEST_SUBJECT, TEST_BODY);
+      results.push({ channel: "slack", attempted: true, ok: true });
+    } catch (err) {
+      results.push({
+        channel: "slack",
+        attempted: true,
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  // Email
+  if (!settings.emailEnabled) {
+    results.push({
+      channel: "email",
+      attempted: false,
+      ok: false,
+      skippedReason: "Email notifications are turned off.",
+    });
+  } else if (settings.emailRecipients.length === 0) {
+    results.push({
+      channel: "email",
+      attempted: false,
+      ok: false,
+      skippedReason: "No recipient email addresses configured.",
+    });
+  } else if (!settings.emailDeliveryConfigured) {
+    results.push({
+      channel: "email",
+      attempted: false,
+      ok: false,
+      skippedReason:
+        "Email delivery isn't configured on the server (SENDGRID_API_KEY missing).",
+    });
+  } else {
+    try {
+      await sendEmailRaw(settings.emailRecipients, TEST_SUBJECT, TEST_BODY);
+      results.push({ channel: "email", attempted: true, ok: true });
+    } catch (err) {
+      results.push({
+        channel: "email",
+        attempted: true,
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return results;
 }

@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import {
   useGetNotificationSettings,
   useUpdateNotificationSettings,
+  useSendTestNotification,
   getGetNotificationSettingsQueryKey,
 } from "@workspace/api-client-react";
+import type { TestNotificationChannelResult } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +13,16 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Bell, RotateCcw, AlertTriangle } from "lucide-react";
+import {
+  Loader2,
+  Bell,
+  RotateCcw,
+  AlertTriangle,
+  Send,
+  CheckCircle2,
+  XCircle,
+  MinusCircle,
+} from "lucide-react";
 import { SettingsTabs } from "@/components/settings-tabs";
 
 function parseRecipients(raw: string): string[] {
@@ -26,12 +37,16 @@ export default function NotificationsSettingsPage() {
   const queryClient = useQueryClient();
   const settingsQuery = useGetNotificationSettings();
   const updateMutation = useUpdateNotificationSettings();
+  const testMutation = useSendTestNotification();
 
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState("");
   const [slackEnabled, setSlackEnabled] = useState(false);
   const [slackWebhookUrl, setSlackWebhookUrl] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [testResults, setTestResults] = useState<
+    TestNotificationChannelResult[] | null
+  >(null);
 
   useEffect(() => {
     if (settingsQuery.data && !dirty) {
@@ -83,6 +98,52 @@ export default function NotificationsSettingsPage() {
     } catch (err) {
       toast({
         title: "Failed to save",
+        description: err instanceof Error ? err.message : String(err),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSendTest = async () => {
+    if (dirty) {
+      toast({
+        title: "Save changes first",
+        description:
+          "Save your channel settings before sending a test — the test uses the saved configuration.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setTestResults(null);
+    try {
+      const res = await testMutation.mutateAsync();
+      setTestResults(res.results);
+      const attempted = res.results.filter((r) => r.attempted);
+      const failed = res.results.filter((r) => r.attempted && !r.ok);
+      if (attempted.length === 0) {
+        toast({
+          title: "Nothing to test",
+          description:
+            "No channels are enabled. Turn on Email or Slack and save before testing.",
+          variant: "destructive",
+        });
+      } else if (failed.length === 0) {
+        toast({
+          title: "Test notification sent",
+          description: `Delivered on ${attempted
+            .map((r) => r.channel)
+            .join(", ")}.`,
+        });
+      } else {
+        toast({
+          title: "Some channels failed",
+          description: `Failed: ${failed.map((r) => r.channel).join(", ")}`,
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Test failed",
         description: err instanceof Error ? err.message : String(err),
         variant: "destructive",
       });
@@ -230,7 +291,7 @@ export default function NotificationsSettingsPage() {
             </div>
           </div>
 
-          <div className="pt-2 flex items-center gap-3 border-t border-border">
+          <div className="pt-2 flex flex-wrap items-center gap-3 border-t border-border">
             <Button
               onClick={handleSave}
               disabled={!dirty || updateMutation.isPending}
@@ -254,10 +315,74 @@ export default function NotificationsSettingsPage() {
               <RotateCcw className="h-4 w-4" />
               Reset
             </Button>
+            <Button
+              variant="secondary"
+              onClick={handleSendTest}
+              disabled={
+                dirty ||
+                testMutation.isPending ||
+                (!emailEnabled && !slackEnabled)
+              }
+              className="gap-2"
+              data-testid="button-send-test-notification"
+            >
+              {testMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Sending test…
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  Send test
+                </>
+              )}
+            </Button>
             <p className="text-xs text-muted-foreground ml-auto">
               Last updated: {updatedAt}
             </p>
           </div>
+
+          {testResults ? (
+            <div
+              className="border-t border-border pt-4 space-y-2"
+              data-testid="test-notification-results"
+            >
+              <p className="text-sm font-semibold text-foreground">
+                Test results
+              </p>
+              {testResults.map((r) => {
+                const Icon = r.ok
+                  ? CheckCircle2
+                  : r.attempted
+                    ? XCircle
+                    : MinusCircle;
+                const tone = r.ok
+                  ? "text-green-700 bg-green-50 border-green-200"
+                  : r.attempted
+                    ? "text-red-700 bg-red-50 border-red-200"
+                    : "text-muted-foreground bg-muted/40 border-border";
+                const label = r.channel === "slack" ? "Slack" : "Email";
+                const detail = r.ok
+                  ? "Delivered."
+                  : r.attempted
+                    ? `Failed: ${r.error ?? "Unknown error"}`
+                    : (r.skippedReason ?? "Skipped.");
+                return (
+                  <div
+                    key={r.channel}
+                    className={`flex items-start gap-2 rounded-md border p-3 text-sm ${tone}`}
+                    data-testid={`test-result-${r.channel}`}
+                  >
+                    <Icon className="h-4 w-4 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-medium">{label}:</span> {detail}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       </div>
     </>

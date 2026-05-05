@@ -2942,6 +2942,43 @@ export const UpdateNotificationSettingsResponse = zod
   );
 
 /**
+ * @summary Send a sample notification on every enabled channel to verify delivery
+ */
+export const SendTestNotificationResponse = zod.object({
+  results: zod.array(
+    zod
+      .object({
+        channel: zod.enum(["email", "slack"]),
+        attempted: zod
+          .boolean()
+          .describe(
+            "True when the channel was enabled and a delivery was attempted. False when the channel is disabled, missing config, or the server can't actually deliver (e.g. SENDGRID_API_KEY not set).",
+          ),
+        ok: zod
+          .boolean()
+          .describe(
+            "True when the channel accepted the test message. False when delivery failed or wasn't attempted.",
+          ),
+        skippedReason: zod
+          .string()
+          .nullish()
+          .describe(
+            "Set when attempted=false; explains why the channel was skipped.",
+          ),
+        error: zod
+          .string()
+          .nullish()
+          .describe(
+            "Set when attempted=true and ok=false; carries the underlying error message.",
+          ),
+      })
+      .describe(
+        "Outcome of sending a test message on a single notification channel.",
+      ),
+  ),
+});
+
+/**
  * @summary Enrich low-confidence candidates from a completed run and re-score them
  */
 export const ImproveAndRerunBody = zod.object({

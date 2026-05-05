@@ -13,6 +13,7 @@ import {
 import {
   getNotificationSettings,
   updateNotificationSettings,
+  sendTestNotification,
 } from "../lib/notifications";
 
 const router: IRouter = Router();
@@ -99,5 +100,23 @@ router.put("/settings/notifications", async (req, res): Promise<void> => {
   );
   res.json(updated);
 });
+
+router.post(
+  "/settings/notifications/test",
+  async (req, res): Promise<void> => {
+    const results = await sendTestNotification();
+    req.log.info(
+      {
+        results: results.map((r) => ({
+          channel: r.channel,
+          attempted: r.attempted,
+          ok: r.ok,
+        })),
+      },
+      "Test notification dispatched",
+    );
+    res.json({ results });
+  },
+);
 
 export default router;

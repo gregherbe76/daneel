@@ -1043,6 +1043,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/NotificationSettings"
 
+  /settings/notifications/test:
+    post:
+      operationId: sendTestNotification
+      tags: [settings]
+      summary: Send a sample notification on every enabled channel to verify delivery
+      responses:
+        "200":
+          description: Per-channel delivery results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestNotificationResult"
+
   /workflows/improve-and-rerun:
     post:
       operationId: improveAndRerun
@@ -2710,6 +2723,38 @@ components:
           nullable: true
           description: Timestamp of the most recent fired alert, if any.
       required: [active, threshold, consecutiveFailures]
+
+    TestNotificationChannelResult:
+      type: object
+      description: Outcome of sending a test message on a single notification channel.
+      properties:
+        channel:
+          type: string
+          enum: [email, slack]
+        attempted:
+          type: boolean
+          description: True when the channel was enabled and a delivery was attempted. False when the channel is disabled, missing config, or the server can't actually deliver (e.g. SENDGRID_API_KEY not set).
+        ok:
+          type: boolean
+          description: True when the channel accepted the test message. False when delivery failed or wasn't attempted.
+        skippedReason:
+          type: string
+          nullable: true
+          description: Set when attempted=false; explains why the channel was skipped.
+        error:
+          type: string
+          nullable: true
+          description: Set when attempted=true and ok=false; carries the underlying error message.
+      required: [channel, attempted, ok]
+
+    TestNotificationResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestNotificationChannelResult"
+      required: [results]
 
     # ── WORKFLOWS ──
     RunWorkflowBody:
