@@ -16,6 +16,15 @@ export type TelemetryEvent =
   | "provider_connected"
   | "providers_marketplace_opened";
 
+const ALLOWED_EVENTS: ReadonlySet<TelemetryEvent> = new Set([
+  "workflow_started",
+  "workflow_completed",
+  "provider_card_viewed",
+  "provider_connect_clicked",
+  "provider_connected",
+  "providers_marketplace_opened",
+]);
+
 export interface TelemetryProps {
   provider?: string;
   workflow_step?: string;
@@ -149,6 +158,7 @@ export function track(event: TelemetryEvent, props: TelemetryProps = {}): void {
   if (isDev()) return;
   if (!getKey()) return;
   if (getConsent() !== "granted") return;
+  if (!ALLOWED_EVENTS.has(event)) return;
   if (!initialized || !posthog) return;
   const safe: Record<string, string> = {
     timestamp: new Date().toISOString(),

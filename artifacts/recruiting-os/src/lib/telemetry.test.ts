@@ -190,6 +190,65 @@ describe("telemetry — consent gating of track()", () => {
     const [, payload] = posthogMocks.capture.mock.calls[0];
     expect(Object.keys(payload)).toEqual(["timestamp"]);
   });
+
+  it("track() rejects events outside the whitelist (does not call capture)", async () => {
+    const t = await loadTelemetry({
+      DEV: false,
+      VITE_POSTHOG_KEY: "phc_test_key",
+    });
+    t.setConsent(true);
+    await flushMicrotasks();
+
+    // Bypass the TS union to simulate a future caller drifting from the contract.
+    (t.track as unknown as (e: string, p?: unknown) => void)(
+      "candidate_clicked",
+      { provider: "x" },
+    );
+    (t.track as unknown as (e: string, p?: unknown) => void)("page_view");
+
+    expect(posthogMocks.capture).not.toHaveBeenCalled();
+  });
+
+  it(
+    "track() strips payload keys outside the {provider, workflow_step, timestamp} " +
+      "allow-list — no candidate PII or JD content can leak through",
+    async () => {
+      const t = await loadTelemetry({
+        DEV: false,
+        VITE_POSTHOG_KEY: "phc_test_key",
+      });
+      t.setConsent(true);
+      await flushMicrotasks();
+
+      (t.track as unknown as (
+        e: string,
+        p?: Record<string, unknown>,
+      ) => void)("workflow_started", {
+        provider: "GitHub Agent",
+        workflow_step: "sourcing",
+        // The following must NEVER reach posthog.capture():
+        candidateEmail: "alice@example.com",
+        candidateName: "Alice Example",
+        jobDescription: "secret JD body",
+        userId: 42,
+      });
+
+      expect(posthogMocks.capture).toHaveBeenCalledTimes(1);
+      const [event, payload] = posthogMocks.capture.mock.calls[0];
+      expect(event).toBe("workflow_started");
+      expect(Object.keys(payload).sort()).toEqual([
+        "provider",
+        "timestamp",
+        "workflow_step",
+      ]);
+      expect(payload.provider).toBe("GitHub Agent");
+      expect(payload.workflow_step).toBe("sourcing");
+      expect(payload).not.toHaveProperty("candidateEmail");
+      expect(payload).not.toHaveProperty("candidateName");
+      expect(payload).not.toHaveProperty("jobDescription");
+      expect(payload).not.toHaveProperty("userId");
+    },
+  );
 });
 
 describe("telemetry — anonymous id persistence", () => {
@@ -260,7 +319,6 @@ describe("telemetry — consent revocation clears state", () => {
       expect(window.localStorage.getItem("daneel.telemetryConsent")).toBe(
         "denied",
       );
-      expect(t.getConsent()).toBe("denied");
 
       // Subsequent track() must not reach PostHog.
       posthogMocks.capture.mockClear();

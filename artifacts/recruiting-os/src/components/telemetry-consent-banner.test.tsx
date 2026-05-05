@@ -6,7 +6,7 @@ import {
   it,
   vi,
 } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const posthogMocks = vi.hoisted(() => ({
@@ -133,4 +133,30 @@ describe("TelemetryConsentBanner — choice handling", () => {
       screen.queryByTestId("telemetry-consent-banner"),
     ).not.toBeInTheDocument();
   });
+
+  it(
+    "does not re-render once a choice is recorded — even after a fresh mount " +
+      "in the same browser session",
+    async () => {
+      const Banner = await loadBanner({
+        DEV: false,
+        VITE_POSTHOG_KEY: "phc_test_key",
+      });
+
+      // First mount: user clicks Yes.
+      const { unmount } = render(<Banner />);
+      await userEvent.click(screen.getByTestId("telemetry-consent-yes"));
+      expect(
+        screen.queryByTestId("telemetry-consent-banner"),
+      ).not.toBeInTheDocument();
+      unmount();
+      cleanup();
+
+      // Second mount, same browser session — banner must stay hidden.
+      render(<Banner />);
+      expect(
+        screen.queryByTestId("telemetry-consent-banner"),
+      ).not.toBeInTheDocument();
+    },
+  );
 });
