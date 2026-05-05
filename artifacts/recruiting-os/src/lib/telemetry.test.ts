@@ -382,6 +382,40 @@ describe("telemetry — recent events ring buffer", () => {
   });
 });
 
+describe("telemetry — compile-time payload guard", () => {
+  it("rejects forbidden payload keys and unknown event names at compile time", async () => {
+    const t = await loadTelemetry({
+      DEV: false,
+      VITE_POSTHOG_KEY: "phc_test_key",
+    });
+
+    // These calls must compile cleanly — they match the contract.
+    t.track("workflow_started");
+    t.track("workflow_started", { provider: "Native OpenAI" });
+    t.track("provider_connected", {
+      provider: "Custom Webhook",
+      workflow_step: "candidate_matching",
+    });
+
+    // @ts-expect-error — `candidateEmail` is not in TelemetryProps.
+    t.track("workflow_started", { provider: "x", candidateEmail: "a@b.com" });
+
+    // @ts-expect-error — `userId` is not in TelemetryProps.
+    t.track("workflow_completed", { userId: 42 });
+
+    // @ts-expect-error — event name is not in the TelemetryEvent union.
+    t.track("not_a_real_event", {});
+
+    // @ts-expect-error — typo'd event name.
+    t.track("provider_conected", { provider: "x" });
+
+    // The runtime-side behaviour of these guards is exhaustively covered by
+    // the other suites; this test exists purely so `pnpm typecheck` fails if
+    // the type-level guard ever regresses.
+    expect(true).toBe(true);
+  });
+});
+
 describe("telemetry — anonymous id persistence", () => {
   it("generates a stable anonymous id on first init and persists it to localStorage", async () => {
     const t = await loadTelemetry({

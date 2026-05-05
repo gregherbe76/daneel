@@ -30,6 +30,19 @@ export interface TelemetryProps {
   workflow_step?: string;
 }
 
+// Forces a payload object to contain ONLY keys declared in `TelemetryProps`.
+// Any extra key is typed as `never`, so passing it (even via an intermediate
+// variable, where TS's normal excess-property check would not fire) produces
+// a compile-time error. This is what catches accidental PII like
+// `{ candidateEmail }` at `pnpm typecheck` time, not just at runtime.
+//
+// The param type for `track` below intersects `P` with this brand so that
+// inference picks `P` up from the actual argument shape — without that, TS
+// would happily widen `P` to `TelemetryProps` and miss the extra keys.
+type NoExtraKeys<P> = {
+  [K in Exclude<keyof P, keyof TelemetryProps>]: never;
+};
+
 const CONSENT_KEY = "daneel.telemetryConsent";
 const ANON_ID_KEY = "daneel.telemetryAnonId";
 
@@ -179,7 +192,10 @@ export function setConsent(granted: boolean): void {
  * this file. The event name is constrained to the `TelemetryEvent` union at
  * compile time; payload field names are the contract you must not break.
  */
-export function track(event: TelemetryEvent, props: TelemetryProps = {}): void {
+export function track<P extends TelemetryProps>(
+  event: TelemetryEvent,
+  props: P & NoExtraKeys<P> = {} as P & NoExtraKeys<P>,
+): void {
   if (isDev()) return;
   if (!getKey()) return;
   if (getConsent() !== "granted") return;
