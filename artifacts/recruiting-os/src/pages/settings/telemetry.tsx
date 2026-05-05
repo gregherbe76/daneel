@@ -1,22 +1,40 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, ChevronDown } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { SettingsTabs } from "@/components/settings-tabs";
 import {
   getConsent,
+  getRecentEvents,
   setConsent,
   subscribeConsent,
+  subscribeRecentEvents,
+  type RecentTelemetryEntry,
 } from "@/lib/telemetry";
 
 export default function TelemetrySettingsPage() {
   const [consent, setLocalConsent] = useState(() => getConsent());
+  const [recent, setRecent] = useState<readonly RecentTelemetryEntry[]>(
+    () => getRecentEvents(),
+  );
+  const [recentOpen, setRecentOpen] = useState(false);
 
   useEffect(() => {
     const update = () => setLocalConsent(getConsent());
     update();
     return subscribeConsent(update);
+  }, []);
+
+  useEffect(() => {
+    const update = () => setRecent(getRecentEvents());
+    update();
+    return subscribeRecentEvents(update);
   }, []);
 
   const key = import.meta.env.VITE_POSTHOG_KEY as string | undefined;
@@ -78,6 +96,76 @@ export default function TelemetrySettingsPage() {
             aria-label="Share anonymous usage data"
           />
         </div>
+
+        {enabled && (
+          <Collapsible
+            open={recentOpen}
+            onOpenChange={setRecentOpen}
+            className="border border-border rounded-lg bg-card"
+            data-testid="recent-events-section"
+          >
+            <CollapsibleTrigger
+              className="w-full flex items-center justify-between gap-4 p-5 text-left"
+              data-testid="recent-events-toggle"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  Recent events ({recent.length})
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  The last {recent.length === 0 ? 20 : recent.length} events
+                  this browser has sent. Only event names, timestamps, and
+                  payload key names are shown — never the values.
+                </p>
+              </div>
+              <ChevronDown
+                className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${
+                  recentOpen ? "rotate-180" : ""
+                }`}
+              />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="border-t border-border px-5 py-4">
+                {recent.length === 0 ? (
+                  <p
+                    className="text-xs text-muted-foreground"
+                    data-testid="recent-events-empty"
+                  >
+                    No events sent yet in this session.
+                  </p>
+                ) : (
+                  <ul
+                    className="space-y-2"
+                    data-testid="recent-events-list"
+                  >
+                    {recent
+                      .slice()
+                      .reverse()
+                      .map((entry, idx) => (
+                        <li
+                          key={`${entry.timestamp}-${idx}`}
+                          className="flex items-start justify-between gap-4 text-xs"
+                          data-testid="recent-events-item"
+                        >
+                          <div className="min-w-0">
+                            <p className="font-mono text-foreground">
+                              {entry.event}
+                            </p>
+                            <p className="text-muted-foreground mt-0.5">
+                              keys: {entry.payloadKeys.join(", ") || "—"}
+                            </p>
+                          </div>
+                          <time className="text-muted-foreground font-mono shrink-0">
+                            {entry.timestamp}
+                          </time>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
 
         <Link href="/settings/telemetry/dashboard">
           <a

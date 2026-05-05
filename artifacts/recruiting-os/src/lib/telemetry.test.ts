@@ -251,6 +251,137 @@ describe("telemetry — consent gating of track()", () => {
   );
 });
 
+describe("telemetry — recent events ring buffer", () => {
+  it("records fired events with event name, timestamp, and sorted payload keys", async () => {
+    const t = await loadTelemetry({
+      DEV: false,
+      VITE_POSTHOG_KEY: "phc_test_key",
+    });
+    t.setConsent(true);
+    await flushMicrotasks();
+
+    expect(t.getRecentEvents()).toEqual([]);
+
+    t.track("provider_connected", {
+      provider: "Custom Webhook",
+      workflow_step: "candidate_matching",
+    });
+    t.track("workflow_started");
+
+    const recent = t.getRecentEvents();
+    expect(recent).toHaveLength(2);
+    expect(recent[0]).toMatchObject({
+      event: "provider_connected",
+      payloadKeys: ["provider", "timestamp", "workflow_step"],
+    });
+    expect(typeof recent[0].timestamp).toBe("string");
+    expect(recent[1]).toMatchObject({
+      event: "workflow_started",
+      payloadKeys: ["timestamp"],
+    });
+  });
+
+  it(
+    "the recent buffer never stores raw payload values — even when callers pass " +
+      "PII-shaped fields, only the (already-stripped) key names are recorded",
+    async () => {
+      const t = await loadTelemetry({
+        DEV: false,
+        VITE_POSTHOG_KEY: "phc_test_key",
+      });
+      t.setConsent(true);
+      await flushMicrotasks();
+
+      (t.track as unknown as (
+        e: string,
+        p?: Record<string, unknown>,
+      ) => void)("workflow_started", {
+        provider: "GitHub Agent",
+        workflow_step: "sourcing",
+        candidateEmail: "alice@example.com",
+        candidateName: "Alice Example",
+        jobDescription: "secret JD body",
+      });
+
+      const recent = t.getRecentEvents();
+      expect(recent).toHaveLength(1);
+      const entry = recent[0];
+
+      // Only key NAMES from the allow-listed surface — never values, never the
+      // forbidden field names that the caller tried to slip in.
+      expect(entry.payloadKeys).toEqual([
+        "provider",
+        "timestamp",
+        "workflow_step",
+      ]);
+      expect(entry.payloadKeys).not.toContain("candidateEmail");
+      expect(entry.payloadKeys).not.toContain("candidateName");
+      expect(entry.payloadKeys).not.toContain("jobDescription");
+
+      // Walk every property of the buffer entry and ensure no raw value leaked.
+      const serialized = JSON.stringify(entry);
+      expect(serialized).not.toContain("alice@example.com");
+      expect(serialized).not.toContain("Alice Example");
+      expect(serialized).not.toContain("secret JD body");
+      expect(serialized).not.toContain("GitHub Agent");
+
+      // Buffer entry should expose exactly these three top-level fields.
+      expect(Object.keys(entry).sort()).toEqual([
+        "event",
+        "payloadKeys",
+        "timestamp",
+      ]);
+    },
+  );
+
+  it("caps the ring buffer at 20 entries, dropping the oldest first", async () => {
+    const t = await loadTelemetry({
+      DEV: false,
+      VITE_POSTHOG_KEY: "phc_test_key",
+    });
+    t.setConsent(true);
+    await flushMicrotasks();
+
+    for (let i = 0; i < 25; i++) {
+      t.track("workflow_started", { provider: `p-${i}` });
+    }
+    const recent = t.getRecentEvents();
+    expect(recent).toHaveLength(20);
+  });
+
+  it("does not record entries for events that never reach posthog.capture (e.g. no consent)", async () => {
+    const t = await loadTelemetry({
+      DEV: false,
+      VITE_POSTHOG_KEY: "phc_test_key",
+    });
+    // No consent granted.
+    t.track("workflow_started");
+    expect(t.getRecentEvents()).toEqual([]);
+  });
+
+  it("subscribeRecentEvents() listeners fire on each recorded event and stop after unsubscribe", async () => {
+    const t = await loadTelemetry({
+      DEV: false,
+      VITE_POSTHOG_KEY: "phc_test_key",
+    });
+    t.setConsent(true);
+    await flushMicrotasks();
+
+    const listener = vi.fn();
+    const unsubscribe = t.subscribeRecentEvents(listener);
+
+    t.track("workflow_started");
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    t.track("workflow_completed");
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    unsubscribe();
+    t.track("provider_card_viewed");
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("telemetry — anonymous id persistence", () => {
   it("generates a stable anonymous id on first init and persists it to localStorage", async () => {
     const t = await loadTelemetry({

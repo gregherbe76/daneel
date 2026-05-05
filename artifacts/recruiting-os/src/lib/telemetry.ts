@@ -40,6 +40,31 @@ let initialized = false;
 
 const consentListeners = new Set<() => void>();
 
+export interface RecentTelemetryEntry {
+  event: TelemetryEvent;
+  timestamp: string;
+  payloadKeys: string[];
+}
+
+const RECENT_BUFFER_LIMIT = 20;
+const recentBuffer: RecentTelemetryEntry[] = [];
+const recentListeners = new Set<() => void>();
+
+function notifyRecent() {
+  recentListeners.forEach((l) => l());
+}
+
+export function getRecentEvents(): readonly RecentTelemetryEntry[] {
+  return recentBuffer.slice();
+}
+
+export function subscribeRecentEvents(listener: () => void): () => void {
+  recentListeners.add(listener);
+  return () => {
+    recentListeners.delete(listener);
+  };
+}
+
 function isDev(): boolean {
   return Boolean(import.meta.env.DEV);
 }
@@ -167,6 +192,16 @@ export function track(event: TelemetryEvent, props: TelemetryProps = {}): void {
   if (props.workflow_step) safe.workflow_step = props.workflow_step;
   try {
     posthog.capture(event, safe);
+    const entry: RecentTelemetryEntry = {
+      event,
+      timestamp: safe.timestamp,
+      payloadKeys: Object.keys(safe).sort(),
+    };
+    recentBuffer.push(entry);
+    if (recentBuffer.length > RECENT_BUFFER_LIMIT) {
+      recentBuffer.splice(0, recentBuffer.length - RECENT_BUFFER_LIMIT);
+    }
+    notifyRecent();
   } catch {
     // never let telemetry break the app
   }

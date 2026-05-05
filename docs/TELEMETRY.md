@@ -100,6 +100,22 @@ If the env vars are missing, the endpoint still returns 200 with
 `configured: false` and the dashboard renders a calm "not configured" hint
 instead of an error.
 
+## In-app "Recent events" debug panel
+
+Settings → Telemetry also includes a collapsible **Recent events** section
+(visible only when consent is granted). It lists the last 20 events the
+current browser tab has actually sent to PostHog, with:
+
+- the event name
+- the ISO timestamp
+- the **sorted list of payload key names** — never the values
+
+The buffer lives entirely in memory in `telemetry.ts` (it is reset on tab
+reload) and is populated only after `posthog.capture()` has been called, so
+events that are short-circuited by consent/dev/missing-key never appear. This
+gives recruiters a way to verify the no-PII guarantee themselves without
+opening dev tools.
+
 ## Implementation pointers
 
 - Wrapper module: `artifacts/recruiting-os/src/lib/telemetry.ts`
