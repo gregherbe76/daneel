@@ -1131,6 +1131,38 @@ export interface UploadUrlResponse {
   metadata?: UploadUrlRequest;
 }
 
+export type TelemetryDashboardRange =
+  (typeof TelemetryDashboardRange)[keyof typeof TelemetryDashboardRange];
+
+export const TelemetryDashboardRange = {
+  "7d": "7d",
+  "30d": "30d",
+} as const;
+
+export interface TelemetryDailyCount {
+  /** ISO date (YYYY-MM-DD) in UTC. */
+  date: string;
+  count: number;
+}
+
+export interface TelemetryEventStats {
+  event: string;
+  total: number;
+  daily: TelemetryDailyCount[];
+}
+
+/**
+ * Aggregate counts for the five allow-listed telemetry events. When the
+server has no PostHog credentials configured, `configured` is false
+and `events` is empty.
+
+ */
+export interface TelemetryDashboard {
+  configured: boolean;
+  range: TelemetryDashboardRange;
+  events: TelemetryEventStats[];
+}
+
 export type ListCandidateDeliberationsParams = {
   jobId?: number;
 };
@@ -1175,3 +1207,15 @@ export type ListEmailStatusChangesParams = {
 export type MarkAllEmailStatusChangesRead200 = {
   updated: number;
 };
+
+export type GetTelemetryDashboardParams = {
+  range?: GetTelemetryDashboardRange;
+};
+
+export type GetTelemetryDashboardRange =
+  (typeof GetTelemetryDashboardRange)[keyof typeof GetTelemetryDashboardRange];
+
+export const GetTelemetryDashboardRange = {
+  "7d": "7d",
+  "30d": "30d",
+} as const;

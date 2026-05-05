@@ -45,6 +45,7 @@ import type {
   EmailRevalidationSettings,
   EmailStatusChange,
   EnqueueBulkCandidateJobBody,
+  GetTelemetryDashboardParams,
   HealthStatus,
   HiringReport,
   ImproveAndRerunBody,
@@ -71,6 +72,7 @@ import type {
   ScoutConnectCallbackParams,
   ScoutConnectStateResponse,
   TeamMember,
+  TelemetryDashboard,
   ToggleProviderBody,
   UpdateApplicationBody,
   UpdateBrandingSettingsBody,
@@ -6362,6 +6364,115 @@ export const useRequestUploadUrl = <
 > => {
   return useMutation(getRequestUploadUrlMutationOptions(options));
 };
+
+/**
+ * Server-side proxy to the PostHog Query API. Uses the project-scoped
+personal API key configured via `POSTHOG_PERSONAL_API_KEY` and
+`POSTHOG_PROJECT_ID` env vars on the server — the project key is
+never exposed to the browser.
+
+If no PostHog credentials are configured the endpoint still returns
+200 with `configured: false` and an empty `events` array, so the UI
+can render a calm "not configured" state instead of an error.
+
+ * @summary Aggregate counts for the five allow-listed telemetry events
+ */
+export const getGetTelemetryDashboardUrl = (
+  params?: GetTelemetryDashboardParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/telemetry/dashboard?${stringifiedParams}`
+    : `/api/telemetry/dashboard`;
+};
+
+export const getTelemetryDashboard = async (
+  params?: GetTelemetryDashboardParams,
+  options?: RequestInit,
+): Promise<TelemetryDashboard> => {
+  return customFetch<TelemetryDashboard>(getGetTelemetryDashboardUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetTelemetryDashboardQueryKey = (
+  params?: GetTelemetryDashboardParams,
+) => {
+  return [`/api/telemetry/dashboard`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetTelemetryDashboardQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTelemetryDashboard>>,
+  TError = ErrorType<void>,
+>(
+  params?: GetTelemetryDashboardParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTelemetryDashboard>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetTelemetryDashboardQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getTelemetryDashboard>>
+  > = ({ signal }) =>
+    getTelemetryDashboard(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTelemetryDashboard>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTelemetryDashboardQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTelemetryDashboard>>
+>;
+export type GetTelemetryDashboardQueryError = ErrorType<void>;
+
+/**
+ * @summary Aggregate counts for the five allow-listed telemetry events
+ */
+
+export function useGetTelemetryDashboard<
+  TData = Awaited<ReturnType<typeof getTelemetryDashboard>>,
+  TError = ErrorType<void>,
+>(
+  params?: GetTelemetryDashboardParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTelemetryDashboard>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTelemetryDashboardQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get pipeline summary - counts per stage across all jobs

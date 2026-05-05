@@ -36,6 +36,8 @@ tags:
     description: Object storage upload and serving endpoints.
   - name: deliberations
     description: Council multi-pole deliberations on (candidate, job) pairs.
+  - name: telemetry
+    description: Aggregated, server-side proxied views of the opt-in PostHog telemetry funnel.
 paths:
   /healthz:
     get:
@@ -1508,6 +1510,38 @@ paths:
           description: Missing or invalid required fields.
         "500":
           description: Failed to generate upload URL.
+
+  /telemetry/dashboard:
+    get:
+      operationId: getTelemetryDashboard
+      tags: [telemetry]
+      summary: Aggregate counts for the five allow-listed telemetry events
+      description: |
+        Server-side proxy to the PostHog Query API. Uses the project-scoped
+        personal API key configured via `POSTHOG_PERSONAL_API_KEY` and
+        `POSTHOG_PROJECT_ID` env vars on the server — the project key is
+        never exposed to the browser.
+
+        If no PostHog credentials are configured the endpoint still returns
+        200 with `configured: false` and an empty `events` array, so the UI
+        can render a calm "not configured" state instead of an error.
+      parameters:
+        - in: query
+          name: range
+          required: false
+          schema:
+            type: string
+            enum: [7d, 30d]
+            default: 7d
+      responses:
+        "200":
+          description: Aggregated event counts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelemetryDashboard"
+        "502":
+          description: Upstream PostHog query failed.
 
   /pipeline/summary:
     get:
@@ -3315,3 +3349,45 @@ components:
           type: string
         metadata:
           $ref: "#/components/schemas/UploadUrlRequest"
+
+    # ── TELEMETRY ──
+    TelemetryDashboard:
+      type: object
+      description: |
+        Aggregate counts for the five allow-listed telemetry events. When the
+        server has no PostHog credentials configured, `configured` is false
+        and `events` is empty.
+      properties:
+        configured:
+          type: boolean
+        range:
+          type: string
+          enum: [7d, 30d]
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetryEventStats"
+      required: [configured, range, events]
+
+    TelemetryEventStats:
+      type: object
+      properties:
+        event:
+          type: string
+        total:
+          type: integer
+        daily:
+          type: array
+          items:
+            $ref: "#/components/schemas/TelemetryDailyCount"
+      required: [event, total, daily]
+
+    TelemetryDailyCount:
+      type: object
+      properties:
+        date:
+          type: string
+          description: ISO date (YYYY-MM-DD) in UTC.
+        count:
+          type: integer
+      required: [date, count]

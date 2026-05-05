@@ -80,6 +80,26 @@ telemetry is **fully disabled** regardless of consent state:
 6. Go to **Settings → Telemetry**, turn the toggle off. No further `/e/`
    requests should be sent.
 
+## In-app dashboard
+
+Once events are flowing into PostHog, the product team can view aggregate
+counts and 7/30-day trend lines without a PostHog account at:
+
+- **Settings → Telemetry → "View usage dashboard"** (`/settings/telemetry/dashboard`)
+
+Behind the scenes the page calls `GET /api/telemetry/dashboard?range=7d|30d`,
+which the API server proxies to the PostHog Query API using a server-side
+personal API key. The browser never sees the PostHog credentials. Required
+env vars on the API server:
+
+- `POSTHOG_PERSONAL_API_KEY` — personal API key with project read access.
+- `POSTHOG_PROJECT_ID` — numeric PostHog project id.
+- `POSTHOG_HOST` — optional, defaults to `https://eu.posthog.com`.
+
+If the env vars are missing, the endpoint still returns 200 with
+`configured: false` and the dashboard renders a calm "not configured" hint
+instead of an error.
+
 ## Implementation pointers
 
 - Wrapper module: `artifacts/recruiting-os/src/lib/telemetry.ts`

@@ -26,6 +26,7 @@ import EmailRevalidationSettingsPage from "./pages/settings/email-revalidation";
 import BrandingSettingsPage from "./pages/settings/branding";
 import NotificationsSettingsPage from "./pages/settings/notifications";
 import TelemetrySettingsPage from "./pages/settings/telemetry";
+import TelemetryDashboardPage from "./pages/settings/telemetry-dashboard";
 import MentionsPage from "./pages/mentions";
 
 const queryClient = new QueryClient();
@@ -53,6 +54,7 @@ function AppRoutes() {
         <Route path="/settings/email-revalidation" component={EmailRevalidationSettingsPage} />
         <Route path="/settings/branding" component={BrandingSettingsPage} />
         <Route path="/settings/notifications" component={NotificationsSettingsPage} />
+        <Route path="/settings/telemetry/dashboard" component={TelemetryDashboardPage} />
         <Route path="/settings/telemetry" component={TelemetrySettingsPage} />
         
         <Route component={NotFound} />

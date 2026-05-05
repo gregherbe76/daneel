@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Link } from "wouter";
+import { BarChart3 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { SettingsTabs } from "@/components/settings-tabs";
@@ -76,6 +78,30 @@ export default function TelemetrySettingsPage() {
             aria-label="Share anonymous usage data"
           />
         </div>
+
+        <Link href="/settings/telemetry/dashboard">
+          <a
+            className="border border-border rounded-lg p-5 bg-card flex items-center justify-between gap-4 hover:bg-muted/40 transition cursor-pointer"
+            data-testid="link-telemetry-dashboard"
+          >
+            <div className="flex items-start gap-3 min-w-0">
+              <BarChart3 className="h-5 w-5 mt-0.5 text-muted-foreground" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  View usage dashboard
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Aggregated counts and 7/30-day trend lines for the five
+                  allow-listed events. Read directly from PostHog via a
+                  server-side key.
+                </p>
+              </div>
+            </div>
+            <span className="text-xs text-primary font-medium shrink-0">
+              Open →
+            </span>
+          </a>
+        </Link>
       </div>
     </div>
   );

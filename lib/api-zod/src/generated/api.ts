@@ -3843,6 +3843,47 @@ export const RequestUploadUrlResponse = zod.object({
 });
 
 /**
+ * Server-side proxy to the PostHog Query API. Uses the project-scoped
+personal API key configured via `POSTHOG_PERSONAL_API_KEY` and
+`POSTHOG_PROJECT_ID` env vars on the server — the project key is
+never exposed to the browser.
+
+If no PostHog credentials are configured the endpoint still returns
+200 with `configured: false` and an empty `events` array, so the UI
+can render a calm "not configured" state instead of an error.
+
+ * @summary Aggregate counts for the five allow-listed telemetry events
+ */
+export const getTelemetryDashboardQueryRangeDefault = `7d`;
+
+export const GetTelemetryDashboardQueryParams = zod.object({
+  range: zod
+    .enum(["7d", "30d"])
+    .default(getTelemetryDashboardQueryRangeDefault),
+});
+
+export const GetTelemetryDashboardResponse = zod
+  .object({
+    configured: zod.boolean(),
+    range: zod.enum(["7d", "30d"]),
+    events: zod.array(
+      zod.object({
+        event: zod.string(),
+        total: zod.number(),
+        daily: zod.array(
+          zod.object({
+            date: zod.string().describe("ISO date (YYYY-MM-DD) in UTC."),
+            count: zod.number(),
+          }),
+        ),
+      }),
+    ),
+  })
+  .describe(
+    "Aggregate counts for the five allow-listed telemetry events. When the\nserver has no PostHog credentials configured, `configured` is false\nand `events` is empty.\n",
+  );
+
+/**
  * @summary Get pipeline summary - counts per stage across all jobs
  */
 export const GetPipelineSummaryResponse = zod.object({
