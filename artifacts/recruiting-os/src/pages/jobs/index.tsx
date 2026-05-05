@@ -3,8 +3,9 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, MapPin, Loader2, Briefcase, Sparkles, Zap, FlaskConical, Store } from "lucide-react";
+import { Plus, MapPin, Loader2, Briefcase, Sparkles, Store } from "lucide-react";
 import { useUnseenRunsByJob } from "@/lib/pending-runs";
+import { RealSourcingPill } from "@/components/real-sourcing-pill";
 
 export default function JobsPage() {
   const { data: jobs, isLoading } = useListJobs();
@@ -62,24 +63,7 @@ export default function JobsPage() {
                   <div>
                     <h3 className="text-xl font-semibold group-hover:text-primary transition-colors flex items-center gap-2 flex-wrap">
                       {job.title}
-                      {job.hasRealSourcingProvider ? (
-                        <Badge
-                          className="bg-green-500/15 text-green-700 border border-green-500/30 hover:bg-green-500/15 gap-1"
-                          title="A real sourcing provider is configured — workflow runs will use real candidates."
-                        >
-                          <Zap className="h-3 w-3" />
-                          Real sourcing ready
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="secondary"
-                          className="text-muted-foreground gap-1"
-                          title="No real sourcing provider is configured — workflow runs will use mock candidates."
-                        >
-                          <FlaskConical className="h-3 w-3" />
-                          Demo mode
-                        </Badge>
-                      )}
+                      <RealSourcingPill hasRealSourcingProvider={job.hasRealSourcingProvider} />
                       {unseenCount > 0 && (
                         <Badge className="bg-primary/15 text-primary border border-primary/30 hover:bg-primary/15 gap-1">
                           <Sparkles className="h-3 w-3" />

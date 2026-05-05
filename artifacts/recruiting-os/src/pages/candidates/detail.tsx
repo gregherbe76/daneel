@@ -39,6 +39,7 @@ import { CandidateNotesPanel } from "@/components/candidate-notes-panel";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
 import { EmailSourceBadge } from "@/components/email-source-badge";
 import { EmailStatusHistoryCard } from "@/components/email-status-history-card";
+import { RealSourcingPill } from "@/components/real-sourcing-pill";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CouncilTab } from "@/components/council/council-tab";
 
@@ -277,6 +278,56 @@ export default function CandidateDetailPage() {
             candidateEmail={candidate.email}
             rows={emailHistory}
           />
+
+          {/* Per-pipeline summary cards. One card per job this candidate is
+              applied to, each showing the same "Real sourcing ready" /
+              "Demo mode" pill from the jobs list — so recruiters can see at
+              a glance which of this candidate's pipelines will produce real
+              vs mock candidates without bouncing into each job page. */}
+          {linkedJobs.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">In Pipelines</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Jobs this candidate is currently in the pipeline for.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {linkedJobs.map((j) => (
+                    <Link key={j.id} href={`/jobs/${j.id}`}>
+                      <div
+                        className="rounded-md border border-border bg-card hover:border-primary/50 transition-colors p-3 cursor-pointer h-full flex flex-col gap-2"
+                        data-testid={`pipeline-summary-card-${j.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-sm font-semibold truncate">
+                            {j.title}
+                          </span>
+                          <RealSourcingPill
+                            hasRealSourcingProvider={j.hasRealSourcingProvider}
+                          />
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          {j.location && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {j.location}
+                            </span>
+                          )}
+                          {j.seniority && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {j.seniority}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Notes & comments scoped to a job */}
           <Card>

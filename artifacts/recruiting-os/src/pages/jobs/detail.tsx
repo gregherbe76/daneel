@@ -50,6 +50,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CandidateNotesIndicator } from "@/components/candidate-notes-indicator";
 import { BulkActionBar } from "@/components/bulk-action-bar";
+import { RealSourcingPill } from "@/components/real-sourcing-pill";
 import { EmailSourceBadge } from "@/components/email-source-badge";
 import { EmailValidationBadge } from "@/components/email-validation-badge";
 import {
@@ -689,24 +690,7 @@ export default function JobDetailPage() {
                 {job.location}
               </span>
               <Badge variant="secondary">{job.seniority}</Badge>
-              {job.hasRealSourcingProvider ? (
-                <Badge
-                  className="bg-green-500/15 text-green-700 border border-green-500/30 hover:bg-green-500/15 gap-1"
-                  title="A real sourcing provider is configured — workflow runs will use real candidates."
-                >
-                  <Zap className="h-3 w-3" />
-                  Real sourcing ready
-                </Badge>
-              ) : (
-                <Badge
-                  variant="secondary"
-                  className="text-muted-foreground gap-1"
-                  title="No real sourcing provider is configured — workflow runs will use mock candidates."
-                >
-                  <FlaskConical className="h-3 w-3" />
-                  Demo mode
-                </Badge>
-              )}
+              <RealSourcingPill hasRealSourcingProvider={job.hasRealSourcingProvider} />
             </div>
             <div className="flex gap-2 flex-wrap">
               {job.mustHaveSkills?.map((skill) => (
@@ -1479,6 +1463,7 @@ export default function JobDetailPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
                 <h2 className="text-lg font-semibold">Pipeline</h2>
+                <RealSourcingPill hasRealSourcingProvider={job.hasRealSourcingProvider} />
                 {filteredCandidateIds.length > 0 && (
                   <label className="inline-flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
                     <Checkbox
