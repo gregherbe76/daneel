@@ -1,4 +1,4 @@
-import { and, eq, inArray, desc, or } from "drizzle-orm";
+import { and, eq, inArray, desc, or, lt, sql } from "drizzle-orm";
 import {
   db,
   bulkJobsTable,
@@ -22,6 +22,63 @@ const RECHECK_CONCURRENCY = 5;
 
 /** How often the in-process worker wakes up to look for new pending jobs. */
 const POLL_INTERVAL_MS = 2_000;
+
+/**
+ * How long completed/failed/canceled bulk-job rows are kept before the
+ * retention sweep deletes them. Each row carries the full id list and, for
+ * `export-csv`, the assembled CSV blob in `result`, so without retention the
+ * table grows unbounded. Configurable via `BULK_JOBS_RETENTION_DAYS`.
+ */
+const DEFAULT_RETENTION_DAYS = 7;
+function retentionDays(): number {
+  const raw = process.env.BULK_JOBS_RETENTION_DAYS;
+  if (!raw) return DEFAULT_RETENTION_DAYS;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_RETENTION_DAYS;
+}
+
+/** How often the worker runs the retention sweep. */
+const RETENTION_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+let lastRetentionSweepAt = 0;
+
+/**
+ * Delete completed/failed/canceled bulk-job rows older than the retention
+ * window. Uses `finishedAt` (falling back to `updatedAt` for safety) so we
+ * never trim a row that is still in flight.
+ */
+export async function sweepBulkJobRetention(now: Date = new Date()): Promise<number> {
+  const cutoff = new Date(now.getTime() - retentionDays() * 24 * 60 * 60 * 1000);
+  const deleted = await db
+    .delete(bulkJobsTable)
+    .where(
+      and(
+        inArray(bulkJobsTable.status, ["completed", "failed", "canceled"]),
+        lt(sql`coalesce(${bulkJobsTable.finishedAt}, ${bulkJobsTable.updatedAt})`, cutoff),
+      ),
+    )
+    .returning({ id: bulkJobsTable.id });
+  if (deleted.length > 0) {
+    logger.info(
+      { count: deleted.length, cutoff: cutoff.toISOString() },
+      "Bulk-job retention sweep deleted old rows",
+    );
+  }
+  return deleted.length;
+}
+
+async function maybeRunRetentionSweep(): Promise<void> {
+  const now = Date.now();
+  if (now - lastRetentionSweepAt < RETENTION_SWEEP_INTERVAL_MS) return;
+  lastRetentionSweepAt = now;
+  try {
+    await sweepBulkJobRetention(new Date(now));
+  } catch (err) {
+    logger.error(
+      { err: err instanceof Error ? err.message : String(err) },
+      "Bulk-job retention sweep failed",
+    );
+  }
+}
 
 function csvEscape(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -341,6 +398,10 @@ async function tick() {
   }
   running = true;
   try {
+    // Trim old completed/failed/canceled rows on the same cadence as the
+    // worker tick — bounded by `RETENTION_SWEEP_INTERVAL_MS` internally so we
+    // don't hammer the DB.
+    await maybeRunRetentionSweep();
     // Process oldest pending first so the queue behaves FIFO.
     const [job] = await db
       .select()
