@@ -1610,6 +1610,12 @@ paths:
           description: When set, only return rows for this candidate.
           schema:
             type: integer
+        - name: unnotified
+          in: query
+          required: false
+          description: When true, only return rows where no outbound notification (email/Slack) has been sent yet (notificationSentAt is null).
+          schema:
+            type: boolean
         - name: limit
           in: query
           required: false

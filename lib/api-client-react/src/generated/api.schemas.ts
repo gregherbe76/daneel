@@ -1378,6 +1378,10 @@ export type ListEmailStatusChangesParams = {
    * When set, only return rows for this candidate.
    */
   candidateId?: number;
+  /**
+   * When true, only return rows where no outbound notification (email/Slack) has been sent yet (notificationSentAt is null).
+   */
+  unnotified?: boolean;
   limit?: number;
 };
 

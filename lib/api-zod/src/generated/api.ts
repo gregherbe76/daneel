@@ -4295,6 +4295,12 @@ export const ListEmailStatusChangesQueryParams = zod.object({
     .number()
     .optional()
     .describe("When set, only return rows for this candidate."),
+  unnotified: zod.coerce
+    .boolean()
+    .optional()
+    .describe(
+      "When true, only return rows where no outbound notification (email\/Slack) has been sent yet (notificationSentAt is null).",
+    ),
   limit: zod.coerce.number().default(listEmailStatusChangesQueryLimitDefault),
 });
 

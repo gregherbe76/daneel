@@ -27,12 +27,14 @@ const SELECT_COLUMNS = {
 };
 
 router.get("/email-status-changes", async (req, res) => {
-  const { unread, candidateId, limit } = ListEmailStatusChangesQueryParams.parse(
-    req.query,
-  );
+  const { unread, candidateId, unnotified, limit } =
+    ListEmailStatusChangesQueryParams.parse(req.query);
 
   const filters = [
     unread ? isNull(emailStatusChangesTable.notifiedAt) : undefined,
+    unnotified
+      ? isNull(emailStatusChangesTable.notificationSentAt)
+      : undefined,
     candidateId
       ? eq(emailStatusChangesTable.candidateId, candidateId)
       : undefined,

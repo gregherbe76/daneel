@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -38,6 +38,7 @@ export default function MentionsPage() {
   const userId = currentUser?.id ?? "";
   const [lastRead, setLastRead] = useMentionsLastRead(userId);
   const queryClient = useQueryClient();
+  const [unnotifiedOnly, setUnnotifiedOnly] = useState(false);
 
   const mentionsQuery = useListMentionsForMember(userId, undefined, {
     query: {
@@ -48,15 +49,17 @@ export default function MentionsPage() {
   });
   const mentions = mentionsQuery.data ?? [];
 
-  const regressionsQuery = useListEmailStatusChanges(
-    { unread: true, limit: 50 },
-    {
-      query: {
-        queryKey: getListEmailStatusChangesQueryKey({ unread: true, limit: 50 }),
-        refetchInterval: 15000,
-      },
+  const regressionParams = {
+    unread: true,
+    limit: 50,
+    ...(unnotifiedOnly ? { unnotified: true } : {}),
+  };
+  const regressionsQuery = useListEmailStatusChanges(regressionParams, {
+    query: {
+      queryKey: getListEmailStatusChangesQueryKey(regressionParams),
+      refetchInterval: 15000,
     },
-  );
+  });
   const regressions = regressionsQuery.data ?? [];
 
   const refreshRegressions = () => {
@@ -128,11 +131,32 @@ export default function MentionsPage() {
       </div>
 
       {/* Email regressions section */}
-      {regressionsQuery.isLoading ? null : regressions.length > 0 ? (
+      {regressionsQuery.isLoading ? null : (
         <section className="mb-6">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
-            <MailWarning className="h-3.5 w-3.5 text-amber-600" /> Email regressions
-          </h2>
+          <div className="flex items-center justify-between gap-3 mb-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+              <MailWarning className="h-3.5 w-3.5 text-amber-600" /> Email regressions
+            </h2>
+            <Button
+              variant={unnotifiedOnly ? "default" : "outline"}
+              size="sm"
+              onClick={() => setUnnotifiedOnly((v) => !v)}
+              data-testid="toggle-unnotified-only"
+              aria-pressed={unnotifiedOnly}
+              className="h-7 text-xs"
+            >
+              {unnotifiedOnly ? "Showing un-notified only" : "Show un-notified only"}
+            </Button>
+          </div>
+          {regressions.length === 0 ? (
+            <Card>
+              <CardContent className="py-6 text-center text-sm text-muted-foreground">
+                {unnotifiedOnly
+                  ? "No un-notified email regressions. Everything has already been pinged externally."
+                  : "No email regressions in your inbox right now."}
+              </CardContent>
+            </Card>
+          ) : null}
           <ul className="space-y-3" data-testid="email-regressions-list">
             {regressions.map((r) => {
               const changedIso = toIso(r.changedAt);
