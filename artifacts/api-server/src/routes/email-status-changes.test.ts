@@ -38,6 +38,7 @@ async function insertChange(opts: {
   previousReason: string | null;
   newReason: string | null;
   changedAt: Date;
+  notificationSentAt?: Date | null;
 }): Promise<SeededRow> {
   const [row] = await db
     .insert(emailStatusChangesTable)
@@ -48,6 +49,7 @@ async function insertChange(opts: {
       previousReason: opts.previousReason,
       newReason: opts.newReason,
       changedAt: opts.changedAt,
+      notificationSentAt: opts.notificationSentAt ?? null,
     })
     .returning({
       id: emailStatusChangesTable.id,
@@ -197,6 +199,52 @@ describe("GET /api/email-status-changes?candidateId=...", () => {
     // Still newest-first even when truncated.
     expect(res.body[0].id).toBe(newestRow.id);
     expect(res.body[1].id).toBe(middleRow.id);
+  });
+
+  it("includes notificationSentAt in the response payload (set when an outbound ping was dispatched, null otherwise)", async () => {
+    // Task #69 added a "Notified <time>" pill in the inbox driven by
+    // notificationSentAt. Lock the field into the API contract so a future
+    // refactor can't silently drop it from SELECT_COLUMNS.
+    const notifiedCandidateId = await insertCandidate({
+      name: `ESH Notified ${uniqueSuffix}`,
+      email: `esh-notified-${uniqueSuffix}@example.com`,
+    });
+    const notifiedAt = new Date(Date.now() - 30 * 60 * 1000);
+    const notifiedRow = await insertChange({
+      candidateId: notifiedCandidateId,
+      previousStatus: "valid",
+      newStatus: "invalid",
+      previousReason: "smtp ok",
+      newReason: "mailbox bounced",
+      changedAt: new Date(Date.now() - 20 * 60 * 1000),
+      notificationSentAt: notifiedAt,
+    });
+
+    const res = await request(app)
+      .get("/api/email-status-changes")
+      .query({ candidateId: notifiedCandidateId });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    const row = res.body[0];
+    expect(row.id).toBe(notifiedRow.id);
+    // Field must be present (not undefined) and serialise to a parseable timestamp.
+    expect(row).toHaveProperty("notificationSentAt");
+    expect(typeof row.notificationSentAt).toBe("string");
+    expect(new Date(row.notificationSentAt).getTime()).toBe(notifiedAt.getTime());
+
+    // Sanity check: a candidate whose changes never had notificationSentAt set
+    // still surfaces the field, but as null — the UI relies on this to decide
+    // whether to render the "Notified" pill.
+    const baselineRes = await request(app)
+      .get("/api/email-status-changes")
+      .query({ candidateId: candidateWithHistoryId });
+    expect(baselineRes.status).toBe(200);
+    expect(baselineRes.body.length).toBeGreaterThan(0);
+    for (const r of baselineRes.body) {
+      expect(r).toHaveProperty("notificationSentAt");
+      expect(r.notificationSentAt).toBeNull();
+    }
   });
 
   it("count of rows for one candidate matches the badge value the UI renders", async () => {
