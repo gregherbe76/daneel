@@ -3,9 +3,15 @@ import {
   useGetNotificationSettings,
   useUpdateNotificationSettings,
   useSendTestNotification,
+  useRunNotificationDigest,
+  usePreviewNotificationDigest,
   getGetNotificationSettingsQueryKey,
+  getPreviewNotificationDigestQueryKey,
 } from "@workspace/api-client-react";
-import type { TestNotificationChannelResult } from "@workspace/api-client-react";
+import type {
+  TestNotificationChannelResult,
+  DigestRunResult,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +35,7 @@ import {
   CheckCircle2,
   XCircle,
   MinusCircle,
+  Mail,
 } from "lucide-react";
 import { SettingsTabs } from "@/components/settings-tabs";
 
@@ -65,6 +72,8 @@ export default function NotificationsSettingsPage() {
   const settingsQuery = useGetNotificationSettings();
   const updateMutation = useUpdateNotificationSettings();
   const testMutation = useSendTestNotification();
+  const digestPreviewQuery = usePreviewNotificationDigest();
+  const runDigestMutation = useRunNotificationDigest();
 
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState("");
@@ -76,6 +85,9 @@ export default function NotificationsSettingsPage() {
   const [testResults, setTestResults] = useState<
     TestNotificationChannelResult[] | null
   >(null);
+  const [lastDigestRun, setLastDigestRun] = useState<DigestRunResult | null>(
+    null,
+  );
 
   useEffect(() => {
     if (settingsQuery.data && !dirty) {
@@ -141,9 +153,14 @@ export default function NotificationsSettingsPage() {
           digestCadenceHours,
         },
       });
-      await queryClient.invalidateQueries({
-        queryKey: getGetNotificationSettingsQueryKey(),
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: getGetNotificationSettingsQueryKey(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: getPreviewNotificationDigestQueryKey(),
+        }),
+      ]);
       setDirty(false);
       toast({
         title: "Notification settings saved",
@@ -198,6 +215,60 @@ export default function NotificationsSettingsPage() {
     } catch (err) {
       toast({
         title: "Test failed",
+        description: err instanceof Error ? err.message : String(err),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRunDigest = async () => {
+    if (dirty) {
+      toast({
+        title: "Save changes first",
+        description:
+          "Save your channel settings before sending a digest — it uses the saved configuration.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setLastDigestRun(null);
+    try {
+      const res = await runDigestMutation.mutateAsync();
+      setLastDigestRun(res);
+      // Refresh both the settings (for digestLastSentAt) and the preview list
+      // (which will now be empty since the cursor has been advanced).
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: getGetNotificationSettingsQueryKey(),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: getPreviewNotificationDigestQueryKey(),
+        }),
+      ]);
+      if (res.attempted) {
+        toast({
+          title: "Digest sent",
+          description: `Delivered ${res.regressionCount} regression${res.regressionCount === 1 ? "" : "s"} to ${res.recipientCount} recipient${res.recipientCount === 1 ? "" : "s"}.`,
+        });
+      } else {
+        const reasonLabel: Record<string, string> = {
+          email_disabled: "Email notifications are turned off.",
+          no_digest_recipients: "No recipients are set to digest mode.",
+          delivery_not_configured:
+            "Email delivery isn't configured on the server.",
+          no_new_regressions:
+            "No new regressions since the last digest — nothing to send.",
+        };
+        toast({
+          title: "Digest not sent",
+          description: res.reason
+            ? (reasonLabel[res.reason] ?? res.reason)
+            : "Nothing to send.",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Digest failed",
         description: err instanceof Error ? err.message : String(err),
         variant: "destructive",
       });
@@ -380,6 +451,95 @@ export default function NotificationsSettingsPage() {
               <p className="text-xs text-muted-foreground">
                 Last digest sent: {digestLastSentAt}
               </p>
+            </div>
+
+            <div
+              className="mt-4 rounded-md border border-border bg-muted/30 p-4 space-y-3"
+              data-testid="digest-preview-panel"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-sm font-semibold text-foreground">
+                    Pending digest preview
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleRunDigest}
+                  disabled={dirty || runDigestMutation.isPending}
+                  className="gap-2"
+                  data-testid="button-run-digest-now"
+                >
+                  {runDigestMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Sending…
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" />
+                      Send digest now
+                    </>
+                  )}
+                </Button>
+              </div>
+              {digestPreviewQuery.isLoading ? (
+                <p className="text-xs text-muted-foreground flex items-center gap-2">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Loading preview…
+                </p>
+              ) : digestPreviewQuery.error ? (
+                <p className="text-xs text-destructive">
+                  Failed to load preview:{" "}
+                  {String(digestPreviewQuery.error)}
+                </p>
+              ) : digestPreviewQuery.data ? (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    {digestPreviewQuery.data.rows.length === 0
+                      ? `No new regressions since the last digest. Targets ${digestPreviewQuery.data.digestRecipientCount} digest recipient${digestPreviewQuery.data.digestRecipientCount === 1 ? "" : "s"}.`
+                      : `${digestPreviewQuery.data.rows.length} regression${digestPreviewQuery.data.rows.length === 1 ? "" : "s"} would be sent to ${digestPreviewQuery.data.digestRecipientCount} digest recipient${digestPreviewQuery.data.digestRecipientCount === 1 ? "" : "s"}.`}
+                  </p>
+                  {digestPreviewQuery.data.rows.length > 0 ? (
+                    <ul
+                      className="rounded-md border border-border bg-background divide-y divide-border max-h-64 overflow-auto"
+                      data-testid="digest-preview-list"
+                    >
+                      {digestPreviewQuery.data.rows.map((r) => (
+                        <li
+                          key={r.id}
+                          className="p-3 text-xs"
+                          data-testid={`digest-preview-row-${r.id}`}
+                        >
+                          <div className="font-medium text-foreground">
+                            {r.candidateName}{" "}
+                            <span className="text-muted-foreground font-normal">
+                              (#{r.candidateId},{" "}
+                              {r.candidateEmail ?? "no email"})
+                            </span>
+                          </div>
+                          <div className="text-muted-foreground">
+                            {r.previousStatus} → {r.newStatus}
+                            {r.newReason ? ` — ${r.newReason}` : ""}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </>
+              ) : null}
+              {lastDigestRun ? (
+                <p
+                  className={`text-xs ${lastDigestRun.attempted ? "text-green-700" : "text-muted-foreground"}`}
+                  data-testid="digest-run-result"
+                >
+                  {lastDigestRun.attempted
+                    ? `Last manual run: sent ${lastDigestRun.regressionCount} regression${lastDigestRun.regressionCount === 1 ? "" : "s"} to ${lastDigestRun.recipientCount} recipient${lastDigestRun.recipientCount === 1 ? "" : "s"}.`
+                    : `Last manual run: nothing sent${lastDigestRun.reason ? ` (${lastDigestRun.reason})` : ""}.`}
+                </p>
+              ) : null}
             </div>
           </div>
 

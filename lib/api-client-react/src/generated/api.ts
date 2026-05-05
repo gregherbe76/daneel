@@ -40,6 +40,8 @@ import type {
   CreateSavedRunComparisonBody,
   DeliberationQuotaError,
   DeliberationRecord,
+  DigestPreview,
+  DigestRunResult,
   DisconnectScout200,
   EmailRevalidationAlertStatus,
   EmailRevalidationRun,
@@ -5139,6 +5141,163 @@ export const useSendTestNotification = <
 > => {
   return useMutation(getSendTestNotificationMutationOptions(options));
 };
+
+/**
+ * @summary Trigger an immediate digest sweep for digest-mode recipients
+ */
+export const getRunNotificationDigestUrl = () => {
+  return `/api/settings/notifications/digest/run`;
+};
+
+export const runNotificationDigest = async (
+  options?: RequestInit,
+): Promise<DigestRunResult> => {
+  return customFetch<DigestRunResult>(getRunNotificationDigestUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRunNotificationDigestMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runNotificationDigest>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof runNotificationDigest>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["runNotificationDigest"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof runNotificationDigest>>,
+    void
+  > = () => {
+    return runNotificationDigest(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RunNotificationDigestMutationResult = NonNullable<
+  Awaited<ReturnType<typeof runNotificationDigest>>
+>;
+
+export type RunNotificationDigestMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Trigger an immediate digest sweep for digest-mode recipients
+ */
+export const useRunNotificationDigest = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runNotificationDigest>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof runNotificationDigest>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getRunNotificationDigestMutationOptions(options));
+};
+
+/**
+ * @summary Preview the regression rows that the next digest would include
+ */
+export const getPreviewNotificationDigestUrl = () => {
+  return `/api/settings/notifications/digest/preview`;
+};
+
+export const previewNotificationDigest = async (
+  options?: RequestInit,
+): Promise<DigestPreview> => {
+  return customFetch<DigestPreview>(getPreviewNotificationDigestUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getPreviewNotificationDigestQueryKey = () => {
+  return [`/api/settings/notifications/digest/preview`] as const;
+};
+
+export const getPreviewNotificationDigestQueryOptions = <
+  TData = Awaited<ReturnType<typeof previewNotificationDigest>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof previewNotificationDigest>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getPreviewNotificationDigestQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof previewNotificationDigest>>
+  > = ({ signal }) => previewNotificationDigest({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof previewNotificationDigest>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type PreviewNotificationDigestQueryResult = NonNullable<
+  Awaited<ReturnType<typeof previewNotificationDigest>>
+>;
+export type PreviewNotificationDigestQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Preview the regression rows that the next digest would include
+ */
+
+export function usePreviewNotificationDigest<
+  TData = Awaited<ReturnType<typeof previewNotificationDigest>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof previewNotificationDigest>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getPreviewNotificationDigestQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Enrich low-confidence candidates from a completed run and re-score them

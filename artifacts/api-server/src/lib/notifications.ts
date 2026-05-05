@@ -429,7 +429,7 @@ export async function sendTestNotification(): Promise<
   return results;
 }
 
-interface DigestRow {
+export interface DigestRow {
   id: number;
   candidateId: number;
   candidateName: string;
@@ -465,6 +465,35 @@ function buildDigestBody(rows: DigestRow[], windowHours: number): string {
  * `digestCadenceHours`-wide window so the very first digest after enabling
  * the feature does not flood recipients with the entire history.
  */
+export interface DigestPreviewSummary {
+  cadenceHours: number;
+  since: Date | null;
+  digestRecipientCount: number;
+  rows: DigestRow[];
+}
+
+/**
+ * Build the same payload the next digest sweep would render — without sending
+ * anything. Used by the Settings UI "preview" affordance so recruiters can see
+ * what's about to ship before they click "Send digest now".
+ */
+export async function previewDigest(): Promise<DigestPreviewSummary> {
+  const settings = await getNotificationSettings();
+  const digestRecipientCount = settings.emailRecipients.filter(
+    (r) => r.mode === "digest",
+  ).length;
+  const rows = await loadDigestRows(
+    settings.digestLastSentAt,
+    settings.digestCadenceHours,
+  );
+  return {
+    cadenceHours: settings.digestCadenceHours,
+    since: settings.digestLastSentAt,
+    digestRecipientCount,
+    rows,
+  };
+}
+
 export async function loadDigestRows(
   since: Date | null,
   cadenceHours: number,

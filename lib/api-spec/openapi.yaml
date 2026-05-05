@@ -1222,6 +1222,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/TestNotificationResult"
 
+  /settings/notifications/digest/run:
+    post:
+      operationId: runNotificationDigest
+      tags: [settings]
+      summary: Trigger an immediate digest sweep for digest-mode recipients
+      responses:
+        "200":
+          description: Structured result describing whether the digest was sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DigestRunResult"
+
+  /settings/notifications/digest/preview:
+    get:
+      operationId: previewNotificationDigest
+      tags: [settings]
+      summary: Preview the regression rows that the next digest would include
+      responses:
+        "200":
+          description: Pending digest preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DigestPreview"
+
   /workflows/improve-and-rerun:
     post:
       operationId: improveAndRerun
@@ -3122,6 +3148,71 @@ components:
           items:
             $ref: "#/components/schemas/TestNotificationChannelResult"
       required: [results]
+
+    DigestRunResult:
+      type: object
+      description: Outcome of a manual or scheduled digest sweep.
+      properties:
+        attempted:
+          type: boolean
+          description: True when an email was actually dispatched. False when there were no recipients, no new regressions, or delivery isn't configured.
+        recipientCount:
+          type: integer
+          description: Number of digest-mode recipients targeted by this sweep.
+        regressionCount:
+          type: integer
+          description: Number of regression rows included in the digest body.
+        reason:
+          type: string
+          nullable: true
+          description: When attempted=false, a short machine-readable reason such as `email_disabled`, `no_digest_recipients`, `delivery_not_configured`, or `no_new_regressions`.
+      required: [attempted, recipientCount, regressionCount]
+
+    DigestPreviewRow:
+      type: object
+      description: A single regression row that would be included in the next digest.
+      properties:
+        id:
+          type: integer
+        candidateId:
+          type: integer
+        candidateName:
+          type: string
+        candidateEmail:
+          type: string
+          nullable: true
+        previousStatus:
+          type: string
+        newStatus:
+          type: string
+        newReason:
+          type: string
+          nullable: true
+        changedAt:
+          type: string
+          format: date-time
+      required: [id, candidateId, candidateName, previousStatus, newStatus, changedAt]
+
+    DigestPreview:
+      type: object
+      description: What the next digest sweep would include if triggered now.
+      properties:
+        cadenceHours:
+          type: integer
+          description: The configured digest cadence (used to compute the lookback window when no digest has been sent yet).
+        since:
+          type: string
+          format: date-time
+          nullable: true
+          description: Lower bound for `changed_at`. Null when no digest has ever been sent (in which case the preview uses a `cadenceHours`-wide window).
+        digestRecipientCount:
+          type: integer
+          description: Number of recipients in `digest` mode that would receive this digest.
+        rows:
+          type: array
+          items:
+            $ref: "#/components/schemas/DigestPreviewRow"
+      required: [cadenceHours, digestRecipientCount, rows]
 
     # ── WORKFLOWS ──
     RunWorkflowBody:

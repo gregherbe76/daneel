@@ -3474,6 +3474,71 @@ export const SendTestNotificationResponse = zod.object({
 });
 
 /**
+ * @summary Trigger an immediate digest sweep for digest-mode recipients
+ */
+export const RunNotificationDigestResponse = zod
+  .object({
+    attempted: zod
+      .boolean()
+      .describe(
+        "True when an email was actually dispatched. False when there were no recipients, no new regressions, or delivery isn't configured.",
+      ),
+    recipientCount: zod
+      .number()
+      .describe("Number of digest-mode recipients targeted by this sweep."),
+    regressionCount: zod
+      .number()
+      .describe("Number of regression rows included in the digest body."),
+    reason: zod
+      .string()
+      .nullish()
+      .describe(
+        "When attempted=false, a short machine-readable reason such as `email_disabled`, `no_digest_recipients`, `delivery_not_configured`, or `no_new_regressions`.",
+      ),
+  })
+  .describe("Outcome of a manual or scheduled digest sweep.");
+
+/**
+ * @summary Preview the regression rows that the next digest would include
+ */
+export const PreviewNotificationDigestResponse = zod
+  .object({
+    cadenceHours: zod
+      .number()
+      .describe(
+        "The configured digest cadence (used to compute the lookback window when no digest has been sent yet).",
+      ),
+    since: zod.coerce
+      .date()
+      .nullish()
+      .describe(
+        "Lower bound for `changed_at`. Null when no digest has ever been sent (in which case the preview uses a `cadenceHours`-wide window).",
+      ),
+    digestRecipientCount: zod
+      .number()
+      .describe(
+        "Number of recipients in `digest` mode that would receive this digest.",
+      ),
+    rows: zod.array(
+      zod
+        .object({
+          id: zod.number(),
+          candidateId: zod.number(),
+          candidateName: zod.string(),
+          candidateEmail: zod.string().nullish(),
+          previousStatus: zod.string(),
+          newStatus: zod.string(),
+          newReason: zod.string().nullish(),
+          changedAt: zod.coerce.date(),
+        })
+        .describe(
+          "A single regression row that would be included in the next digest.",
+        ),
+    ),
+  })
+  .describe("What the next digest sweep would include if triggered now.");
+
+/**
  * @summary Enrich low-confidence candidates from a completed run and re-score them
  */
 export const ImproveAndRerunBody = zod.object({

@@ -934,6 +934,47 @@ export interface TestNotificationResult {
 }
 
 /**
+ * Outcome of a manual or scheduled digest sweep.
+ */
+export interface DigestRunResult {
+  /** True when an email was actually dispatched. False when there were no recipients, no new regressions, or delivery isn't configured. */
+  attempted: boolean;
+  /** Number of digest-mode recipients targeted by this sweep. */
+  recipientCount: number;
+  /** Number of regression rows included in the digest body. */
+  regressionCount: number;
+  /** When attempted=false, a short machine-readable reason such as `email_disabled`, `no_digest_recipients`, `delivery_not_configured`, or `no_new_regressions`. */
+  reason?: string | null;
+}
+
+/**
+ * A single regression row that would be included in the next digest.
+ */
+export interface DigestPreviewRow {
+  id: number;
+  candidateId: number;
+  candidateName: string;
+  candidateEmail?: string | null;
+  previousStatus: string;
+  newStatus: string;
+  newReason?: string | null;
+  changedAt: string;
+}
+
+/**
+ * What the next digest sweep would include if triggered now.
+ */
+export interface DigestPreview {
+  /** The configured digest cadence (used to compute the lookback window when no digest has been sent yet). */
+  cadenceHours: number;
+  /** Lower bound for `changed_at`. Null when no digest has ever been sent (in which case the preview uses a `cadenceHours`-wide window). */
+  since?: string | null;
+  /** Number of recipients in `digest` mode that would receive this digest. */
+  digestRecipientCount: number;
+  rows: DigestPreviewRow[];
+}
+
+/**
  * Enforces strict data separation. "real" uses only Twin-sourced or imported candidates. "mock" uses only AI-generated mock candidates. "fallback" means a real run where the Twin provider failed and native was used instead.
 
  */

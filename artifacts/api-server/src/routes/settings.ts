@@ -14,6 +14,8 @@ import {
   getNotificationSettings,
   updateNotificationSettings,
   sendTestNotification,
+  runDigestSweep,
+  previewDigest,
 } from "../lib/notifications";
 
 const router: IRouter = Router();
@@ -116,6 +118,31 @@ router.post(
       "Test notification dispatched",
     );
     res.json({ results });
+  },
+);
+
+router.post(
+  "/settings/notifications/digest/run",
+  async (req, res): Promise<void> => {
+    const result = await runDigestSweep();
+    req.log.info(
+      {
+        attempted: result.attempted,
+        recipientCount: result.recipientCount,
+        regressionCount: result.regressionCount,
+        reason: result.reason,
+      },
+      "Manual digest sweep finished",
+    );
+    res.json(result);
+  },
+);
+
+router.get(
+  "/settings/notifications/digest/preview",
+  async (_req, res): Promise<void> => {
+    const preview = await previewDigest();
+    res.json(preview);
   },
 );
 
