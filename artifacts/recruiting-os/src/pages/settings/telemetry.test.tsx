@@ -32,7 +32,12 @@ async function loadPage(env: {
     env.VITE_POSTHOG_KEY === undefined ? "" : env.VITE_POSTHOG_KEY,
   );
   const mod = await import("./telemetry");
-  return mod.default;
+  const telemetry = await import("@/lib/telemetry");
+  return { Page: mod.default, telemetry };
+}
+
+async function flushMicrotasks() {
+  await new Promise((r) => setTimeout(r, 0));
 }
 
 function renderWithRouter(ui: React.ReactElement) {
@@ -47,6 +52,7 @@ beforeEach(() => {
   window.localStorage.clear();
   posthogMocks.init.mockClear();
   posthogMocks.identify.mockClear();
+  posthogMocks.capture.mockClear();
   posthogMocks.opt_out_capturing.mockClear();
   posthogMocks.reset.mockClear();
 });
@@ -57,7 +63,7 @@ afterEach(() => {
 
 describe("TelemetrySettingsPage", () => {
   it("the toggle reflects no stored consent (unchecked) and is enabled when key is set + not dev", async () => {
-    const Page = await loadPage({
+    const { Page } = await loadPage({
       DEV: false,
       VITE_POSTHOG_KEY: "phc_test_key",
     });
@@ -70,7 +76,7 @@ describe("TelemetrySettingsPage", () => {
 
   it("the toggle reflects stored 'granted' consent (checked) on initial render", async () => {
     window.localStorage.setItem("daneel.telemetryConsent", "granted");
-    const Page = await loadPage({
+    const { Page } = await loadPage({
       DEV: false,
       VITE_POSTHOG_KEY: "phc_test_key",
     });
@@ -84,7 +90,7 @@ describe("TelemetrySettingsPage", () => {
     "flipping the toggle on writes 'granted' to localStorage and reflects checked state; " +
       "flipping it off writes 'denied' and reflects unchecked",
     async () => {
-      const Page = await loadPage({
+      const { Page } = await loadPage({
         DEV: false,
         VITE_POSTHOG_KEY: "phc_test_key",
       });
@@ -108,7 +114,7 @@ describe("TelemetrySettingsPage", () => {
   );
 
   it("disables the toggle and shows the dev-mode notice when running in dev", async () => {
-    const Page = await loadPage({
+    const { Page } = await loadPage({
       DEV: true,
       VITE_POSTHOG_KEY: "phc_test_key",
     });
@@ -122,7 +128,7 @@ describe("TelemetrySettingsPage", () => {
   });
 
   it("disables the toggle and shows the missing-key notice when VITE_POSTHOG_KEY is not configured", async () => {
-    const Page = await loadPage({ DEV: false, VITE_POSTHOG_KEY: "" });
+    const { Page } = await loadPage({ DEV: false, VITE_POSTHOG_KEY: "" });
     renderWithRouter(<Page />);
 
     const toggle = screen.getByTestId("telemetry-consent-toggle");
@@ -130,5 +136,99 @@ describe("TelemetrySettingsPage", () => {
     expect(
       screen.getByText(/Telemetry key not configured/i),
     ).toBeInTheDocument();
+  });
+
+  it("flipping the toggle on triggers PostHog init without a reload", async () => {
+    const { Page } = await loadPage({
+      DEV: false,
+      VITE_POSTHOG_KEY: "phc_test_key",
+    });
+    renderWithRouter(<Page />);
+
+    expect(posthogMocks.init).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByTestId("telemetry-consent-toggle"));
+    await flushMicrotasks();
+
+    expect(window.localStorage.getItem("daneel.telemetryConsent")).toBe(
+      "granted",
+    );
+    expect(posthogMocks.init).toHaveBeenCalledTimes(1);
+    expect(posthogMocks.init).toHaveBeenCalledWith(
+      "phc_test_key",
+      expect.objectContaining({ autocapture: false }),
+    );
+    expect(posthogMocks.identify).toHaveBeenCalledTimes(1);
+  });
+
+  it(
+    "flipping the toggle off after granting opts out, resets PostHog, persists 'denied', " +
+      "and prevents further track() emissions",
+    async () => {
+      const { Page, telemetry } = await loadPage({
+        DEV: false,
+        VITE_POSTHOG_KEY: "phc_test_key",
+      });
+      renderWithRouter(<Page />);
+      const toggle = screen.getByTestId("telemetry-consent-toggle");
+
+      // Grant via the toggle so PostHog is fully initialized.
+      await userEvent.click(toggle);
+      await flushMicrotasks();
+      expect(posthogMocks.init).toHaveBeenCalledTimes(1);
+
+      // A track() before revocation should reach PostHog.
+      telemetry.track("workflow_started");
+      expect(posthogMocks.capture).toHaveBeenCalledTimes(1);
+
+      // Now flip it off.
+      await userEvent.click(toggle);
+      await flushMicrotasks();
+
+      expect(window.localStorage.getItem("daneel.telemetryConsent")).toBe(
+        "denied",
+      );
+      expect(posthogMocks.opt_out_capturing).toHaveBeenCalledTimes(1);
+      expect(posthogMocks.reset).toHaveBeenCalledTimes(1);
+
+      // Subsequent track() must not reach PostHog.
+      posthogMocks.capture.mockClear();
+      telemetry.track("workflow_completed");
+      expect(posthogMocks.capture).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not initialize PostHog when the toggle is disabled by config (dev mode)", async () => {
+    const { Page } = await loadPage({
+      DEV: true,
+      VITE_POSTHOG_KEY: "phc_test_key",
+    });
+    renderWithRouter(<Page />);
+    const toggle = screen.getByTestId("telemetry-consent-toggle");
+
+    // Radix's disabled Switch swallows clicks; user-event respects pointer-events.
+    await userEvent.click(toggle).catch(() => {
+      /* disabled element may throw */
+    });
+    await flushMicrotasks();
+
+    expect(toggle).toBeDisabled();
+    expect(posthogMocks.init).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem("daneel.telemetryConsent")).toBeNull();
+  });
+
+  it("does not initialize PostHog when the toggle is disabled by config (missing VITE_POSTHOG_KEY)", async () => {
+    const { Page } = await loadPage({ DEV: false, VITE_POSTHOG_KEY: "" });
+    renderWithRouter(<Page />);
+    const toggle = screen.getByTestId("telemetry-consent-toggle");
+
+    await userEvent.click(toggle).catch(() => {
+      /* disabled element may throw */
+    });
+    await flushMicrotasks();
+
+    expect(toggle).toBeDisabled();
+    expect(posthogMocks.init).not.toHaveBeenCalled();
+    expect(window.localStorage.getItem("daneel.telemetryConsent")).toBeNull();
   });
 });
