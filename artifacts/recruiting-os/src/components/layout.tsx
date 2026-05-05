@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Briefcase, Users, PlayCircle, ListChecks, AtSign, Settings as SettingsIcon } from "lucide-react";
+import { Briefcase, Users, PlayCircle, ListChecks, AtSign, Trash2, Settings as SettingsIcon } from "lucide-react";
 import {
   useListTeamMembers,
   useListMentionsForMember,
@@ -71,6 +71,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { name: "Jobs", href: "/jobs", icon: Briefcase },
     { name: "Candidates", href: "/candidates", icon: Users },
     { name: "Inbox", href: "/mentions", icon: AtSign, badge: <InboxBadge /> },
+    { name: "Trash", href: "/trash", icon: Trash2 },
     { name: "Settings", href: "/settings/marketplace", icon: SettingsIcon, match: undefined },
   ];
 

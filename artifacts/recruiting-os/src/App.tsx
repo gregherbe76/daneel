@@ -28,6 +28,7 @@ import NotificationsSettingsPage from "./pages/settings/notifications";
 import TelemetrySettingsPage from "./pages/settings/telemetry";
 import TelemetryDashboardPage from "./pages/settings/telemetry-dashboard";
 import MentionsPage from "./pages/mentions";
+import TrashPage from "./pages/trash";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ function AppRoutes() {
         <Route path="/candidates/:id/edit" component={() => <div className="p-8">Candidate Edit (WIP)</div>} />
         <Route path="/pipeline" component={() => <div className="p-8">Pipeline (WIP)</div>} />
         <Route path="/mentions" component={MentionsPage} />
+        <Route path="/trash" component={TrashPage} />
         {LEGACY_SETTINGS_REDIRECTS.map(({ from, to }) => (
           <Route key={from} path={from} component={() => <Redirect to={to} />} />
         ))}

@@ -834,6 +834,83 @@ export const RestoreCandidateBatchResponse = zod.object({
 });
 
 /**
+ * Returns every candidate with `deletedAt IS NOT NULL` that has not yet been hard-deleted by the retention sweeper. Each row carries a `daysRemaining` countdown to surface urgency in the recruiter-facing Trash view.
+
+ * @summary List soft-deleted candidates currently in the trash bin
+ */
+export const ListTrashedCandidatesResponse = zod.object({
+  retentionDays: zod
+    .number()
+    .describe(
+      "Configured retention window in whole days, used by the UI to caption the page.",
+    ),
+  items: zod.array(
+    zod
+      .object({
+        id: zod.number(),
+        name: zod.string(),
+        email: zod.string().nullish(),
+        headline: zod.string().nullish(),
+        location: zod.string().nullish(),
+        currentCompany: zod.string().nullish(),
+        source: zod.string().nullish(),
+        deletedAt: zod.coerce.date(),
+        deletionBatchId: zod
+          .string()
+          .nullish()
+          .describe(
+            'Groups candidates that were deleted in the same bulk action so the Trash view can offer a \"Restore batch\" button. Null for legacy rows soft-deleted before batch ids existed.\n',
+          ),
+        batchSize: zod
+          .number()
+          .describe(
+            "How many candidates share this `deletionBatchId` (1 for solo deletes \/ legacy rows with no batch id).",
+          ),
+        daysRemaining: zod
+          .number()
+          .describe(
+            "Whole days left before the trash sweeper hard-deletes this row. Floored to 0 for rows already past the retention window but not yet swept.",
+          ),
+      })
+      .describe(
+        "A soft-deleted candidate row exposed via the Trash view, augmented with retention metadata.",
+      ),
+  ),
+});
+
+/**
+ * Skips the retention window and immediately purges every soft-deleted candidate. Backs the recruiter-facing "Empty trash" button (gated behind a typed confirmation in the UI).
+
+ * @summary Permanently hard-delete every candidate currently in the trash
+ */
+export const EmptyCandidateTrashResponse = zod.object({
+  ok: zod.boolean(),
+  purged: zod
+    .number()
+    .describe(
+      "Number of soft-deleted candidates that were permanently hard-deleted.",
+    ),
+});
+
+/**
+ * Backs the per-candidate and per-batch "Restore" buttons in the Trash view. Already-restored or hard-deleted ids are silently skipped — the response reports the actual number of rows brought back.
+
+ * @summary Restore one or more soft-deleted candidates by id
+ */
+export const restoreCandidatesByIdsBodyIdsMax = 1000;
+
+export const RestoreCandidatesByIdsBody = zod.object({
+  ids: zod.array(zod.number()).min(1).max(restoreCandidatesByIdsBodyIdsMax),
+});
+
+export const RestoreCandidatesByIdsResponse = zod.object({
+  ok: zod.boolean(),
+  restored: zod
+    .number()
+    .describe("Number of candidates that were brought back from the trash."),
+});
+
+/**
  * @summary Get all applications for a candidate (with job info)
  */
 export const GetCandidateApplicationsParams = zod.object({

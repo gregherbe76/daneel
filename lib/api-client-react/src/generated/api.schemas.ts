@@ -288,6 +288,41 @@ export interface RestoreCandidateBatchResult {
   restored: number;
 }
 
+export interface RestoreCandidatesByIdBody {
+  /**
+   * @minItems 1
+   * @maxItems 1000
+   */
+  ids: number[];
+}
+
+export interface EmptyCandidateTrashResult {
+  ok: boolean;
+  /** Number of soft-deleted candidates that were permanently hard-deleted. */
+  purged: number;
+}
+
+/**
+ * A soft-deleted candidate row exposed via the Trash view, augmented with retention metadata.
+ */
+export interface TrashedCandidate {
+  id: number;
+  name: string;
+  email?: string | null;
+  headline?: string | null;
+  location?: string | null;
+  currentCompany?: string | null;
+  source?: string | null;
+  deletedAt: string;
+  /** Groups candidates that were deleted in the same bulk action so the Trash view can offer a "Restore batch" button. Null for legacy rows soft-deleted before batch ids existed.
+   */
+  deletionBatchId?: string | null;
+  /** How many candidates share this `deletionBatchId` (1 for solo deletes / legacy rows with no batch id). */
+  batchSize: number;
+  /** Whole days left before the trash sweeper hard-deletes this row. Floored to 0 for rows already past the retention window but not yet swept. */
+  daysRemaining: number;
+}
+
 export interface Application {
   id: number;
   jobId: number;
@@ -1221,6 +1256,12 @@ export interface TelemetryDashboard {
   range: TelemetryDashboardRange;
   events: TelemetryEventStats[];
 }
+
+export type ListTrashedCandidates200 = {
+  /** Configured retention window in whole days, used by the UI to caption the page. */
+  retentionDays: number;
+  items: TrashedCandidate[];
+};
 
 export type ListCandidateDeliberationsParams = {
   jobId?: number;

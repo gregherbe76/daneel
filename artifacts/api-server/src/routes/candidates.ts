@@ -14,8 +14,14 @@ import {
   EnqueueBulkCandidateJobBody,
   GetBulkCandidateJobParams,
   RestoreCandidateBatchBody,
+  RestoreCandidatesByIdsBody,
 } from "@workspace/api-zod";
+import { isNotNull, sql } from "drizzle-orm";
 import { revalidateCandidateEmail } from "../lib/email-revalidation";
+import {
+  RETENTION_MS,
+  purgeExpiredSoftDeletedCandidates,
+} from "../lib/candidate-trash";
 import { hasRealSourcingProvider } from "./workflows/providers/registry";
 import {
   enqueueBulkJob,
@@ -110,6 +116,99 @@ router.post("/candidates/bulk-jobs", async (req, res) => {
 router.get("/candidates/bulk-jobs", async (_req, res) => {
   const jobs = await listActiveBulkJobs();
   res.json(jobs.map(serializeBulkJob));
+});
+
+// Trash bin: list every soft-deleted candidate still inside the retention
+// window so the recruiter can review and restore mistakes. Registered ABOVE
+// `/candidates/:id` so the literal `/candidates/trash` path isn't swallowed
+// by the numeric `:id` matcher.
+router.get("/candidates/trash", async (_req, res) => {
+  // Opportunistic sweep: hard-delete anything past retention before we list,
+  // so the recruiter never sees a row that's about to vanish out from under
+  // their click. Failure here is non-fatal — the scheduled sweeper will
+  // catch up later.
+  try {
+    await purgeExpiredSoftDeletedCandidates();
+  } catch {
+    /* ignore — listing must not depend on the sweep succeeding */
+  }
+  const rows = await db
+    .select()
+    .from(candidatesTable)
+    .where(isNotNull(candidatesTable.deletedAt))
+    .orderBy(sql`${candidatesTable.deletedAt} DESC`);
+  // Pre-compute batch sizes so the UI can show "X candidates in this batch"
+  // and offer a single "Restore batch" action without a second round trip.
+  const batchCounts = new Map<string, number>();
+  for (const r of rows) {
+    if (r.deletionBatchId) {
+      batchCounts.set(
+        r.deletionBatchId,
+        (batchCounts.get(r.deletionBatchId) ?? 0) + 1,
+      );
+    }
+  }
+  const now = Date.now();
+  const items = rows.map((r) => {
+    const deletedAtMs = r.deletedAt ? r.deletedAt.getTime() : now;
+    const purgeAt = deletedAtMs + RETENTION_MS;
+    const msRemaining = Math.max(0, purgeAt - now);
+    const daysRemaining = Math.floor(msRemaining / (24 * 60 * 60 * 1000));
+    return {
+      id: r.id,
+      name: r.name,
+      email: r.email ?? null,
+      headline: r.headline ?? null,
+      location: r.location ?? null,
+      currentCompany: r.currentCompany ?? null,
+      source: r.source ?? null,
+      deletedAt: r.deletedAt,
+      deletionBatchId: r.deletionBatchId ?? null,
+      batchSize: r.deletionBatchId ? (batchCounts.get(r.deletionBatchId) ?? 1) : 1,
+      daysRemaining,
+    };
+  });
+  res.json({
+    retentionDays: Math.floor(RETENTION_MS / (24 * 60 * 60 * 1000)),
+    items,
+  });
+});
+
+// Empty the trash immediately. Bypasses the retention window so a recruiter
+// who's confident about their cleanup doesn't have to wait 7 days for the
+// rows to vanish. The frontend gates this behind a typed confirmation.
+router.delete("/candidates/trash", async (_req, res) => {
+  const purged = await db
+    .delete(candidatesTable)
+    .where(isNotNull(candidatesTable.deletedAt))
+    .returning({ id: candidatesTable.id });
+  res.json({ ok: true, purged: purged.length });
+});
+
+// Restore one or more soft-deleted candidates by id. Powers both the
+// per-row "Restore" button and the per-batch "Restore batch" action in the
+// Trash view (the frontend just expands the batch into its candidate ids).
+// Already-restored or hard-deleted ids are silently filtered out by the
+// `isNotNull(deletedAt)` predicate so the response count reflects what
+// actually changed.
+router.post("/candidates/restore-by-id", async (req, res) => {
+  const body = RestoreCandidatesByIdsBody.parse(req.body);
+  const ids = Array.from(new Set(body.ids));
+  const restored = await db
+    .update(candidatesTable)
+    .set({
+      deletedAt: null,
+      deletionBatchId: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        inArray(candidatesTable.id, ids),
+        isNotNull(candidatesTable.deletedAt),
+      ),
+    )
+    .returning({ id: candidatesTable.id });
+  res.json({ ok: true, restored: restored.length });
 });
 
 router.get("/candidates/bulk-jobs/:id", async (req, res) => {

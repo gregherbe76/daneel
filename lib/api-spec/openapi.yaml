@@ -425,6 +425,71 @@ paths:
               schema:
                 $ref: "#/components/schemas/RestoreCandidateBatchResult"
 
+  /candidates/trash:
+    get:
+      operationId: listTrashedCandidates
+      tags: [candidates]
+      summary: List soft-deleted candidates currently in the trash bin
+      description: >
+        Returns every candidate with `deletedAt IS NOT NULL` that has not yet
+        been hard-deleted by the retention sweeper. Each row carries a
+        `daysRemaining` countdown to surface urgency in the recruiter-facing
+        Trash view.
+      responses:
+        "200":
+          description: Trashed candidates (most recently deleted first)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  retentionDays:
+                    type: integer
+                    description: Configured retention window in whole days, used by the UI to caption the page.
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TrashedCandidate"
+                required: [retentionDays, items]
+    delete:
+      operationId: emptyCandidateTrash
+      tags: [candidates]
+      summary: Permanently hard-delete every candidate currently in the trash
+      description: >
+        Skips the retention window and immediately purges every soft-deleted
+        candidate. Backs the recruiter-facing "Empty trash" button (gated
+        behind a typed confirmation in the UI).
+      responses:
+        "200":
+          description: Trash emptied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmptyCandidateTrashResult"
+
+  /candidates/restore-by-id:
+    post:
+      operationId: restoreCandidatesByIds
+      tags: [candidates]
+      summary: Restore one or more soft-deleted candidates by id
+      description: >
+        Backs the per-candidate and per-batch "Restore" buttons in the Trash
+        view. Already-restored or hard-deleted ids are silently skipped — the
+        response reports the actual number of rows brought back.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestoreCandidatesByIdBody"
+      responses:
+        "200":
+          description: Restore completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RestoreCandidateBatchResult"
+
   /candidates/{id}/applications:
     get:
       operationId: getCandidateApplications
@@ -1969,6 +2034,68 @@ components:
           type: integer
           description: Number of candidates that were brought back from the trash.
       required: [ok, restored]
+
+    RestoreCandidatesByIdBody:
+      type: object
+      properties:
+        ids:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            type: integer
+      required: [ids]
+
+    EmptyCandidateTrashResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        purged:
+          type: integer
+          description: Number of soft-deleted candidates that were permanently hard-deleted.
+      required: [ok, purged]
+
+    TrashedCandidate:
+      type: object
+      description: A soft-deleted candidate row exposed via the Trash view, augmented with retention metadata.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+          nullable: true
+        headline:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        currentCompany:
+          type: string
+          nullable: true
+        source:
+          type: string
+          nullable: true
+        deletedAt:
+          type: string
+          format: date-time
+        deletionBatchId:
+          type: string
+          nullable: true
+          description: >
+            Groups candidates that were deleted in the same bulk action so the
+            Trash view can offer a "Restore batch" button. Null for legacy
+            rows soft-deleted before batch ids existed.
+        batchSize:
+          type: integer
+          description: How many candidates share this `deletionBatchId` (1 for solo deletes / legacy rows with no batch id).
+        daysRemaining:
+          type: integer
+          description: Whole days left before the trash sweeper hard-deletes this row. Floored to 0 for rows already past the retention window but not yet swept.
+      required: [id, name, deletedAt, batchSize, daysRemaining]
 
     # ── APPLICATION ──
     Application:

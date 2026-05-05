@@ -12,7 +12,7 @@ import { logger } from "./logger";
  * lengthen it when running customer-facing data migrations.
  */
 const DEFAULT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
-const RETENTION_MS = (() => {
+export const RETENTION_MS = (() => {
   const raw = Number(process.env["CANDIDATE_TRASH_RETENTION_MS"]);
   return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_RETENTION_MS;
 })();

@@ -44,6 +44,7 @@ import type {
   EmailRevalidationRun,
   EmailRevalidationSettings,
   EmailStatusChange,
+  EmptyCandidateTrashResult,
   EnqueueBulkCandidateJobBody,
   GetTelemetryDashboardParams,
   HealthStatus,
@@ -58,6 +59,7 @@ import type {
   ListCandidateNotesParams,
   ListEmailStatusChangesParams,
   ListMentionsForMemberParams,
+  ListTrashedCandidates200,
   MarkAllEmailStatusChangesRead200,
   MentionEntry,
   NotificationSettings,
@@ -67,6 +69,7 @@ import type {
   ProviderStepSettingWithProvider,
   RestoreCandidateBatchBody,
   RestoreCandidateBatchResult,
+  RestoreCandidatesByIdBody,
   RunVariantBody,
   RunWorkflowBody,
   ScoutConnectCallbackParams,
@@ -1676,6 +1679,258 @@ export const useRestoreCandidateBatch = <
   TContext
 > => {
   return useMutation(getRestoreCandidateBatchMutationOptions(options));
+};
+
+/**
+ * Returns every candidate with `deletedAt IS NOT NULL` that has not yet been hard-deleted by the retention sweeper. Each row carries a `daysRemaining` countdown to surface urgency in the recruiter-facing Trash view.
+
+ * @summary List soft-deleted candidates currently in the trash bin
+ */
+export const getListTrashedCandidatesUrl = () => {
+  return `/api/candidates/trash`;
+};
+
+export const listTrashedCandidates = async (
+  options?: RequestInit,
+): Promise<ListTrashedCandidates200> => {
+  return customFetch<ListTrashedCandidates200>(getListTrashedCandidatesUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTrashedCandidatesQueryKey = () => {
+  return [`/api/candidates/trash`] as const;
+};
+
+export const getListTrashedCandidatesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTrashedCandidates>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTrashedCandidates>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListTrashedCandidatesQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listTrashedCandidates>>
+  > = ({ signal }) => listTrashedCandidates({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTrashedCandidates>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTrashedCandidatesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTrashedCandidates>>
+>;
+export type ListTrashedCandidatesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List soft-deleted candidates currently in the trash bin
+ */
+
+export function useListTrashedCandidates<
+  TData = Awaited<ReturnType<typeof listTrashedCandidates>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listTrashedCandidates>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTrashedCandidatesQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Skips the retention window and immediately purges every soft-deleted candidate. Backs the recruiter-facing "Empty trash" button (gated behind a typed confirmation in the UI).
+
+ * @summary Permanently hard-delete every candidate currently in the trash
+ */
+export const getEmptyCandidateTrashUrl = () => {
+  return `/api/candidates/trash`;
+};
+
+export const emptyCandidateTrash = async (
+  options?: RequestInit,
+): Promise<EmptyCandidateTrashResult> => {
+  return customFetch<EmptyCandidateTrashResult>(getEmptyCandidateTrashUrl(), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getEmptyCandidateTrashMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emptyCandidateTrash>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof emptyCandidateTrash>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["emptyCandidateTrash"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof emptyCandidateTrash>>,
+    void
+  > = () => {
+    return emptyCandidateTrash(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EmptyCandidateTrashMutationResult = NonNullable<
+  Awaited<ReturnType<typeof emptyCandidateTrash>>
+>;
+
+export type EmptyCandidateTrashMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Permanently hard-delete every candidate currently in the trash
+ */
+export const useEmptyCandidateTrash = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof emptyCandidateTrash>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof emptyCandidateTrash>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getEmptyCandidateTrashMutationOptions(options));
+};
+
+/**
+ * Backs the per-candidate and per-batch "Restore" buttons in the Trash view. Already-restored or hard-deleted ids are silently skipped — the response reports the actual number of rows brought back.
+
+ * @summary Restore one or more soft-deleted candidates by id
+ */
+export const getRestoreCandidatesByIdsUrl = () => {
+  return `/api/candidates/restore-by-id`;
+};
+
+export const restoreCandidatesByIds = async (
+  restoreCandidatesByIdBody: RestoreCandidatesByIdBody,
+  options?: RequestInit,
+): Promise<RestoreCandidateBatchResult> => {
+  return customFetch<RestoreCandidateBatchResult>(
+    getRestoreCandidatesByIdsUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(restoreCandidatesByIdBody),
+    },
+  );
+};
+
+export const getRestoreCandidatesByIdsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreCandidatesByIds>>,
+    TError,
+    { data: BodyType<RestoreCandidatesByIdBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreCandidatesByIds>>,
+  TError,
+  { data: BodyType<RestoreCandidatesByIdBody> },
+  TContext
+> => {
+  const mutationKey = ["restoreCandidatesByIds"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreCandidatesByIds>>,
+    { data: BodyType<RestoreCandidatesByIdBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return restoreCandidatesByIds(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreCandidatesByIdsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restoreCandidatesByIds>>
+>;
+export type RestoreCandidatesByIdsMutationBody =
+  BodyType<RestoreCandidatesByIdBody>;
+export type RestoreCandidatesByIdsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Restore one or more soft-deleted candidates by id
+ */
+export const useRestoreCandidatesByIds = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreCandidatesByIds>>,
+    TError,
+    { data: BodyType<RestoreCandidatesByIdBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof restoreCandidatesByIds>>,
+  TError,
+  { data: BodyType<RestoreCandidatesByIdBody> },
+  TContext
+> => {
+  return useMutation(getRestoreCandidatesByIdsMutationOptions(options));
 };
 
 /**
