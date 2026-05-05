@@ -128,6 +128,34 @@ Edit `artifacts/api-server/src/routes/reports.ts` to change the structure of Mar
 
 ## Setup
 
+### Quickstart with Docker (recommended)
+
+Requires **Docker Desktop** or **Docker Engine + Compose v2**.
+
+```
+git clone https://github.com/gregherbe76/daneel
+cd daneel
+cp .env.example .env
+docker compose up
+```
+
+This brings up Postgres, the API server, and the frontend in a single command,
+pushes the database schema, and seeds a small demo dataset (a couple of jobs,
+a few candidates, sample applications). Re-running `docker compose up` is safe
+— the seed step is idempotent and will not duplicate rows.
+
+Once everything is healthy:
+
+- App UI: http://localhost:5173
+- API: http://localhost:3000/api/healthz
+- Postgres: `localhost:5432` (user/password/db all `daneel`)
+
+To stop and wipe the database volume: `docker compose down -v`.
+
+---
+
+### Replit-native setup
+
 ### Prerequisites
 
 - Node.js 20+

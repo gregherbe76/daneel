@@ -1,0 +1,84 @@
+# One-command local stack for Daneel / HiringAI.
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose up
+#
+# Services:
+#   db    — Postgres 16  (host port 5432)
+#   api   — Express API   (host port 3000, /api)
+#   web   — React + nginx (host port 5173, proxies /api -> api:3000)
+
+name: daneel
+
+networks:
+  daneel:
+    driver: bridge
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    networks: [daneel]
+    environment:
+      POSTGRES_USER: daneel
+      POSTGRES_PASSWORD: daneel
+      POSTGRES_DB: daneel
+    ports:
+      - "5432:5432"
+    volumes:
+      - daneel_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U daneel -d daneel"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile.api
+    restart: unless-stopped
+    networks: [daneel]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: ${DATABASE_URL:-postgresql://daneel:daneel@db:5432/daneel}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-me}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      APP_TEMPLATE: hiringai
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "node -e \"fetch('http://localhost:3000/api/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  web:
+    build:
+      context: .
+      dockerfile: artifacts/recruiting-os/Dockerfile.web
+    restart: unless-stopped
+    networks: [daneel]
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "5173:5173"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:5173/ >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  daneel_pgdata:

@@ -7,6 +7,7 @@
     "hello": "tsx ./src/hello.ts",
     "rescore-3d": "tsx ./src/rescore-3d.ts",
     "backfill-email-validation": "tsx ./src/backfill-email-validation.ts",
+    "seed-demo": "tsx ./src/seed-demo.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
