@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useGetNotificationSettings,
   useUpdateNotificationSettings,
@@ -12,6 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   Loader2,
@@ -25,11 +32,31 @@ import {
 } from "lucide-react";
 import { SettingsTabs } from "@/components/settings-tabs";
 
-function parseRecipients(raw: string): string[] {
+type Mode = "instant" | "digest";
+
+interface RecipientDraft {
+  email: string;
+  mode: Mode;
+}
+
+function parseRecipientLines(raw: string): string[] {
   return raw
     .split(/[\s,;\n]+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+/**
+ * Merge a free-form textarea (one address per line/comma) with a per-email
+ * `modeMap` so the UI can let recruiters edit the address list as text while
+ * still attaching a delivery mode to each entry. Addresses missing from the
+ * map default to `"instant"`.
+ */
+function buildRecipients(raw: string, modeMap: Record<string, Mode>): RecipientDraft[] {
+  return parseRecipientLines(raw).map((email) => ({
+    email,
+    mode: modeMap[email] === "digest" ? "digest" : "instant",
+  }));
 }
 
 export default function NotificationsSettingsPage() {
@@ -41,8 +68,10 @@ export default function NotificationsSettingsPage() {
 
   const [emailEnabled, setEmailEnabled] = useState(false);
   const [emailRecipients, setEmailRecipients] = useState("");
+  const [recipientModes, setRecipientModes] = useState<Record<string, Mode>>({});
   const [slackEnabled, setSlackEnabled] = useState(false);
   const [slackWebhookUrl, setSlackWebhookUrl] = useState("");
+  const [digestCadenceHours, setDigestCadenceHours] = useState(24);
   const [dirty, setDirty] = useState(false);
   const [testResults, setTestResults] = useState<
     TestNotificationChannelResult[] | null
@@ -50,17 +79,34 @@ export default function NotificationsSettingsPage() {
 
   useEffect(() => {
     if (settingsQuery.data && !dirty) {
+      const recipients = settingsQuery.data.emailRecipients;
       setEmailEnabled(settingsQuery.data.emailEnabled);
-      setEmailRecipients(settingsQuery.data.emailRecipients.join(", "));
+      setEmailRecipients(recipients.map((r) => r.email).join(", "));
+      const modes: Record<string, Mode> = {};
+      for (const r of recipients) modes[r.email] = r.mode;
+      setRecipientModes(modes);
       setSlackEnabled(settingsQuery.data.slackEnabled);
       setSlackWebhookUrl(settingsQuery.data.slackWebhookUrl ?? "");
+      setDigestCadenceHours(settingsQuery.data.digestCadenceHours);
     }
   }, [settingsQuery.data, dirty]);
 
   const markDirty = () => setDirty(true);
 
+  // Re-derive the structured list every render so the per-recipient mode
+  // pickers stay in sync with whatever the user is typing in the textarea.
+  const draftRecipients = useMemo(
+    () => buildRecipients(emailRecipients, recipientModes),
+    [emailRecipients, recipientModes],
+  );
+
+  const setMode = (email: string, mode: Mode) => {
+    setRecipientModes((prev) => ({ ...prev, [email]: mode }));
+    markDirty();
+  };
+
   const handleSave = async () => {
-    const recipients = parseRecipients(emailRecipients);
+    const recipients = draftRecipients;
     if (emailEnabled && recipients.length === 0) {
       toast({
         title: "Add at least one recipient",
@@ -77,6 +123,13 @@ export default function NotificationsSettingsPage() {
       });
       return;
     }
+    if (!Number.isFinite(digestCadenceHours) || digestCadenceHours < 1) {
+      toast({
+        title: "Digest cadence must be at least 1 hour",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       await updateMutation.mutateAsync({
@@ -85,6 +138,7 @@ export default function NotificationsSettingsPage() {
           emailRecipients: recipients,
           slackEnabled,
           slackWebhookUrl: slackWebhookUrl.trim() || null,
+          digestCadenceHours,
         },
       });
       await queryClient.invalidateQueries({
@@ -152,10 +206,15 @@ export default function NotificationsSettingsPage() {
 
   const handleReset = () => {
     if (!settingsQuery.data) return;
+    const recipients = settingsQuery.data.emailRecipients;
     setEmailEnabled(settingsQuery.data.emailEnabled);
-    setEmailRecipients(settingsQuery.data.emailRecipients.join(", "));
+    setEmailRecipients(recipients.map((r) => r.email).join(", "));
+    const modes: Record<string, Mode> = {};
+    for (const r of recipients) modes[r.email] = r.mode;
+    setRecipientModes(modes);
     setSlackEnabled(settingsQuery.data.slackEnabled);
     setSlackWebhookUrl(settingsQuery.data.slackWebhookUrl ?? "");
+    setDigestCadenceHours(settingsQuery.data.digestCadenceHours);
     setDirty(false);
   };
 
@@ -185,6 +244,9 @@ export default function NotificationsSettingsPage() {
   const updatedAt = settingsQuery.data?.updatedAt
     ? new Date(settingsQuery.data.updatedAt).toLocaleString()
     : "—";
+  const digestLastSentAt = settingsQuery.data?.digestLastSentAt
+    ? new Date(settingsQuery.data.digestLastSentAt).toLocaleString()
+    : "Never";
   const emailDeliveryConfigured =
     settingsQuery.data?.emailDeliveryConfigured ?? false;
 
@@ -251,6 +313,72 @@ export default function NotificationsSettingsPage() {
               />
               <p className="text-xs text-muted-foreground">
                 Comma-, space-, or newline-separated email addresses.
+              </p>
+            </div>
+
+            {draftRecipients.length > 0 ? (
+              <div className="mt-4 grid gap-2">
+                <Label className="text-sm font-semibold">
+                  Per-recipient delivery
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Choose <strong>Instant</strong> for one email per regression,
+                  or <strong>Digest</strong> to roll them up into a single
+                  periodic summary.
+                </p>
+                <div className="rounded-md border border-border divide-y divide-border">
+                  {draftRecipients.map((r) => (
+                    <div
+                      key={r.email}
+                      className="flex items-center justify-between gap-3 p-3"
+                      data-testid={`recipient-row-${r.email}`}
+                    >
+                      <span className="text-sm font-mono truncate">
+                        {r.email}
+                      </span>
+                      <Select
+                        value={r.mode}
+                        onValueChange={(v) => setMode(r.email, v as Mode)}
+                      >
+                        <SelectTrigger
+                          className="w-32"
+                          data-testid={`mode-select-${r.email}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="instant">Instant</SelectItem>
+                          <SelectItem value="digest">Digest</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+              <div className="grid gap-2">
+                <Label htmlFor="digest-cadence">Digest cadence (hours)</Label>
+                <Input
+                  id="digest-cadence"
+                  type="number"
+                  min={1}
+                  value={digestCadenceHours}
+                  onChange={(e) => {
+                    setDigestCadenceHours(Number(e.target.value));
+                    markDirty();
+                  }}
+                  data-testid="input-digest-cadence"
+                  className="w-32"
+                />
+                <p className="text-xs text-muted-foreground">
+                  How often digest-mode recipients receive a roll-up email.
+                  Defaults to every 24 hours.
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Last digest sent: {digestLastSentAt}
               </p>
             </div>
           </div>

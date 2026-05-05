@@ -755,24 +755,52 @@ export interface EmailRevalidationRun {
 }
 
 /**
+ * Per-recipient delivery mode. `instant` fires one email per regression
+as it happens; `digest` rolls regressions up into a single periodic
+email per recipient.
+
+ */
+export type NotificationRecipientMode =
+  (typeof NotificationRecipientMode)[keyof typeof NotificationRecipientMode];
+
+export const NotificationRecipientMode = {
+  instant: "instant",
+  digest: "digest",
+} as const;
+
+export interface NotificationRecipient {
+  email: string;
+  mode: NotificationRecipientMode;
+}
+
+/**
  * Outbound notification preferences for email validation regressions.
  */
 export interface NotificationSettings {
   emailEnabled: boolean;
-  /** Recipient email addresses. Stored server-side as a comma-separated string. */
-  emailRecipients: string[];
+  /** Recipient email addresses with per-recipient delivery mode. */
+  emailRecipients: NotificationRecipient[];
   slackEnabled: boolean;
   slackWebhookUrl?: string | null;
   /** True when the server has a SENDGRID_API_KEY configured. When false, email notifications cannot actually be delivered even if enabled. */
   emailDeliveryConfigured: boolean;
+  /**
+   * Cadence (in hours) at which the digest scheduler emits a summary email to digest-mode recipients.
+   * @minimum 1
+   */
+  digestCadenceHours: number;
+  /** Timestamp of the most recent successful digest dispatch. */
+  digestLastSentAt?: string | null;
   updatedAt: string;
 }
 
 export interface UpdateNotificationSettingsBody {
   emailEnabled: boolean;
-  emailRecipients: string[];
+  emailRecipients: NotificationRecipient[];
   slackEnabled: boolean;
   slackWebhookUrl?: string | null;
+  /** @minimum 1 */
+  digestCadenceHours?: number;
 }
 
 /**

@@ -2660,6 +2660,23 @@ components:
           description: When this run participated in firing an admin alert.
       required: [id, startedAt, rechecked, errors, trigger]
 
+    NotificationRecipientMode:
+      type: string
+      enum: [instant, digest]
+      description: |
+        Per-recipient delivery mode. `instant` fires one email per regression
+        as it happens; `digest` rolls regressions up into a single periodic
+        email per recipient.
+
+    NotificationRecipient:
+      type: object
+      properties:
+        email:
+          type: string
+        mode:
+          $ref: "#/components/schemas/NotificationRecipientMode"
+      required: [email, mode]
+
     NotificationSettings:
       type: object
       description: Outbound notification preferences for email validation regressions.
@@ -2669,8 +2686,8 @@ components:
         emailRecipients:
           type: array
           items:
-            type: string
-          description: Recipient email addresses. Stored server-side as a comma-separated string.
+            $ref: "#/components/schemas/NotificationRecipient"
+          description: Recipient email addresses with per-recipient delivery mode.
         slackEnabled:
           type: boolean
         slackWebhookUrl:
@@ -2679,10 +2696,19 @@ components:
         emailDeliveryConfigured:
           type: boolean
           description: True when the server has a SENDGRID_API_KEY configured. When false, email notifications cannot actually be delivered even if enabled.
+        digestCadenceHours:
+          type: integer
+          minimum: 1
+          description: Cadence (in hours) at which the digest scheduler emits a summary email to digest-mode recipients.
+        digestLastSentAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp of the most recent successful digest dispatch.
         updatedAt:
           type: string
           format: date-time
-      required: [emailEnabled, emailRecipients, slackEnabled, emailDeliveryConfigured, updatedAt]
+      required: [emailEnabled, emailRecipients, slackEnabled, emailDeliveryConfigured, digestCadenceHours, updatedAt]
 
     UpdateNotificationSettingsBody:
       type: object
@@ -2692,12 +2718,15 @@ components:
         emailRecipients:
           type: array
           items:
-            type: string
+            $ref: "#/components/schemas/NotificationRecipient"
         slackEnabled:
           type: boolean
         slackWebhookUrl:
           type: string
           nullable: true
+        digestCadenceHours:
+          type: integer
+          minimum: 1
       required: [emailEnabled, emailRecipients, slackEnabled]
 
     EmailRevalidationAlertStatus:

@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { startEmailRevalidationScheduler } from "./lib/email-revalidation";
 import { startBulkJobsWorker } from "./lib/bulk-jobs";
 import { startCandidateTrashCleanupScheduler } from "./lib/candidate-trash";
+import { startDigestScheduler } from "./lib/notifications";
 
 const rawPort = process.env["PORT"];
 
@@ -28,4 +29,5 @@ app.listen(port, (err) => {
   startEmailRevalidationScheduler();
   void startBulkJobsWorker();
   startCandidateTrashCleanupScheduler();
+  startDigestScheduler();
 });

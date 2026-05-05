@@ -2889,14 +2889,22 @@ export const RunEmailRevalidationSweepNowResponse = zod.object({
 /**
  * @summary Get the current outbound notification preferences
  */
+
 export const GetNotificationSettingsResponse = zod
   .object({
     emailEnabled: zod.boolean(),
     emailRecipients: zod
-      .array(zod.string())
-      .describe(
-        "Recipient email addresses. Stored server-side as a comma-separated string.",
-      ),
+      .array(
+        zod.object({
+          email: zod.string(),
+          mode: zod
+            .enum(["instant", "digest"])
+            .describe(
+              "Per-recipient delivery mode. `instant` fires one email per regression\nas it happens; `digest` rolls regressions up into a single periodic\nemail per recipient.\n",
+            ),
+        }),
+      )
+      .describe("Recipient email addresses with per-recipient delivery mode."),
     slackEnabled: zod.boolean(),
     slackWebhookUrl: zod.string().nullish(),
     emailDeliveryConfigured: zod
@@ -2904,6 +2912,16 @@ export const GetNotificationSettingsResponse = zod
       .describe(
         "True when the server has a SENDGRID_API_KEY configured. When false, email notifications cannot actually be delivered even if enabled.",
       ),
+    digestCadenceHours: zod
+      .number()
+      .min(1)
+      .describe(
+        "Cadence (in hours) at which the digest scheduler emits a summary email to digest-mode recipients.",
+      ),
+    digestLastSentAt: zod.coerce
+      .date()
+      .nullish()
+      .describe("Timestamp of the most recent successful digest dispatch."),
     updatedAt: zod.coerce.date(),
   })
   .describe(
@@ -2913,21 +2931,39 @@ export const GetNotificationSettingsResponse = zod
 /**
  * @summary Update the outbound notification preferences
  */
+
 export const UpdateNotificationSettingsBody = zod.object({
   emailEnabled: zod.boolean(),
-  emailRecipients: zod.array(zod.string()),
+  emailRecipients: zod.array(
+    zod.object({
+      email: zod.string(),
+      mode: zod
+        .enum(["instant", "digest"])
+        .describe(
+          "Per-recipient delivery mode. `instant` fires one email per regression\nas it happens; `digest` rolls regressions up into a single periodic\nemail per recipient.\n",
+        ),
+    }),
+  ),
   slackEnabled: zod.boolean(),
   slackWebhookUrl: zod.string().nullish(),
+  digestCadenceHours: zod.number().min(1).optional(),
 });
 
 export const UpdateNotificationSettingsResponse = zod
   .object({
     emailEnabled: zod.boolean(),
     emailRecipients: zod
-      .array(zod.string())
-      .describe(
-        "Recipient email addresses. Stored server-side as a comma-separated string.",
-      ),
+      .array(
+        zod.object({
+          email: zod.string(),
+          mode: zod
+            .enum(["instant", "digest"])
+            .describe(
+              "Per-recipient delivery mode. `instant` fires one email per regression\nas it happens; `digest` rolls regressions up into a single periodic\nemail per recipient.\n",
+            ),
+        }),
+      )
+      .describe("Recipient email addresses with per-recipient delivery mode."),
     slackEnabled: zod.boolean(),
     slackWebhookUrl: zod.string().nullish(),
     emailDeliveryConfigured: zod
@@ -2935,6 +2971,16 @@ export const UpdateNotificationSettingsResponse = zod
       .describe(
         "True when the server has a SENDGRID_API_KEY configured. When false, email notifications cannot actually be delivered even if enabled.",
       ),
+    digestCadenceHours: zod
+      .number()
+      .min(1)
+      .describe(
+        "Cadence (in hours) at which the digest scheduler emits a summary email to digest-mode recipients.",
+      ),
+    digestLastSentAt: zod.coerce
+      .date()
+      .nullish()
+      .describe("Timestamp of the most recent successful digest dispatch."),
     updatedAt: zod.coerce.date(),
   })
   .describe(

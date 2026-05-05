@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+type Recipient = { email: string; mode: "instant" | "digest" };
+
 const settingsState = {
   current: {
     emailEnabled: false,
-    emailRecipients: [] as string[],
+    emailRecipients: [] as Recipient[],
     slackEnabled: false,
     slackWebhookUrl: null as string | null,
     emailDeliveryConfigured: false,
+    digestCadenceHours: 24,
+    digestLastSentAt: null as Date | null,
     updatedAt: new Date(),
   },
 };
@@ -125,7 +129,7 @@ describe("notifyRegression", () => {
     settingsState.current = {
       ...settingsState.current,
       emailEnabled: true,
-      emailRecipients: ["bob@example.com"],
+      emailRecipients: [{ email: "bob@example.com", mode: "instant" }],
       emailDeliveryConfigured: false,
       slackEnabled: false,
     };
@@ -139,7 +143,10 @@ describe("notifyRegression", () => {
     settingsState.current = {
       ...settingsState.current,
       emailEnabled: true,
-      emailRecipients: ["bob@example.com", "carol@example.com"],
+      emailRecipients: [
+        { email: "bob@example.com", mode: "instant" },
+        { email: "carol@example.com", mode: "instant" },
+      ],
       emailDeliveryConfigured: true,
       slackEnabled: false,
     };
