@@ -1,0 +1,125 @@
+CONTEXT
+
+Suite à ton diagnostic, j'ai pris 3 décisions stratégiques :
+
+1. Twin Agent Browser EST un 5e produit commercial distinct (différent 
+   de A-Player Scout). NAMING.md doit être corrigé pour le refléter, 
+   alignée sur VISION.md.
+
+2. On finit Phase 1 proprement avant de démarrer Phase 3 (Extend) ou 
+   Phase 4 (CodeMatch). Bloquants : LICENSE file, README marketing, 
+   nettoyage HireFlow/ShortlistPro/HiringAI.
+
+3. HiringAI bascule en UI default vers "Daneel". HiringAI peut rester 
+   comme template alternatif dans lib/branding pour démontrer la capacité 
+   white-label, mais ce n'est plus le nom UI par défaut.
+
+GOAL
+
+Finir Phase 1 en 4 tâches discrètes, à faire DANS L'ORDRE, avec un commit 
+distinct par tâche. STOP entre chaque pour validation.
+
+CONTRAINTES — TÂCHE 1 : LICENSE file
+
+- Créer /LICENSE à la racine avec le texte standard MIT License
+- Copyright holder : "Greg Herbé" 
+- Année : 2025-2026
+- Texte canonique MIT (https://opensource.org/license/mit/), pas une 
+  variante
+- Vérifier que package.json déclare déjà "license": "MIT" — sinon ajouter
+- Commit : "chore: add MIT LICENSE file"
+- STOP, attends validation.
+
+CONTRAINTES — TÂCHE 2 : Aligner NAMING.md sur VISION.md (Twin Agent 
+Browser)
+
+- Modifier NAMING.md pour lister les 5 produits commerciaux, pas 4 :
+    1. A-Player Scout
+    2. Extend
+    3. CodeMatch
+    4. Council
+    5. Twin Agent Browser (sous réserve d'accord formel avec Twin — 
+       noter explicitement)
+- Pour chaque produit, garder le format actuel (nom, domain, statut)
+- Pour Twin Agent Browser : domain "tbd, by Twin", statut "pending 
+  Twin commercial agreement"
+- Ajouter une note explicite : "twin-webhook.ts (provider legacy) = 
+  A-Player Scout. twin-agent.ts (provider) = Twin Agent Browser. Ces 
+  deux providers ont des cibles techniques distinctes."
+- Commit : "docs: align NAMING.md with VISION.md (5 commercial providers)"
+- STOP, attends validation.
+
+CONTRAINTES — TÂCHE 3 : Cleanup branding HireFlow/ShortlistPro/HiringAI
+
+- Identifier toutes les occurrences résiduelles de HireFlow et 
+  ShortlistPro dans le code (4+4 selon le diagnostic, probablement 
+  dans lib/branding/templates/). Les supprimer entièrement — pas de 
+  stubs ré-exportant HiringAI, suppression nette.
+- HiringAI : NE PAS supprimer le code template, mais changer le 
+  template DEFAULT de l'UI vers "Daneel". Vérifier dans lib/branding 
+  où le default est défini et le basculer.
+- HiringAI peut rester dans /examples/ ou comme template loadable, 
+  mais l'expérience UI par défaut affiche "Daneel".
+- Tester : démarrer l'app, vérifier qu'aucun écran ne montre "HireFlow", 
+  "ShortlistPro" ou "HiringAI" comme nom par défaut.
+- Commit : "refactor: drop HireFlow/ShortlistPro residuals, default UI 
+  branding to Daneel"
+- STOP, attends validation.
+
+CONTRAINTES — TÂCHE 4 : README marketing — pitch des 5 produits
+
+Le README actuel est techniquement correct mais ne pitch aucun produit 
+commercial. Les visiteurs ne comprennent pas que Daneel est un funnel.
+
+Réécrire le README en gardant la structure existante mais en ajoutant :
+
+1. Hero block au sommet : tagline + 2 CTAs (GitHub Star + Live Demo). 
+   Si pas de live demo encore, le CTA "Live Demo" peut être remplacé 
+   par "Read the docs".
+
+2. Section nouvelle après "What this is" et avant "Use this repo as 
+   a template" :
+
+   ## The Provider Marketplace
+
+   Daneel ships with built-in free providers (NativeOpenAI BYO-key, 
+   GitHub public, SerpAPI, Apify, Custom Webhook). Five commercial 
+   providers, maintained by the project author, plug into the same 
+   interface :
+
+   | Provider | What it does | Maintainer | Status |
+   |---|---|---|---|
+   | **A-Player Scout** | JD → boolean LinkedIn shortlist | A-Player | Live |
+   | **Extend** | Pattern-match from example profiles | A-Player | Live |
+   | **CodeMatch** | GitHub-based technical evaluation | A-Player | Live |
+   | **Council** | 15-persona hiring deliberation | A-Player | Live |
+   | **Twin Agent Browser** | Agentic browser-based sourcing | Twin | Pending |
+
+   All commercial providers are optional. The engine works fully with 
+   the free providers. See [VISION.md](VISION.md) for commercial 
+   disclosure.
+
+3. Garder le reste du README (architecture, examples, setup) à l'identique.
+
+4. Mettre à jour la section setup pour utiliser docker compose comme 
+   méthode principale, avec pnpm en alternative pour les développeurs.
+
+5. Si screenshots/ contient des images utilisables, en intégrer 1-2 
+   dans le README. Sinon, ajouter un placeholder "Screenshots coming 
+   soon" avec lien vers la live demo (ou le repo issues).
+
+- Commit : "docs: README marketing pass — pitch the 5 commercial 
+  providers"
+- STOP, attends validation.
+
+DELIVERABLE FINAL
+
+Après les 4 tâches : Phase 1 est officiellement done, le repo est 
+légalement publiable, et la vision stratégique est lisible depuis le 
+README.
+
+STOP
+
+À chaque STOP entre tâches, attends mon feedback avant de continuer. 
+Si une tâche révèle une décision que tu ne peux pas prendre seul, 
+demande-moi. Ne fais pas de tâche supplémentaire non listée.
