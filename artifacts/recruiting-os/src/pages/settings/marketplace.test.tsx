@@ -64,10 +64,20 @@ function useStepSettingsStore() {
   return stepSettings;
 }
 
+const previewGithubQueryMock = vi.fn();
+const listJobsData: Array<{ id: number; title: string; location?: string | null }> = [
+  { id: 1, title: "Staff Engineer", location: "Remote" },
+];
+
 vi.mock("@workspace/api-client-react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@workspace/api-client-react")>();
   return {
     ...actual,
+    useListJobs: () => ({ data: listJobsData, isLoading: false, error: null }),
+    usePreviewGithubQuery: () => ({
+      mutateAsync: previewGithubQueryMock,
+      isPending: false,
+    }),
     useListProviders: () => {
       const data = useProvidersStore();
       return { data, isLoading: false, error: null };
@@ -162,6 +172,7 @@ beforeEach(() => {
   listeners.clear();
   stepListeners.clear();
   window.localStorage.clear();
+  previewGithubQueryMock.mockReset();
 });
 
 describe("MarketplacePage – categories", () => {
@@ -376,6 +387,53 @@ describe("MarketplacePage – GitHub Agent connect entry", () => {
     expect(within(dialog).getByTestId("github-advanced")).toBeInTheDocument();
     expect(within(dialog).getByTestId("gh-extra-keywords")).toBeInTheDocument();
     expect(within(dialog).getByTestId("gh-min-followers")).toBeInTheDocument();
+  });
+
+  it("renders the GitHub query preview block inside Advanced settings", async () => {
+    renderPage();
+
+    await userEvent.click(screen.getByTestId("connect-github-agent"));
+    const dialog = await screen.findByTestId("connect-dialog-github");
+
+    expect(
+      within(dialog).queryByTestId("github-query-preview"),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByTestId("advanced-toggle"));
+
+    const preview = within(dialog).getByTestId("github-query-preview");
+    expect(preview).toBeInTheDocument();
+    expect(within(preview).getByTestId("gh-preview-job-select")).toBeInTheDocument();
+    expect(within(preview).getByTestId("gh-preview-build-query")).toBeInTheDocument();
+  });
+
+  it("surfaces the assembled query string after clicking Build query", async () => {
+    previewGithubQueryMock.mockResolvedValueOnce({
+      query: "language:typescript followers:>50",
+      totalCount: null,
+      totalCountError: null,
+    });
+
+    renderPage();
+
+    await userEvent.click(screen.getByTestId("connect-github-agent"));
+    const dialog = await screen.findByTestId("connect-dialog-github");
+    await userEvent.click(within(dialog).getByTestId("advanced-toggle"));
+
+    const preview = within(dialog).getByTestId("github-query-preview");
+    await userEvent.click(within(preview).getByTestId("gh-preview-build-query"));
+
+    await waitFor(() =>
+      expect(previewGithubQueryMock).toHaveBeenCalledTimes(1),
+    );
+    const call = previewGithubQueryMock.mock.calls[0][0];
+    expect(call.data.jobId).toBe(1);
+
+    await waitFor(() =>
+      expect(within(preview).getByTestId("gh-preview-query")).toHaveTextContent(
+        "language:typescript followers:>50",
+      ),
+    );
   });
 
   it("opens the advanced Web Search tuning panel from the marketplace card", async () => {
