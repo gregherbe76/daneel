@@ -1,0 +1,111 @@
+CONTEXT
+
+Avant de lancer toute nouvelle tâche de build sur ce projet, je veux 
+vérifier que tu (Replit Agent) as une compréhension claire et exacte 
+de :
+1. L'état actuel du codebase
+2. La vision stratégique du projet
+3. Le plan de travail à venir
+
+Ne fais AUCUNE modification de code ou de fichier. Cette session est 
+purement diagnostique. Tu réponds uniquement par du texte dans le chat.
+
+GOAL
+
+Réponds aux 5 sections ci-dessous, dans l'ordre, avec honnêteté. Si tu 
+ne sais pas quelque chose, dis "je ne sais pas" — c'est plus utile que 
+deviner. Si tu as une incertitude sur une décision stratégique, formule 
+la question explicitement à la fin.
+
+SECTION 1 — État actuel du codebase
+
+Lis le repo et liste :
+- Le nom actuel du projet tel qu'il apparaît dans le README (titre H1)
+- Le nom actuel du projet tel qu'il apparaît dans package.json
+- Les noms de marques différents qui apparaissent dans le README 
+  (ex : HireFlow, Daneel, ShortlistPro, etc.) avec le nombre 
+  d'occurrences approximatif pour chacun
+- Les workflow steps actuellement implémentés dans 
+  artifacts/api-server/src/routes/workflows/
+- Les providers actuellement implémentés dans 
+  artifacts/api-server/src/routes/workflows/providers/
+- Les fichiers de documentation présents à la racine (README.md, 
+  DEVELOPER_GUIDE.md, RELEASE_NOTES.md, replit.md, etc.)
+- Les fichiers OSS standard MANQUANTS à la racine (LICENSE, 
+  CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, .github/)
+- Présence ou absence de : Dockerfile, docker-compose.yml, CI workflow 
+  (.github/workflows/), tests
+- Présence ou absence de : Provider Marketplace UI (page dédiée vs 
+  simple settings form), telemetry, screenshots dans le README
+
+SECTION 2 — Vision stratégique : reformule-la avec tes mots
+
+Sans relire un brief externe, dis-moi ce que tu comprends de la vision 
+du projet en répondant à :
+- Quel est le nom cible final du projet OSS ?
+- Quels noms doivent être supprimés du repo ?
+- Daneel est-il un ATS complet ou un workflow engine ? Quelle est la 
+  différence ?
+- Combien de providers commerciaux ⭐ vont se brancher dans le 
+  marketplace ? Cite-les.
+- Qui est l'audience cible (3 personas) ?
+- Quel est le modèle de distribution prévu (vendre Daneel directement 
+  ? OSS funnel vers les providers commerciaux ? Autre ?)
+
+Si tu ne sais pas répondre à une de ces questions, écris "je ne sais 
+pas" — ne devine pas.
+
+SECTION 3 — Le plan de build : reformule-le avec tes mots
+
+Le plan est structuré en 6 phases avec STOP gates entre chaque. Pour 
+chaque phase, dis-moi :
+- Ce que tu comprends comme étant l'objectif principal de la phase
+- Quelles tâches concrètes elle contient
+- Quelle est la STOP gate (la condition qui valide la phase comme 
+  terminée)
+
+Phases :
+- Phase 0 : Foundation
+- Phase 1 : Daneel hardening
+- Phase 2 : A-Player Scout integration
+- Phase 3 : Extend integration
+- Phase 4 : CodeMatch integration
+- Phase 5 : Council pivot + integration
+- Phase 6 : Launch readiness
+
+Si tu n'as pas reçu le détail d'une phase, écris "je n'ai pas le détail 
+de cette phase" pour celle-là.
+
+SECTION 4 — Où sommes-nous AUJOURD'HUI dans le plan ?
+
+À ta connaissance :
+- Quelle phase est en cours ?
+- Quelle phase est la prochaine à démarrer ?
+- Y a-t-il des tâches déjà commencées qui sont incomplètes ?
+- Y a-t-il des décisions stratégiques en attente que tu connais ?
+
+SECTION 5 — Tes questions et tes incertitudes
+
+Liste explicitement :
+- Les décisions que tu n'es pas sûr d'avoir bien comprises
+- Les contradictions que tu vois entre l'état actuel du code et la 
+  vision énoncée
+- Les choix techniques que tu ferais différemment et pourquoi (max 3)
+- Les risques majeurs que tu identifies dans le plan
+
+CONTRAINTES
+
+- Ne modifie aucun fichier
+- Ne lance aucune commande de build, test, install
+- Réponds uniquement par du texte dans ce chat
+- Si tu n'as pas accès à certains fichiers ou contextes, signale-le 
+  clairement plutôt que d'inventer
+
+DELIVERABLE
+
+Une réponse en chat structurée selon les 5 sections ci-dessus.
+
+STOP
+
+Après ta réponse, n'entreprends aucune autre action. Attends mon 
+feedback.
