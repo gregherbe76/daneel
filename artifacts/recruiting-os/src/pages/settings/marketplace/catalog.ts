@@ -64,7 +64,9 @@ export type ConnectProviderType =
   | "serpapi"
   | "apify"
   | "github"
-  | "twin_agent";
+  | "twin_agent"
+  | "scout"
+  | "council";
 
 /** Twin's brand yellow — used as the marketplace card accent and badge fill. */
 export const TWIN_YELLOW = "#FEDA3D";
@@ -182,6 +184,34 @@ export const CATALOG: CatalogEntry[] = [
     badges: ["free"],
     connectType: "github",
     logoMark: "Gh",
+  },
+  {
+    kind: "connect",
+    id: "a-player-scout",
+    name: "A-Player Scout",
+    category: "sourcing",
+    oneLiner:
+      "JD-driven candidate sourcing via one-click OAuth. Scout becomes your sourcing step — no API key paste required.",
+    pricing: "A-Player subscription — connect via OAuth",
+    badges: ["a-player"],
+    connectType: "scout",
+    helper:
+      "Opens a sign-in tab on A-Player Scout. We never store your password — only a scoped credential.",
+    logoMark: "Sc",
+  },
+  {
+    kind: "connect",
+    id: "council",
+    name: "Council Decision",
+    category: "evaluation",
+    oneLiner:
+      "Optional final-mile multi-pole deliberation on shortlisted candidates — 15 named poles, structured verdict.",
+    pricing: "Pricing enforced by Council — quota-gated",
+    badges: ["byo-key"],
+    connectType: "council",
+    helper:
+      "Connecting auto-assigns Council to the Decision workflow step. Convergence, divergence, and orientations show on the candidate Council tab.",
+    logoMark: "Co",
   },
   {
     kind: "connect",

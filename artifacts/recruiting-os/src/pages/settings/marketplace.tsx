@@ -25,7 +25,11 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { SettingsTabs } from "@/components/settings-tabs";
-import { AdvancedProvidersSection } from "./marketplace-admin";
+import {
+  AdvancedProvidersSection,
+  ProviderDialog,
+  ScoutMarketplaceCard,
+} from "./marketplace-admin";
 import {
   CATALOG,
   CATEGORIES,
@@ -46,6 +50,7 @@ import {
   ChevronDown,
   ChevronRight,
   Settings2,
+  Plus,
 } from "lucide-react";
 import { track as trackTelemetry } from "@/lib/telemetry";
 import { GithubQueryPreview } from "./github-query-preview";
@@ -57,11 +62,14 @@ type ProviderRecord = {
   webhookUrl?: string | null;
   baseUrl?: string | null;
   enabled: boolean;
+  apiKeyLast4?: string | null;
+  apiKeyPlaceholder?: string | null;
   config?: {
     github?: GithubProviderConfig | null;
     web_search?: WebSearchProviderConfig | null;
     twin_agent?: TwinAgentProviderConfig | null;
     apify?: ApifyProviderConfig | null;
+    council?: { baseUrl?: string | null } | null;
   } | null;
 };
 
@@ -125,6 +133,10 @@ const APPLICABLE_STEPS: Record<ConnectProviderType, WorkflowStep[]> = {
   github: ["sourcing"],
   twin_agent: ["sourcing"],
   apify: ["sourcing"],
+  // Scout & Council manage their own step assignment in their connect flow,
+  // so they hide the inline step picker on the marketplace card.
+  scout: [],
+  council: [],
 };
 
 /** Maps a marketplace connectType to the underlying provider `type` column. */
@@ -134,13 +146,24 @@ function providerTypeFor(connectType: ConnectProviderType): string | null {
   if (connectType === "github") return "github";
   if (connectType === "apify") return "apify";
   if (connectType === "twin_agent") return "twin_agent";
+  if (connectType === "council") return "council";
+  // scout uses twin_webhook + the magic name "A-Player Scout"; handled inline.
   return null;
 }
+
+const SCOUT_PROVIDER_NAME = "A-Player Scout";
 
 function findProviderForEntry(
   entry: ConnectProvider,
   providers: ProviderRecord[],
 ): ProviderRecord | null {
+  if (entry.connectType === "scout") {
+    return (
+      providers.find(
+        (p) => p.type === "twin_webhook" && p.name === SCOUT_PROVIDER_NAME,
+      ) ?? null
+    );
+  }
   const type = providerTypeFor(entry.connectType);
   if (!type) return null;
   return providers.find((p) => p.type === type) ?? null;
@@ -172,6 +195,18 @@ function deriveState(entry: ConnectProvider, providers: ProviderRecord[]): ConnS
   }
   if (entry.connectType === "apify") {
     const p = providers.find((x) => x.type === "apify");
+    if (!p) return "disconnected";
+    return p.enabled ? "connected" : "action_required";
+  }
+  if (entry.connectType === "scout") {
+    const p = providers.find(
+      (x) => x.type === "twin_webhook" && x.name === SCOUT_PROVIDER_NAME,
+    );
+    if (!p) return "disconnected";
+    return p.enabled ? "connected" : "action_required";
+  }
+  if (entry.connectType === "council") {
+    const p = providers.find((x) => x.type === "council");
     if (!p) return "disconnected";
     return p.enabled ? "connected" : "action_required";
   }
@@ -338,10 +373,14 @@ function ConnectDialog({
   const { toast } = useToast();
   const create = useCreateProvider();
   const update = useUpdateProvider();
+  const upsertStep = useUpsertProviderStepSetting();
   const [webhookUrl, setWebhookUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  // Council tuning
+  const [councilBaseUrl, setCouncilBaseUrl] = useState("");
 
   // GitHub Agent tuning
   const [ghExtraKeywords, setGhExtraKeywords] = useState("");
@@ -414,6 +453,9 @@ function ConnectDialog({
       setApifyResultsPerPage(
         cfg?.resultsPerPage != null ? String(cfg.resultsPerPage) : "",
       );
+    }
+    if (entry.connectType === "council") {
+      setCouncilBaseUrl(existing?.config?.council?.baseUrl ?? "");
     }
   }, [open, entry, existing]);
 
@@ -530,6 +572,53 @@ function ConnectDialog({
           title: "Twin Agent Browser connected",
           description:
             "Paste your Twin API key from twin.aplayer.ai → Settings to enable agent-browsed sourcing.",
+        });
+      } else if (entry.connectType === "council") {
+        const baseUrl = councilBaseUrl.trim();
+        const payload = {
+          name: "Council",
+          type: "council" as const,
+          webhookUrl: null,
+          baseUrl: null,
+          apiKeyPlaceholder: apiKey
+            ? apiKey
+            : existing?.apiKeyPlaceholder ?? null,
+          config: baseUrl ? { council: { baseUrl } } : null,
+          enabled: true,
+        };
+        let providerId: number;
+        if (existing) {
+          await update.mutateAsync({ id: existing.id, data: payload });
+          providerId = existing.id;
+        } else {
+          const created = (await create.mutateAsync({ data: payload })) as {
+            id: number;
+          };
+          providerId = created.id;
+        }
+        await qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
+        // Auto-assign Council to the decision step — the only step it can run.
+        let stepAssigned = false;
+        try {
+          await upsertStep.mutateAsync({
+            data: {
+              workflowStep: "decision",
+              providerId,
+              enabled: true,
+            },
+          });
+          await qc.invalidateQueries({
+            queryKey: getListProviderStepSettingsQueryKey(),
+          });
+          stepAssigned = true;
+        } catch {
+          /* non-fatal — admin can wire it from the Advanced section */
+        }
+        toast({
+          title: "Council connected",
+          description: stepAssigned
+            ? "Wired up to the Decision step. Verdicts appear on the candidate Council tab."
+            : "Saved, but couldn't auto-assign the Decision step — wire it up from the Advanced section.",
         });
       } else if (entry.connectType === "apify") {
         const apifyConfig: ApifyProviderConfig = {
@@ -775,6 +864,57 @@ function ConnectDialog({
                   }}
                   editProviderId={existing?.id ?? null}
                 />
+              </div>
+            )}
+          </div>
+        )}
+
+        {entry.connectType === "council" && (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="council-key">Council API key</Label>
+              <Input
+                id="council-key"
+                type="password"
+                placeholder={existing?.apiKeyLast4 ? `•••• ${existing.apiKeyLast4}` : "sk-council-…"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                autoComplete="new-password"
+                data-testid="council-key"
+              />
+              <p className="text-xs text-muted-foreground">
+                {existing?.apiKeyLast4
+                  ? "Leave blank to keep the existing key. Paste a new key to rotate."
+                  : "Paste from Council → Settings → API Keys. Sent as Authorization: Bearer …"}
+              </p>
+            </div>
+
+            <div className="rounded-md bg-muted/40 border border-border p-3 text-xs text-muted-foreground">
+              Connecting auto-assigns Council to the <strong>Decision</strong> workflow step. It runs
+              after Shortlist Generation on the top candidates and stores a structured 15-pole verdict
+              on the candidate Council tab.
+            </div>
+
+            <AdvancedToggle open={advancedOpen} onToggle={setAdvancedOpen} />
+
+            {advancedOpen && (
+              <div
+                className="space-y-3 rounded-md border border-border p-3"
+                data-testid="council-advanced"
+              >
+                <div className="space-y-1.5">
+                  <Label>Base URL override</Label>
+                  <Input
+                    placeholder="https://council.replit.app"
+                    value={councilBaseUrl}
+                    onChange={(e) => setCouncilBaseUrl(e.target.value)}
+                    data-testid="council-base-url"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave blank for the hosted production deployment. Override only when self-hosting
+                    Council.
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -1194,6 +1334,16 @@ export default function MarketplacePage() {
   const [activeCategory, setActiveCategory] = useState<ProviderCategory | "all">("all");
   const [stubOpen, setStubOpen] = useState<StubProvider | null>(null);
   const [connectOpen, setConnectOpen] = useState<ConnectProvider | null>(null);
+  const [scoutOpen, setScoutOpen] = useState(false);
+  const [customProviderOpen, setCustomProviderOpen] = useState(false);
+
+  function handleConnect(entry: ConnectProvider) {
+    if (entry.connectType === "scout") {
+      setScoutOpen(true);
+      return;
+    }
+    setConnectOpen(entry);
+  }
 
   // Fire `providers_marketplace_opened` once per visit to the marketplace
   // screen (one event per mount, not per re-render or category switch).
@@ -1213,12 +1363,24 @@ export default function MarketplacePage() {
     <>
       <SettingsTabs />
       <div className="p-8 max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground">Provider Marketplace</h1>
-          <p className="text-muted-foreground mt-1">
-            Discover and connect agents that power each step of your hiring workflow. A-Player
-            providers are arriving in upcoming phases — free providers connect today.
-          </p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Provider Marketplace</h1>
+            <p className="text-muted-foreground mt-1">
+              Discover and connect agents that power each step of your hiring workflow. A-Player
+              providers are arriving in upcoming phases — free providers connect today.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 shrink-0"
+            onClick={() => setCustomProviderOpen(true)}
+            data-testid="marketplace-add-custom-provider"
+          >
+            <Plus className="h-4 w-4" />
+            Add custom provider
+          </Button>
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6 border-b border-border pb-3">
@@ -1277,7 +1439,7 @@ export default function MarketplacePage() {
               key={entry.id}
               entry={entry}
               providers={providersTyped}
-              onConnect={setConnectOpen}
+              onConnect={handleConnect}
               onComingSoon={setStubOpen}
             />
           ))}
@@ -1312,6 +1474,32 @@ export default function MarketplacePage() {
           accent={
             connectOpen ? CATEGORIES.find((c) => c.key === connectOpen.category)!.accent : "#000"
           }
+        />
+
+        <Dialog open={scoutOpen} onOpenChange={setScoutOpen}>
+          <DialogContent
+            className="max-w-lg"
+            data-testid="scout-connect-dialog"
+          >
+            <DialogHeader>
+              <DialogTitle>Connect A-Player Scout</DialogTitle>
+              <DialogDescription>
+                One-click OAuth — Scout becomes your sourcing step.
+              </DialogDescription>
+            </DialogHeader>
+            <ScoutMarketplaceCard providers={providersTyped} />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setScoutOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <ProviderDialog
+          open={customProviderOpen}
+          onOpenChange={setCustomProviderOpen}
+          editProvider={null}
         />
       </div>
     </>
