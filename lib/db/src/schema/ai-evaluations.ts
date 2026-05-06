@@ -93,6 +93,21 @@ export type ShortlistEntry = {
   whyRelevant: string;
   keyRisks: string;
   finalRecommendation: string;
+  // ── Phase 4.3 — CodeMatch ranking boost ────────────────────────────────────
+  // All fields are optional to preserve backward compat with pre-4.3 runs.
+  // When present, the UI displays `finalScore` as the primary score and a
+  // tooltip breakdown (matching + bonus = final). `techEvaluated=true` shows
+  // a "⚡ Tech evaluated" badge.
+  /** Base score = ai_evaluations.score (decisionScore). */
+  matchingScore?: number;
+  /** Raw 0-100 score from technical_evaluations.scores.overall, or null when no valid eval. */
+  codematchOverall?: number | null;
+  /** Bonus added to matchingScore: (codematchOverall / 100) * 20, capped at 20. 0 if no valid eval. */
+  bonusApplied?: number;
+  /** min(100, matchingScore + bonusApplied). */
+  finalScore?: number;
+  /** True iff a valid (evaluated=true, overall not null) technical_evaluation row exists. */
+  techEvaluated?: boolean;
 };
 
 export type AiEvaluation = typeof aiEvaluationsTable.$inferSelect;

@@ -71,3 +71,85 @@ The marketplace card uses the standard `POST /api/providers/:id/test` endpoint. 
 The technical evaluation step runs **after** Candidate Matching and **before** Shortlist Generation. It never modifies shortlist ranking — the recruiter sees both scores side-by-side and decides how to weigh them.
 
 The step is fail-soft: provider errors and missing GitHub usernames are logged and persisted, but the workflow always continues to Shortlist Generation. See `runTechnicalEvaluation()` in `artifacts/api-server/src/routes/workflows/engine.ts`.
+
+## Impact on shortlist ranking (Phase 4.3+)
+
+Starting in Phase 4.3, the CodeMatch `overall` score is folded into the
+`shortlist_generation` ranking via an additive, capped boost:
+
+```
+bonus      = (codematch_overall / 100) * 20      // 0..20 points
+final_score = min(100, matching_score + bonus)   // base = ai_evaluations.score (decisionScore)
+```
+
+The shortlist is sorted by `final_score` DESC (instead of `matching_score`
+DESC pre-4.3). The top-5 are then sent to the LLM `shortlist_generation`
+provider for narrative summaries.
+
+### No-penalty rule
+
+Candidates **without** a valid `technical_evaluations` row receive `bonus = 0`.
+This includes:
+
+- candidates with no GitHub username (`evaluated=false`, error=`no_github_username`)
+- premium-gated profiles (`evaluated=false`, error=`premium_required`)
+- rate-limited or transient provider errors (`evaluated=false`, `scores=null`)
+- candidates the technical step was never run on (no row at all)
+
+There is **no penalty** for being unevaluated — they keep their `matching_score`
+as their `final_score` and compete on equal footing with everyone else's base
+score. The design intent is "boost winners, don't punish the unscored".
+
+### UI signal
+
+Candidates whose final score includes a real CodeMatch contribution
+(`techEvaluated=true`) are flagged in the shortlist UI with a
+**"⚡ Tech evaluated"** badge. The score badge becomes interactive: hovering
+it reveals a tooltip breakdown:
+
+```
+Matching: 72
+Tech bonus: +16 (CodeMatch 80)
+Final: 88
+```
+
+When the boost saturates the cap, the tooltip shows `Final: 100 (capped)`.
+
+### Council deliberation is NOT boosted
+
+The optional `decision` step (Council) deliberates on the **un-boosted**
+`matching_score` (= `ai_evaluations.score` = `decisionScore`). The Phase 4.3
+boost is applied to **shortlist ranking only**, not to Council deliberation.
+
+Rationale: Council is a meta-level deliberation about *the AI's own assessment*
+of a candidate. Mixing in an external technical-evaluation signal would
+contaminate its multi-pole reasoning with a heuristic it has no insight into.
+The badge and the boosted shortlist score are surfaced to the recruiter
+separately so they can weigh both signals themselves.
+
+### Backward compatibility
+
+`ShortlistEntry` gained five new optional fields (`matchingScore`,
+`codematchOverall`, `bonusApplied`, `finalScore`, `techEvaluated`). They
+are stored in the existing `shortlists.summaries` JSONB column — no SQL
+migration was needed. Pre-4.3 shortlist runs are missing these fields; the UI
+gracefully falls back to the legacy `decisionScore` display and omits the
+badge/tooltip when they are absent.
+
+### Manual E2E verification
+
+To verify the boost works end-to-end:
+
+1. Create a job with `technicalEvaluationEnabled = true` and CodeMatch
+   configured as the evaluation provider.
+2. Add 5 candidates: 3 with well-known GitHub usernames (e.g. `torvalds`,
+   `sindresorhus`, `tj`), 2 without.
+3. Run the workflow.
+4. On the shortlist (`/jobs/<id>` Top Candidates section, or the report page
+   Top 5 Picks):
+   - The 3 GitHub candidates show the **⚡ Tech evaluated** badge.
+   - Hovering their score badge reveals the breakdown tooltip.
+   - Their ranking position reflects `matching + bonus` (a candidate boosted
+     from 70 → 86 will overtake an unboosted 80).
+   - The 2 GitHub-less candidates show their original `matching_score` as
+     `final_score`, no badge, no tooltip (legacy display).

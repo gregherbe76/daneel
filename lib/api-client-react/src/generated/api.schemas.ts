@@ -1356,6 +1356,16 @@ export interface ShortlistEntry {
   whyRelevant: string;
   keyRisks: string;
   finalRecommendation: string;
+  /** Base score (= ai_evaluations.score / decisionScore) used as the input to the CodeMatch boost. Optional — only present on runs from Phase 4.3 onward. */
+  matchingScore?: number;
+  /** Raw 0-100 overall score from technical_evaluations.scores.overall, or null when the candidate has no valid technical evaluation. */
+  codematchOverall?: number | null;
+  /** Additive bonus applied to matchingScore. Computed as (codematchOverall / 100) * 20, capped at 20. 0 when no valid technical evaluation. */
+  bonusApplied?: number;
+  /** min(100, matchingScore + bonusApplied). The shortlist is sorted by this value DESC. */
+  finalScore?: number;
+  /** True iff a valid technical_evaluation row exists (evaluated=true and overall not null). Drives the "⚡ Tech evaluated" UI badge. */
+  techEvaluated?: boolean;
 }
 
 export interface Shortlist {

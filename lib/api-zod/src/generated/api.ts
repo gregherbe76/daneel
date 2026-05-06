@@ -1712,6 +1712,36 @@ export const GetLatestJobWorkflowResponse = zod.object({
           whyRelevant: zod.string(),
           keyRisks: zod.string(),
           finalRecommendation: zod.string(),
+          matchingScore: zod
+            .number()
+            .optional()
+            .describe(
+              "Base score (= ai_evaluations.score \/ decisionScore) used as the input to the CodeMatch boost. Optional — only present on runs from Phase 4.3 onward.",
+            ),
+          codematchOverall: zod
+            .number()
+            .nullish()
+            .describe(
+              "Raw 0-100 overall score from technical_evaluations.scores.overall, or null when the candidate has no valid technical evaluation.",
+            ),
+          bonusApplied: zod
+            .number()
+            .optional()
+            .describe(
+              "Additive bonus applied to matchingScore. Computed as (codematchOverall \/ 100) \* 20, capped at 20. 0 when no valid technical evaluation.",
+            ),
+          finalScore: zod
+            .number()
+            .optional()
+            .describe(
+              "min(100, matchingScore + bonusApplied). The shortlist is sorted by this value DESC.",
+            ),
+          techEvaluated: zod
+            .boolean()
+            .optional()
+            .describe(
+              'True iff a valid technical_evaluation row exists (evaluated=true and overall not null). Drives the \"⚡ Tech evaluated\" UI badge.',
+            ),
         }),
       ),
       createdAt: zod.coerce.date(),

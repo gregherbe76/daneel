@@ -19,6 +19,12 @@ import { resolveProvider, resolveSourcingProvider, resolveEnrichmentProvider, re
 import { DecisionQuotaExceededError } from "./providers/decision-interface";
 import { deliberationsTable } from "@workspace/db";
 import type { JobInsightResult, CandidateMatchResult, ShortlistResult } from "./engine-types";
+import type { ShortlistEntry } from "@workspace/db";
+import {
+  computeBoostedShortlist,
+  roundForPersistence,
+  type RankingInputTechnical,
+} from "./shortlist-ranking";
 import type { AgentProvider, SourcingCandidate, SourcingStats, SourcingRunResult, EnrichmentResult, EnrichmentCandidate } from "./providers";
 
 export type { JobInsightResult, CandidateMatchResult, ShortlistResult };
@@ -680,25 +686,73 @@ async function runShortlist(
   logger.info({ runId, step: "shortlist_generation", provider: provider.name }, "Step dispatched");
 
   try {
-    const top5 = [...evaluations].sort((a, b) => b.score - a.score).slice(0, 5);
+    // Phase 4.3 — Pull this run's technical_evaluations rows and apply the
+    // CodeMatch boost to ranking. No-op for runs without any tech evals
+    // (techByCandidate stays empty → bonus 0 everywhere → behaviour identical
+    // to pre-4.3 sort by matching_score DESC).
+    const techRows = await db
+      .select()
+      .from(technicalEvaluationsTable)
+      .where(eq(technicalEvaluationsTable.runId, runId));
+    const techByCandidate = new Map<number, RankingInputTechnical>();
+    for (const t of techRows) {
+      techByCandidate.set(t.candidateId, {
+        evaluated: t.evaluated,
+        overall: t.scores?.overall ?? null,
+      });
+    }
+
+    const boosted = computeBoostedShortlist(evaluations, techByCandidate).map(roundForPersistence);
+    const top5 = boosted.slice(0, 5);
+
+    // Pass the boosted finalScore as `score` to the provider so the LLM's
+    // narratives (whyRelevant / keyRisks) are anchored to the ranking the
+    // hiring manager will actually see. The provider type stays unchanged.
     const summaries = (await provider.run({
       step: "shortlist_generation",
       runId,
       jobId,
-      payload: { job, insight, evaluations: top5 },
+      payload: {
+        job,
+        insight,
+        evaluations: top5.map((b) => ({
+          candidateId: b.candidateId,
+          candidateName: b.candidateName,
+          score: Math.round(b.finalScore),
+          recommendation: b.recommendation,
+          strengths: b.strengths,
+          gaps: b.gaps,
+        })),
+      },
     })) as ShortlistResult[];
+
+    // Merge provider narratives with boosted ranking metadata. Persist the
+    // extended ShortlistEntry shape (jsonb — no schema migration needed).
+    const boostedById = new Map(top5.map((b) => [b.candidateId, b]));
+    const enrichedSummaries: ShortlistEntry[] = summaries.map((s) => {
+      const b = boostedById.get(s.candidateId);
+      if (!b) return s;
+      return {
+        ...s,
+        matchingScore: b.matchingScore,
+        codematchOverall: b.codematchOverall,
+        bonusApplied: b.bonusApplied,
+        finalScore: b.finalScore,
+        techEvaluated: b.techEvaluated,
+      };
+    });
 
     await db.insert(shortlistsTable).values({
       runId,
       jobId,
       rankedCandidateIds: top5.map((c) => c.candidateId),
-      summaries,
+      summaries: enrichedSummaries,
     });
 
     await logStep(runId, "shortlist", "completed", { top5Count: top5.length, provider: provider.name }, {
       providerName: provider.name,
       providerType: provider.type,
-      summaries,
+      summaries: enrichedSummaries,
     });
   } catch (err) {
     await logStep(runId, "shortlist", "failed", {}, {

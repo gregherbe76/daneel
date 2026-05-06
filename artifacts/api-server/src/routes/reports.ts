@@ -107,7 +107,18 @@ async function buildReport(jobId: number, runId?: number) {
   }));
 
   const top5WithCandidates = top5Evals.map((e) => {
-    const summary = (shortlist?.summaries as Array<{ candidateId: number; whyRelevant: string; keyRisks: string; finalRecommendation: string }> ?? [])
+    const summary = (shortlist?.summaries as Array<{
+      candidateId: number;
+      whyRelevant: string;
+      keyRisks: string;
+      finalRecommendation: string;
+      // Phase 4.3 — optional CodeMatch boost fields (undefined on pre-4.3 runs)
+      matchingScore?: number;
+      codematchOverall?: number | null;
+      bonusApplied?: number;
+      finalScore?: number;
+      techEvaluated?: boolean;
+    }> ?? [])
       .find((s) => s.candidateId === e.candidateId) ?? null;
     const candidateName = candidateMap.get(e.candidateId)?.name ?? "This candidate";
     const generatedNarrative = summary

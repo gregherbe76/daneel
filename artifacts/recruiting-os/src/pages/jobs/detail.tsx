@@ -21,6 +21,7 @@ import {
 import { useRoute, Link, useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -1426,26 +1427,85 @@ export default function JobDetailPage() {
                           )}
                         </h3>
                         <div className="grid md:grid-cols-3 gap-4">
-                          {workflowData.shortlist.summaries.map((summary: { candidateId: number; candidateName: string; whyRelevant: string; keyRisks?: string }) => {
+                          {workflowData.shortlist.summaries.map((summary: {
+                            candidateId: number;
+                            candidateName: string;
+                            whyRelevant: string;
+                            keyRisks?: string;
+                            // Phase 4.3 — optional CodeMatch boost fields
+                            matchingScore?: number;
+                            codematchOverall?: number | null;
+                            bonusApplied?: number;
+                            finalScore?: number;
+                            techEvaluated?: boolean;
+                          }) => {
                             const evalData = workflowData.evaluations.find((e: { candidateId: number }) => e.candidateId === summary.candidateId);
                             const isSourced = sourcedCandidates.some((c) => c.id === summary.candidateId);
+                            // Phase 4.3 — prefer the boosted finalScore when present (post-4.3 runs).
+                            // Falls back to decisionScore/score on legacy runs.
+                            const baseScore = evalData ? (evalData.decisionScore ?? evalData.score) : null;
+                            const displayScore = summary.finalScore !== undefined
+                              ? Math.round(summary.finalScore)
+                              : baseScore;
+                            const hasBoostBreakdown = summary.finalScore !== undefined && summary.matchingScore !== undefined && summary.bonusApplied !== undefined;
                             return (
                               <Card key={summary.candidateId} className="flex flex-col">
                                 <CardHeader className="pb-2">
                                   <div className="flex justify-between items-start">
                                     <div className="min-w-0">
-                                      <CardTitle className="text-base truncate">{summary.candidateName}</CardTitle>
+                                      <CardTitle className="text-base truncate flex items-center gap-1.5 flex-wrap">
+                                        <span className="truncate">{summary.candidateName}</span>
+                                        {summary.techEvaluated === true && (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-[10px] bg-amber-500/10 text-amber-700 border-amber-200 shrink-0"
+                                            data-testid="badge-tech-evaluated"
+                                            title={`Technical evaluation score: ${summary.codematchOverall ?? "n/a"}/100`}
+                                          >
+                                            <Zap className="h-2.5 w-2.5 mr-0.5" />Tech evaluated
+                                          </Badge>
+                                        )}
+                                      </CardTitle>
                                       {isSourced && (
                                         <Badge variant="outline" className="mt-1 text-[10px] bg-purple-500/10 text-purple-700 border-purple-200">
                                           <Zap className="h-2.5 w-2.5 mr-1" />AI Sourced
                                         </Badge>
                                       )}
                                     </div>
-                                    {evalData && (
+                                    {(evalData || displayScore !== null) && (
                                       <div className="ml-2 shrink-0 flex flex-col items-end gap-1">
-                                        <Badge variant="outline" className={`${getScoreColor(evalData.decisionScore ?? evalData.score)}`}>
-                                          {evalData.decisionScore ?? evalData.score}
-                                        </Badge>
+                                        {displayScore !== null && (
+                                          hasBoostBreakdown ? (
+                                            <TooltipProvider delayDuration={150}>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <Badge variant="outline" className={`cursor-help ${getScoreColor(displayScore)}`} data-testid="badge-final-score">
+                                                    {displayScore}
+                                                  </Badge>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="left" className="text-xs">
+                                                  <div className="font-medium mb-1">Score breakdown</div>
+                                                  <div>Matching: {Math.round(summary.matchingScore!)}</div>
+                                                  <div>
+                                                    Tech bonus: {summary.bonusApplied! > 0 ? "+" : ""}
+                                                    {Math.round(summary.bonusApplied! * 10) / 10}
+                                                    {summary.codematchOverall !== null && summary.codematchOverall !== undefined
+                                                      ? ` (CodeMatch ${summary.codematchOverall})`
+                                                      : ""}
+                                                  </div>
+                                                  <div className="mt-1 pt-1 border-t border-border font-medium">
+                                                    Final: {Math.round(summary.finalScore!)}
+                                                    {summary.finalScore! >= 100 ? " (capped)" : ""}
+                                                  </div>
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            </TooltipProvider>
+                                          ) : (
+                                            <Badge variant="outline" className={`${getScoreColor(displayScore)}`}>
+                                              {displayScore}
+                                            </Badge>
+                                          )
+                                        )}
                                         {evalData.confidenceLevel && (
                                           <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full border ${
                                             evalData.confidenceLevel === "High" ? "bg-green-500/10 border-green-200 text-green-700" :

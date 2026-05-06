@@ -7,6 +7,7 @@ import { branding as defaultBranding } from "@workspace/branding";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -83,7 +84,18 @@ type ReportEvaluation = {
   recommendation: string;
   scoreBreakdown?: ScoreBreakdown | null;
   candidate: ReportCandidate | null;
-  summary: { candidateId: number; whyRelevant: string; keyRisks: string; finalRecommendation: string } | null;
+  summary: {
+    candidateId: number;
+    whyRelevant: string;
+    keyRisks: string;
+    finalRecommendation: string;
+    // Phase 4.3 — optional CodeMatch boost fields (undefined on pre-4.3 runs)
+    matchingScore?: number;
+    codematchOverall?: number | null;
+    bonusApplied?: number;
+    finalScore?: number;
+    techEvaluated?: boolean;
+  } | null;
   clientFitNarrative?: string | null;
   clientFitNarrativeGenerated?: string | null;
   clientFitNarrativeOverride?: string | null;
@@ -1320,9 +1332,18 @@ export default function JobReportPage() {
               const isSourced = cand?.source === "AI Generated / Mock Sourcing";
               const baseCandEval = baseReport?.evaluations.find((be) => be.candidateId === e.candidateId);
               const scoreDelta = baseCandEval ? e.score - baseCandEval.score : null;
+              // Phase 4.3 — prefer the boosted finalScore when present, else fall back
+              // to the legacy decisionScore/score (pre-4.3 runs).
+              const baseScore = e.decisionScore ?? e.score;
+              const finalScoreRaw = e.summary?.finalScore;
+              const displayScore = finalScoreRaw !== undefined ? Math.round(finalScoreRaw) : baseScore;
+              const hasBoostBreakdown =
+                e.summary?.finalScore !== undefined &&
+                e.summary?.matchingScore !== undefined &&
+                e.summary?.bonusApplied !== undefined;
               return (
                 <Card key={e.id} className="overflow-hidden">
-                  <div className="h-1.5 w-full" style={{ background: e.score >= 80 ? "#16a34a" : e.score >= 60 ? "#f97316" : "#dc2626" }} />
+                  <div className="h-1.5 w-full" style={{ background: displayScore >= 80 ? "#16a34a" : displayScore >= 60 ? "#f97316" : "#dc2626" }} />
                   <CardContent className="pt-4">
                     <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                       <div>
@@ -1334,15 +1355,52 @@ export default function JobReportPage() {
                               <Zap className="h-2.5 w-2.5 mr-1" />AI Sourced
                             </Badge>
                           )}
+                          {e.summary?.techEvaluated === true && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] h-5 py-0 bg-amber-500/10 text-amber-700 border-amber-200"
+                              data-testid="badge-tech-evaluated"
+                              title={`Technical evaluation score: ${e.summary.codematchOverall ?? "n/a"}/100`}
+                            >
+                              <Zap className="h-2.5 w-2.5 mr-0.5" />Tech evaluated
+                            </Badge>
+                          )}
                         </div>
                         {cand?.headline && <p className="text-sm text-muted-foreground mt-0.5">{cand.headline}</p>}
                         {cand?.currentCompany && <p className="text-xs text-muted-foreground">{cand.currentCompany}</p>}
                       </div>
                       <div className="flex items-center gap-2 shrink-0 flex-wrap">
                         <div className="flex flex-col items-end gap-0.5">
-                          <Badge variant="outline" className={`font-bold text-sm px-3 py-1 ${scoreBg(e.decisionScore ?? e.score)}`}>
-                            {e.decisionScore ?? e.score}/100
-                          </Badge>
+                          {hasBoostBreakdown ? (
+                            <TooltipProvider delayDuration={150}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className={`font-bold text-sm px-3 py-1 cursor-help ${scoreBg(displayScore)}`} data-testid="badge-final-score">
+                                    {displayScore}/100
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="text-xs">
+                                  <div className="font-medium mb-1">Score breakdown</div>
+                                  <div>Matching: {Math.round(e.summary!.matchingScore!)}</div>
+                                  <div>
+                                    Tech bonus: {e.summary!.bonusApplied! > 0 ? "+" : ""}
+                                    {Math.round(e.summary!.bonusApplied! * 10) / 10}
+                                    {e.summary!.codematchOverall !== null && e.summary!.codematchOverall !== undefined
+                                      ? ` (CodeMatch ${e.summary!.codematchOverall})`
+                                      : ""}
+                                  </div>
+                                  <div className="mt-1 pt-1 border-t border-border font-medium">
+                                    Final: {Math.round(e.summary!.finalScore!)}
+                                    {e.summary!.finalScore! >= 100 ? " (capped)" : ""}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <Badge variant="outline" className={`font-bold text-sm px-3 py-1 ${scoreBg(displayScore)}`}>
+                              {displayScore}/100
+                            </Badge>
+                          )}
                           {e.fitScore != null && e.fitScore !== (e.decisionScore ?? e.score) && (
                             <span className="text-[10px] text-muted-foreground">Fit: {e.fitScore}/100</span>
                           )}

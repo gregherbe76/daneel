@@ -4059,6 +4059,23 @@ components:
           type: string
         finalRecommendation:
           type: string
+        # ── Phase 4.3 — CodeMatch ranking boost (all optional for backward compat) ─
+        matchingScore:
+          type: number
+          description: Base score (= ai_evaluations.score / decisionScore) used as the input to the CodeMatch boost. Optional — only present on runs from Phase 4.3 onward.
+        codematchOverall:
+          type: number
+          nullable: true
+          description: Raw 0-100 overall score from technical_evaluations.scores.overall, or null when the candidate has no valid technical evaluation.
+        bonusApplied:
+          type: number
+          description: Additive bonus applied to matchingScore. Computed as (codematchOverall / 100) * 20, capped at 20. 0 when no valid technical evaluation.
+        finalScore:
+          type: number
+          description: min(100, matchingScore + bonusApplied). The shortlist is sorted by this value DESC.
+        techEvaluated:
+          type: boolean
+          description: True iff a valid technical_evaluation row exists (evaluated=true and overall not null). Drives the "⚡ Tech evaluated" UI badge.
       required: [candidateId, candidateName, whyRelevant, keyRisks, finalRecommendation]
 
     Shortlist:
