@@ -131,6 +131,94 @@ function bufferParser() {
   };
 }
 
+describe("GET /api/reports/job/:jobId/latest hides soft-deleted candidates", () => {
+  it("excludes evaluations and shortlist entries for trashed candidates", async () => {
+    const { jobId, candidate: liveCand } = await seedReport();
+
+    // Add a second candidate, soft-delete it, and attach an evaluation +
+    // include it in the shortlist for the same run. The latest endpoint must
+    // drop both the evaluation and the shortlist entry.
+    const [trashed] = await db
+      .insert(candidatesTable)
+      .values({
+        name: `Trashed ${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        email: `trashed-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`,
+        skills: [],
+        deletedAt: new Date(),
+        deletionBatchId: "reports-test-batch",
+      })
+      .returning();
+    seededCandidateIds.push(trashed!.id);
+
+    // Find the run we just seeded for this job and add an evaluation for the
+    // trashed candidate alongside the existing live one.
+    const { agentRunsTable: runs } = await import("@workspace/db");
+    const { eq, desc } = await import("drizzle-orm");
+    const [run] = await db
+      .select()
+      .from(runs)
+      .where(eq(runs.jobId, jobId))
+      .orderBy(desc(runs.createdAt))
+      .limit(1);
+
+    await db.insert(aiEvaluationsTable).values({
+      runId: run!.id,
+      jobId,
+      candidateId: trashed!.id,
+      score: 90,
+      fitScore: 90,
+      decisionScore: 90,
+      dataConfidenceScore: 80,
+      confidenceLevel: "High",
+      strengths: [],
+      gaps: [],
+      risks: [],
+      recommendation: "Yes",
+    });
+
+    // Replace the existing shortlist row to also include the trashed candidate.
+    await db
+      .delete(shortlistsTable)
+      .where(eq(shortlistsTable.runId, run!.id));
+    await db.insert(shortlistsTable).values({
+      runId: run!.id,
+      jobId,
+      rankedCandidateIds: [trashed!.id, liveCand.id],
+      summaries: [
+        {
+          candidateId: trashed!.id,
+          candidateName: trashed!.name,
+          whyRelevant: "w",
+          keyRisks: "k",
+          finalRecommendation: "Hire.",
+        },
+        {
+          candidateId: liveCand.id,
+          candidateName: liveCand.name,
+          whyRelevant: "w",
+          keyRisks: "k",
+          finalRecommendation: "Hire.",
+        },
+      ],
+    });
+
+    const res = await request(app).get(`/api/reports/job/${jobId}/latest`);
+    expect(res.status).toBe(200);
+
+    const evalIds = (
+      res.body.evaluations as Array<{ candidateId: number }>
+    ).map((e) => e.candidateId);
+    expect(evalIds).toContain(liveCand.id);
+    expect(evalIds).not.toContain(trashed!.id);
+
+    const top5Ids = (res.body.top5 as Array<{ candidateId: number }>).map(
+      (e) => e.candidateId,
+    );
+    expect(top5Ids).toContain(liveCand.id);
+    expect(top5Ids).not.toContain(trashed!.id);
+  });
+});
+
 describe("GET /api/reports/job/:jobId/latest/markdown — client logo + name", () => {
   it("includes a markdown image reference for the client logo and the client name in the header", async () => {
     const clientName = "Acme Robotics";
