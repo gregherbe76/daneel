@@ -1,33 +1,121 @@
 # Daneel
 
-**The AI hiring workflow platform for teams.**
+*The open-source agentic workflow engine for recruiting.*
 
-Run your hiring workflows with AI. From job to shortlist, in one flow.
+Give Daneel a job description and a list of candidates. It runs an agentic workflow — sourcing, enrichment, scoring, deliberation — and produces a ranked shortlist with an auditable hiring report. Every step is a pluggable provider, so you can swap models, add your own scoring logic, or wire in any external system.
 
-> Daneel is the open-source agentic workflow engine that powers this product.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6.svg)](https://www.typescriptlang.org/)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#)
 
-Open-source · MIT licensed · production-ready starting point
+[⭐ Star on GitHub](https://github.com/gregherbe76/Recruit-Pipeline) · [📖 Docs](DEVELOPER_GUIDE.md) · [🚀 Live demo coming soon](#)
 
 ---
 
-## What this is
-
-A guided HR app for small teams, powered by an agentic workflow engine.
+## What Daneel does
 
 ```
-Job Brief → AI Workflow → Shortlist → Hiring Report
+Job description → workflow → ranked shortlist + hiring report
+                   │
+                   ├─ understands the job
+                   ├─ sources candidates       (optional)
+                   ├─ enriches profiles        (optional)
+                   ├─ scores against rubric
+                   ├─ deliberates              (optional, multi-LLM)
+                   └─ produces report
 ```
 
-The system:
-- **Understands the job** — pulls structured criteria from your description
-- **Candidate Matching** — scores every candidate across 3 hiring dimensions
-  (autonomy, product mindset, impact)
-- **Sourcing** — brings new candidates into the pipeline before scoring
-- **Enrichment** — fills in missing details (skills, headline, summary) before scoring
-- **Shortlist** — produces a ranked shortlist and a shareable hiring report
-- **Notes & team discussion** — leave private notes and threaded comments per candidate, scoped per role
+Every step is a pluggable provider. Swap, extend, or replace anything.
 
-You define the criteria. The engine does the work. Every step is logged.
+---
+
+## The Provider Marketplace
+
+Daneel ships with built-in providers, optional commercial ones, and BYOK third-party connectors. Mix and match per workflow step.
+
+### Built-in (free, ship with the engine)
+
+| Provider | What it does | Key required |
+|---|---|---|
+| **Native OpenAI** | Job understanding, candidate matching, shortlist generation | `OPENAI_API_KEY` (BYOK) |
+| **GitHub Public Search** | Sources candidates via the public GitHub REST API | None (optional `GITHUB_TOKEN` for higher rate limits) |
+| **SerpAPI Web Search** | Sources candidates from public LinkedIn / GitHub profile pages | `SERPAPI_KEY` (BYOK) |
+| **Apify Actors** | Runs Apify actors for sourcing or enrichment | `APIFY_TOKEN` (BYOK) |
+| **Custom Webhook** | Routes any step to your own HTTP endpoint | None |
+
+### Commercial providers ⭐
+
+| Provider | What it does | Maintainer | Status |
+|---|---|---|---|
+| **A-Player Scout** | Job description → boolean LinkedIn shortlist | A-Player | Live |
+| **Extend** | Pattern-match candidates from example profiles | A-Player | Live |
+| **CodeMatch** | GitHub-based technical evaluation | A-Player | Live |
+| **Council** | 15-persona hiring deliberation (multi-LLM) | A-Player | Live |
+
+### Third-party connectors (BYOK)
+
+| Connector | What it does | What you bring |
+|---|---|---|
+| **Twin Agent Browser** | Routes sourcing or enrichment to Twin's browser-agent runtime | Your own Twin account + templates |
+| **Custom Webhook** | Plug in any other agent system, n8n flow, or internal service | Your own endpoint |
+
+All commercial providers are optional. The engine is fully functional with built-in and BYOK providers. See [VISION.md](VISION.md) for full commercial disclosure.
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/gregherbe76/Recruit-Pipeline daneel
+cd daneel
+cp .env.example .env
+docker compose up
+```
+
+Then open <http://localhost:5173>. The Native OpenAI provider needs your `OPENAI_API_KEY` in `.env`. Other providers can be added from the marketplace UI under **Settings → Agent Providers**.
+
+`docker compose up` pulls prebuilt images from GHCR (`ghcr.io/gregherbe76/daneel-api`, `ghcr.io/gregherbe76/daneel-web`), so first boot is a quick image download instead of a multi-minute build. Postgres, the API server, and the frontend come up together; the schema is pushed and a small demo dataset is seeded automatically. Re-running is safe — the seed step is idempotent.
+
+To stop and wipe the database volume: `docker compose down -v`.
+
+### Local development without Docker
+
+If you want to hack on the code with hot reload and direct access to a local Postgres, follow the pnpm workspace setup in [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md). It covers Node 20+ / pnpm 9+ install, environment variables, schema push, and running the API and web artifacts in separate terminals.
+
+---
+
+## Architecture for builders
+
+Daneel separates the UI, the workflow engine, the provider layer, and the data store. Anything that talks to a model, an external API, or a webhook lives behind the provider interface — not in the engine.
+
+```
+┌────────────────────────────────────────────────┐
+│                ATS Core (UI)                   │
+│  Jobs · Candidates · Pipeline · Reports        │
+│  React + Vite + Tailwind + shadcn/ui           │
+│  artifacts/recruiting-os/                      │
+└───────────────────┬────────────────────────────┘
+                    │  REST API (OpenAPI → typed hooks + Zod)
+┌───────────────────▼────────────────────────────┐
+│           Agentic Workflow Engine              │
+│  job_understanding · sourcing · enrichment     │
+│  candidate_matching · shortlist · decision     │
+│  artifacts/api-server/src/routes/workflows/    │
+└───────────────────┬────────────────────────────┘
+                    │  AgentProvider.run({ step, payload })
+┌───────────────────▼────────────────────────────┐
+│             Provider Layer                     │
+│  Built-in · Commercial · BYOK connectors       │
+│  Resolved per step from the marketplace UI     │
+└───────────────────┬────────────────────────────┘
+                    │
+┌───────────────────▼────────────────────────────┐
+│          PostgreSQL + Drizzle ORM              │
+│  lib/db/   schema · types · push               │
+└────────────────────────────────────────────────┘
+```
+
+Every workflow step calls `provider.run({ step, payload })` and stores the result. The engine never knows whether the work was done by a built-in OpenAI prompt, a commercial provider, a Twin browser agent, or your own webhook — that's the whole point of the contract.
 
 ---
 
@@ -37,280 +125,45 @@ You define the criteria. The engine does the work. Every step is logged.
 |---|---|
 | Swap the AI model or provider | Add a new `AgentProvider` class |
 | Change how candidates are scored | Edit the scoring prompt in `native-openai.ts` |
-| Change scoring weights or dimensions | Update `scoreBreakdown` weights in the prompt |
+| Change scoring weights or dimensions | Update the rubric weights in the prompt |
 | Add a new workflow step | Register it in `engine.ts` and `interface.ts` |
 | Connect an external AI system | Use `TwinWebhookProvider` or `CustomWebhookProvider` |
 | Change what goes in the report | Edit `artifacts/api-server/src/routes/reports.ts` |
-| Add a data field to candidates | Update Drizzle schema → `pnpm --filter @workspace/db run push` |
+| Add a data field to candidates | Update the Drizzle schema → `pnpm --filter @workspace/db run push` |
 | Add a new UI page | Drop a file in `artifacts/recruiting-os/src/pages/` |
 | Add a new API endpoint | Add a route in `artifacts/api-server/src/routes/` and register it in `openapi.yaml` |
+| Re-skin the UI for a different audience | Add a template under `lib/branding/src/templates/` and set `APP_TEMPLATE` |
 
-Full extension guide: [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md)
-
----
-
-## Architecture for builders
-
-```
-┌────────────────────────────────────────────────┐
-│                ATS Core (UI)                   │
-│  Jobs · Candidates · Pipeline · Reports        │
-│  React + Vite + Tailwind + shadcn/ui           │
-│  artifacts/recruiting-os/                      │
-└───────────────────┬────────────────────────────┘
-                    │  REST API
-                    │  OpenAPI spec → codegen → typed hooks + Zod
-┌───────────────────▼────────────────────────────┐
-│          Agentic Workflow Engine                │
-│  1. job_understanding                          │
-│  2. sourcing          (optional)               │
-│  3. enrichment        (optional)               │
-│  4. candidate_matching                         │
-│  5. shortlist_generation                       │
-│  artifacts/api-server/src/routes/workflows/    │
-└───────────────────┬────────────────────────────┘
-                    │  AgentProvider interface
-                    │  provider.run({ step, payload }) → result
-┌───────────────────▼────────────────────────────┐
-│             Provider Layer                     │
-│  NativeOpenAI     built-in GPT prompts         │
-│  CustomWebhook    any HTTP POST endpoint        │
-│  TwinWebhook      step-routed webhook system   │
-│  YourProvider     implement AgentProvider ✓    │
-└───────────────────┬────────────────────────────┘
-                    │
-┌───────────────────▼────────────────────────────┐
-│          PostgreSQL + Drizzle ORM              │
-│  lib/db/   schema · types · push               │
-└────────────────────────────────────────────────┘
-```
-
-**Core idea:** every workflow step is a pluggable unit. The engine calls `provider.run({ step, payload })` and stores the result. You decide what runs on the other side — a prompt, a webhook, your own model.
+Full extension guide: [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md).
 
 ---
 
-## What can be customized
+## Examples
 
-### Scoring rubric
-Default dimensions and weights (in `native-openai.ts`):
-- **Skills Match** (35%) — required skills coverage
-- **Experience Depth** (30%) — seniority and ownership signals
-- **Autonomy** (20%) — end-to-end project ownership evidence
-- **Product Mindset** (15%) — user/business impact awareness
+Step-by-step recipes for the most common extensions:
 
-Change the weights, add/remove dimensions, or change the recommendation thresholds (80+ = Strong Yes, 60–79 = Yes, etc.) without touching the engine. See [examples/custom-scoring-rubric.md](./examples/custom-scoring-rubric.md).
-
-### AI provider
-Implement the two-method `AgentProvider` interface to plug in any model, vendor, or internal AI system. See [examples/custom-provider.md](./examples/custom-provider.md).
-
-### External agent system (Twin / n8n / webhook)
-Point a webhook provider at any HTTP service that handles one or more steps. See [examples/twin-provider.md](./examples/twin-provider.md).
-
-### Workflow steps
-Add new steps — background screening, culture fit scoring, outreach draft, reference check — without rewriting the engine. See [examples/custom-workflow.md](./examples/custom-workflow.md).
-
-### Reports
-Edit `artifacts/api-server/src/routes/reports.ts` to change the structure of Markdown and PDF exports.
-
----
-
-## Setup
-
-### Quickstart with Docker (recommended)
-
-Requires **Docker Desktop** or **Docker Engine + Compose v2**. Both Intel/AMD
-(`linux/amd64`) and Apple Silicon (`linux/arm64`) Macs are supported out of
-the box — `docker compose up` automatically pulls the native variant for your
-machine, so M1/M2/M3 users get the same near-instant first boot as Linux/amd64
-users (no QEMU emulation).
-
-```
-git clone https://github.com/gregherbe76/daneel
-cd daneel
-cp .env.example .env
-docker compose up
-```
-
-By default this **pulls prebuilt images** from the GitHub Container Registry
-(`ghcr.io/gregherbe76/daneel-api` and `ghcr.io/gregherbe76/daneel-web`), so
-first boot is a quick image download instead of a multi-minute build from
-source. CI publishes new `latest` images on every push to `main` and tagged
-releases on every `v*` git tag.
-
-To pin a specific release:
-
-```
-IMAGE_TAG=v0.4.0 docker compose up
-```
-
-This brings up Postgres, the API server, and the frontend in a single command,
-pushes the database schema, and seeds a small demo dataset (a couple of jobs,
-a few candidates, sample applications). Re-running `docker compose up` is safe
-— the seed step is idempotent and will not duplicate rows.
-
-Once everything is healthy:
-
-- App UI: http://localhost:5173
-- API: http://localhost:3000/api/healthz
-- Postgres: `localhost:5432` (user/password/db all `daneel`)
-
-To stop and wipe the database volume: `docker compose down -v`.
-
-#### Building from source (contributors)
-
-If you are changing application code and want your local changes baked into
-the containers, use the dev override which rebuilds the `api` and `web`
-images from your working tree instead of pulling from GHCR:
-
-```
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
-```
-
-The first build can take several minutes (full `pnpm install` + Vite build +
-esbuild bundle); subsequent rebuilds are cached.
-
----
-
-### Replit-native setup
-
-### Prerequisites
-
-- Node.js 20+
-- pnpm 9+
-- PostgreSQL
-
-### 1. Install
-
-```bash
-git clone https://github.com/gregherbe76/daneel
-cd daneel
-pnpm install
-```
-
-### 2. Environment variables
-
-```env
-DATABASE_URL=postgresql://user:password@localhost:5432/recruiting_os
-SESSION_SECRET=your-session-secret
-```
-
-### 3. Database
-
-```bash
-pnpm --filter @workspace/db run push
-```
-
-Seed data is included — you can run a full workflow immediately after setup.
-
-### 4. Run
-
-```bash
-# API server
-pnpm --filter @workspace/api-server run dev
-
-# Frontend (separate terminal)
-pnpm --filter @workspace/recruiting-os run dev
-```
-
-### 5. Connect an AI provider
-
-Go to **Settings → Agent Providers** in the UI. Add a Native OpenAI provider with your API key. Provider config is stored in the database — no extra env vars needed.
-
-### After changing the API spec
-
-```bash
-pnpm --filter @workspace/api-spec run codegen
-```
-
-Regenerates React Query hooks and Zod validators from `lib/api-spec/openapi.yaml`.
-
----
-
-## Project structure
-
-```
-.
-├── artifacts/
-│   ├── api-server/                    # Express API
-│   │   └── src/routes/
-│   │       ├── workflows/
-│   │       │   ├── engine.ts          # Workflow orchestrator — edit to add steps
-│   │       │   ├── engine-types.ts    # Shared step result types
-│   │       │   └── providers/
-│   │       │       ├── interface.ts   # AgentProvider contract — start here
-│   │       │       ├── registry.ts    # Provider resolution per step
-│   │       │       ├── native-openai.ts          # Scoring prompts live here
-│   │       │       ├── native-openai-sourcing.ts
-│   │       │       ├── native-openai-enrichment.ts
-│   │       │       ├── custom-webhook.ts
-│   │       │       └── twin-webhook.ts
-│   │       ├── reports.ts             # Report generation (MD + PDF)
-│   │       ├── jobs.ts
-│   │       └── candidates.ts
-│   └── recruiting-os/                 # React + Vite frontend
-│       └── src/
-│           ├── pages/jobs/            # Job detail, report, edit
-│           └── components/
-├── lib/
-│   ├── db/src/schema/                 # Drizzle schema
-│   │   ├── agent-runs.ts
-│   │   ├── candidates.ts
-│   │   └── jobs.ts
-│   └── api-spec/openapi.yaml          # API source of truth → codegen
-└── examples/                          # Extension guides for builders
-    ├── custom-provider.md
-    ├── custom-scoring-rubric.md
-    ├── twin-provider.md
-    └── custom-workflow.md
-```
-
----
-
-## Data modes
-
-The system enforces strict separation between real and simulated data:
-
-| Mode | What gets scored | Use for |
-|---|---|---|
-| `mock` | AI-generated mock profiles only | Demo, testing, development |
-| `real` | Imported + Twin-sourced candidates only | Production recruiting |
-| `fallback` | Imported only (Twin failed, auto-triggered) | Error recovery |
-
-Reports are clearly labelled. Mock data is never silently mixed with real data.
-
----
-
-## Demo flow
-
-1. Create a job with description, skills, and seniority
-2. Click **Run AI Workflow** (choose Demo Run or Real Data Run)
-3. Optionally enable sourcing (generates mock candidates) or enrichment
-4. Get structured job insights + evaluation criteria
-5. Every candidate is scored 0–100 across 4 dimensions
-6. Ranked shortlist of top 5 is generated with summaries
-7. Export a hiring report (Markdown or PDF)
-
-**Output:** a clear answer to "Who should I interview and why?"
+- [examples/custom-provider.md](examples/custom-provider.md) — implement the `AgentProvider` interface to plug in any model, vendor, or internal AI system.
+- [examples/custom-scoring-rubric.md](examples/custom-scoring-rubric.md) — change scoring dimensions, weights, and recommendation thresholds.
+- [examples/twin-provider.md](examples/twin-provider.md) — route one or more steps to a Twin Agent Browser flow via the BYOK connector.
+- [examples/custom-workflow.md](examples/custom-workflow.md) — add a new step (background screening, culture fit, outreach draft, reference check) without rewriting the engine.
 
 ---
 
 ## Roadmap
 
-- Real sourcing — LinkedIn, GitHub, Lever, Greenhouse integrations
-- Outreach agents — automated candidate contact
-- Multi-provider workflows — different providers per step
-- Evaluation templates — per-role rubric customization
-- Multi-agent orchestration — parallel scoring, consensus decisions
+- Live demo at `demo.daneel.dev`
+- Extend provider (Phase 3)
+- CodeMatch evaluation provider (Phase 4)
+- Bias auditing module (EU AI Act)
+- More built-in sources (Greenhouse import, Lever import)
+- Multi-tenant white-label mode
 
 ---
 
-## Telemetry
+## Disclosure & License
 
-The frontend ships with **opt-in, anonymous** PostHog product analytics
-(disabled in dev, no PII, GDPR-compliant). See
-[`docs/TELEMETRY.md`](docs/TELEMETRY.md) for the exact event list, payload
-fields, and how to opt out.
+Daneel is MIT-licensed and the engine is fully functional without any commercial provider. Commercial providers (Scout, Extend, CodeMatch, Council) are maintained by A-Player and ship as optional plug-ins; they are listed in the marketplace UI but never required for the core workflow. Full commercial framing and the "engine ↔ providers ↔ connectors" model is documented in [VISION.md](VISION.md). License terms in [LICENSE](LICENSE).
 
-## License
+## Built by
 
-MIT
+Built by [Greg Herbé](https://www.linkedin.com/in/gregherbe), Operating Partner @ Twin and founder of A-Player.
