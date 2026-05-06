@@ -1,0 +1,94 @@
+Tâche 2 validée. VISION.md et NAMING.md sont cohérents.
+
+Procède maintenant à la Tâche 3 : cleanup branding HireFlow / 
+ShortlistPro / HiringAI.
+
+CONTEXT
+
+Diagnostic précédent identifie :
+- HireFlow : 4 occurrences résiduelles (probablement dans 
+  lib/branding/templates/)
+- ShortlistPro : 4 occurrences résiduelles
+- HiringAI : reste autorisé comme template, mais brouille le message 
+  si c'est le default UI
+
+Décisions prises :
+1. HireFlow et ShortlistPro = supprimés entièrement. Pas de stubs, pas 
+   de ré-exports, pas de "deprecated" comments — suppression nette.
+2. HiringAI = code template conservé, mais le default UI doit être 
+   "Daneel". HiringAI peut rester comme template alternatif activable 
+   via lib/branding (utile pour démontrer la capacité white-label).
+
+GOAL
+
+Procède en 3 étapes claires DANS L'ORDRE, avec un seul commit final.
+
+ETAPE 1 — Inventaire avant modification
+
+- Cherche TOUTES les occurrences de "HireFlow" (case-insensitive) dans 
+  le repo, hors node_modules et hors lockfiles
+- Pareil pour "ShortlistPro"
+- Pareil pour "HiringAI"
+- Pour chaque occurrence, note : fichier, ligne, contexte (1 ligne 
+  avant + ligne + 1 ligne après)
+- Affiche-moi cet inventaire dans le chat AVANT de modifier quoi que 
+  ce soit
+
+STOP intermédiaire. Attends ma confirmation que l'inventaire est complet 
+avant de procéder à l'étape 2.
+
+ETAPE 2 — Nettoyage HireFlow et ShortlistPro
+
+Suite à mon OK sur l'inventaire :
+
+- Supprimer toutes les occurrences de "HireFlow" et "ShortlistPro"
+- Si une occurrence est dans un template branding (lib/branding/templates/) 
+  qui n'a pas d'usage downstream : supprimer le fichier entièrement
+- Si une occurrence est dans un fichier qui ré-exporte ou réfère à ces 
+  templates : retirer juste les lignes concernées et nettoyer les 
+  imports orphelins
+- Si tu trouves un cas ambigu (ex : un test qui vérifie le comportement 
+  HireFlow), arrête-toi et demande-moi avant de modifier
+
+ETAPE 3 — Bascule UI default vers Daneel
+
+- Identifier où dans lib/branding le template default est défini
+- Vérifier s'il pointe sur HiringAI ou sur autre chose
+- Le basculer pour que le default soit "Daneel" : nom du produit, 
+  tagline si applicable, métadonnées de page (title, description)
+- HiringAI reste comme template alternatif chargeable mais n'est plus 
+  le default
+- Tester en lançant l'app : démarrer api-server + frontend, vérifier 
+  qu'aucun écran utilisateur ne montre HireFlow, ShortlistPro, ou 
+  HiringAI comme nom par défaut. Si l'environnement Replit ne permet 
+  pas de tester en live, fais une vérification statique (grep dans 
+  les fichiers de rendu pour s'assurer que "Daneel" est bien le 
+  fallback final)
+
+CONTRAINTES
+
+- Aucune modification de README, VISION.md, NAMING.md
+- Aucune modification du code engine, des providers, du marketplace, 
+  de la télémétrie
+- Aucune nouvelle dépendance
+- Si lib/branding contient une logique complexe qu'il faudrait 
+  refactorer profondément pour faire ce nettoyage, NE PAS refactorer. 
+  Plutôt me signaler la complexité et je décide si on la traite 
+  maintenant ou si on la note comme dette technique.
+
+DELIVERABLE
+
+- Inventaire posté dans le chat (étape 1)
+- Modifications appliquées (étapes 2 et 3) après validation
+- Un seul commit final regroupant les modifications des étapes 2 et 3 :
+  "refactor: drop HireFlow/ShortlistPro residuals, default UI branding 
+  to Daneel"
+- Push
+
+STOP
+
+Trois STOPs dans cette tâche :
+1. Après l'inventaire (étape 1) — j'approuve avant que tu modifies quoi 
+   que ce soit
+2. Si tu rencontres un cas ambigu — tu demandes
+3. Après le commit final — tu attends ma validation avant Tâche 4
