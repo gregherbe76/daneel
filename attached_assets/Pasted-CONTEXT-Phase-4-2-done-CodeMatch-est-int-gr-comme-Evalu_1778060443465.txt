@@ -1,0 +1,212 @@
+CONTEXT
+
+Phase 4.2 done : CodeMatch est intégré comme EvaluationProvider, le 
+step technical_evaluation tourne après candidate_matching, et les 
+résultats sont stockés dans la table technical_evaluations puis 
+affichés dans l'UI candidat. Tout est validé E2E.
+
+Sous-tâche 4.3 : intégrer le score CodeMatch dans le ranking 
+shortlist_generation pour que les candidats avec un bon score 
+technique remontent dans la shortlist finale.
+
+DÉCISIONS DE DESIGN ARBITRÉES
+
+Décision 1 — Formule de pondération : Option C (boost additif avec 
+plafond)
+
+  final_score = min(100, matching_score + bonus)
+  où bonus = (codematch_overall / 100) × 20
+
+  - matching_score reste la base du ranking (préserve le 
+    comportement actuel)
+  - codematch_overall ajoute jusqu'à +20 points max
+  - Plafond à 100 pour éviter les scores > 100
+
+Décision 2 — Candidats sans évaluation CodeMatch valide : Option X 
+(no bonus, no penalty)
+
+  - Candidat sans github_username, ou avec evaluation échouée 
+    (timeout, rate_limit, etc.) : bonus = 0
+  - Pas de pénalité, pas de section séparée
+  - Mais : ajouter un indicateur UI sur la shortlist (badge 
+    "⚡ Tech evaluated" ou similaire) pour les candidats avec 
+    technical_evaluations.evaluated = true
+
+ÉTAPE 1 — DIAGNOSTIC AVANT MODIFICATION
+
+Avant de modifier quoi que ce soit, réponds dans le chat :
+
+1. Ouvre artifacts/api-server/src/routes/workflows/providers/native-openai.ts 
+   (ou le fichier qui implémente shortlist_generation actuellement) 
+   et donne-moi un résumé de comment la shortlist est générée 
+   aujourd'hui :
+   - Quels signaux sont utilisés pour le ranking ?
+   - Où est calculé le matching_score actuel ?
+   - Où est stocké le résultat (table, format) ?
+
+2. Cherche s'il existe une notion de "final_score" ou "shortlist_rank" 
+   stockée séparément, ou si le ranking est calculé à la volée à 
+   l'affichage.
+
+3. Vérifie : la table technical_evaluations contient-elle bien 
+   overall_score (ou équivalent) que je pourrai joindre au moment 
+   du ranking ? Donne-moi le schéma exact.
+
+4. UI shortlist actuelle : trouve le composant qui affiche la 
+   shortlist (probablement quelque chose comme 
+   artifacts/recruiting-os/src/pages/jobs/shortlist.tsx ou inline 
+   dans la page job). Décris brièvement le rendu actuel : colonnes 
+   visibles, ordre, signaux affichés.
+
+5. Vérifie si recharts ou une lib de tooltip est disponible pour 
+   afficher le breakdown du score (matching + bonus = final) au 
+   hover. Sinon, on fait du tooltip natif HTML.
+
+STOP intermédiaire. Affiche le diagnostic dans le chat. Aucune 
+modification de fichier. Attends mon OK avant l'étape 2.
+
+ÉTAPE 2 — IMPLÉMENTATION (après mon OK)
+
+A. Logique de ranking modifiée
+
+   Dans le step shortlist_generation :
+
+   1. Récupérer les candidats du job avec leurs matching_score 
+      existants (logique actuelle inchangée)
+   
+   2. Pour chaque candidat, joindre le dernier 
+      technical_evaluations row si présent (basé sur run_id ou 
+      candidate_id selon le pattern)
+   
+   3. Calculer le bonus :
+      - Si pas de technical_evaluation OU evaluated=false OU 
+        overall_score est null : bonus = 0
+      - Sinon : bonus = (overall_score / 100) × 20
+   
+   4. Calculer final_score = min(100, matching_score + bonus)
+   
+   5. Trier par final_score DESC
+   
+   6. Stocker dans la shortlist (ou retourner) chaque candidat avec :
+      - matching_score (base)
+      - codematch_overall (raw, ou null)
+      - bonus_applied (0 à 20)
+      - final_score (matching + bonus, plafonné à 100)
+      - tech_evaluated (boolean : true si bonus > 0)
+
+B. Schéma BDD
+
+   Si la table shortlists existe et stocke les ranks :
+   
+   - Ajouter les colonnes : 
+     - matching_score (numeric, nullable)
+     - codematch_overall (numeric, nullable)
+     - bonus_applied (numeric, default 0)
+     - final_score (numeric, nullable)
+     - tech_evaluated (boolean, default false)
+   
+   - Migration via drizzle-kit
+   
+   Si la shortlist est calculée à la volée à chaque affichage 
+   (pas de table) : skip cette section, le ranking se fera dans 
+   la couche logique sans persistance.
+
+C. UI shortlist
+
+   1. Affichage du score : afficher final_score comme score principal 
+      (le grand chiffre)
+   
+   2. Breakdown visible au hover : tooltip natif HTML qui montre 
+      "Matching: 72 + Tech bonus: +15 = Final: 87" ou similaire
+   
+   3. Badge "⚡ Tech evaluated" : affiché à côté du nom du candidat 
+      si tech_evaluated=true. Pas de badge si tech_evaluated=false 
+      (pas un malus visuel, juste l'absence d'indicateur)
+   
+   4. Si la shortlist a une colonne dédiée pour les sub-scores (selon 
+      le design actuel), ajouter une colonne "Tech" qui affiche 
+      codematch_overall ou "—" si non évalué
+   
+   5. Pas de changement de tri par défaut : la shortlist est triée 
+      par final_score DESC (au lieu de matching_score DESC avant)
+
+D. Tests unitaires
+
+   Ajouter au moins 5 tests pour la logique de ranking :
+   
+   1. 3 candidats avec matching_score variés, sans technical_eval : 
+      ranking identique au comportement actuel (bonus = 0 partout)
+   
+   2. 2 candidats avec matching_score égal (70), un avec 
+      codematch_overall=80 (bonus +16), l'autre sans : le premier 
+      ranke en haut (final_score 86 vs 70)
+   
+   3. Candidat avec matching_score=85 + codematch_overall=100 : 
+      final_score plafonné à 100 (vérification du min())
+   
+   4. Candidat avec matching_score=60 + technical_evaluation 
+      evaluated=false : bonus = 0, final_score = 60
+   
+   5. Candidat avec matching_score=60 + technical_evaluation 
+      avec error="rate_limited" et overall_score=null : bonus = 0, 
+      final_score = 60
+
+E. Test E2E manuel (à toi de faire après mon push, pas l'agent)
+
+   Instructions à inclure dans la doc :
+   - Créer un job avec technical_evaluation activée
+   - Ajouter 5 candidats : 3 avec GitHub username connu (ex: 
+     "torvalds", "sindresorhus", "tj"), 2 sans
+   - Lancer le workflow
+   - Vérifier sur la shortlist :
+     - Les 3 avec GitHub ont un badge "⚡ Tech evaluated"
+     - Le ranking est cohérent (le bonus pousse les techs en haut 
+       si leur matching_score était proche)
+     - Le tooltip au hover montre le breakdown matching + bonus = 
+       final
+     - Les 2 sans GitHub gardent leur matching_score original 
+       comme final_score
+
+F. Documentation
+
+   Mettre à jour docs/providers/codematch.md :
+   - Nouvelle section "Impact on shortlist ranking"
+   - Expliquer la formule (boost additif jusqu'à +20)
+   - Expliquer que les candidats non évalués ne sont pas pénalisés
+   - Mentionner le badge UI
+
+CONTRAINTES STRICTES
+
+- Aucune modification de la logique candidate_matching existante
+- Aucune modification du step technical_evaluation lui-même
+- Aucune modification de codematch-provider.ts (Phase 4.2 est figée)
+- Aucune modification de VISION.md, NAMING.md, README.md
+- Pas de changement structurel de la table technical_evaluations
+- Si la shortlist actuelle utilise une logique custom complexe que 
+  cette modification casserait, ARRÊTE et signale-moi avant de 
+  continuer
+- Si la migration DB est risquée (table avec beaucoup de données 
+  existantes en prod), ARRÊTE et signale
+
+DELIVERABLE
+
+Après l'implémentation :
+1. Commit local hash : <sha7>
+2. Liste des fichiers modifiés/créés
+3. Output des tests (devrait inclure les 5 nouveaux tests + tous 
+   les tests existants qui passent toujours)
+4. Description de ce qui change visuellement dans l'UI shortlist 
+   (1-2 phrases + screenshot mental si pas de capture possible)
+
+Le push vers GitHub sera fait par moi.
+
+Commit message exact :
+"feat: weight CodeMatch overall score into shortlist ranking with +20 
+bonus cap (Phase 4.3)"
+
+STOP
+
+Après le commit local, attends ma confirmation. Je vais tester l'E2E 
+en local (créer un job, ajouter candidats avec/sans GitHub, lancer 
+workflow, vérifier le ranking et les badges) avant de pousser vers 
+GitHub.
