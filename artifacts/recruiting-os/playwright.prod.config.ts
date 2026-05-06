@@ -36,7 +36,7 @@ export default defineConfig({
       env: {
         PORT: String(PORT_WITH_KEY),
         BASE_PATH: "/",
-        VITE_APP_TEMPLATE: "hiringai",
+        VITE_APP_TEMPLATE: "daneel",
         VITE_POSTHOG_KEY: POSTHOG_KEY,
         NODE_ENV: "production",
       },
@@ -49,7 +49,7 @@ export default defineConfig({
       env: {
         PORT: String(PORT_NO_KEY),
         BASE_PATH: "/",
-        VITE_APP_TEMPLATE: "hiringai",
+        VITE_APP_TEMPLATE: "daneel",
         // Explicitly blank so an inherited VITE_POSTHOG_KEY from the
         // surrounding shell can't leak into this "no key" build and make
         // the assertion non-deterministic.

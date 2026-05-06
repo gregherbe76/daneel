@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { branding } from "@workspace/branding";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -112,7 +113,7 @@ interface Provider {
 
 const WORKFLOW_STEPS: { key: WorkflowStep; label: string; description: string; comingSoon?: boolean }[] = [
   { key: "job_understanding", label: "Job Understanding", description: "Reads the job posting and pulls out what really matters" },
-  { key: "candidate_matching", label: "Candidate Matching", description: "Scores every candidate against the role across the HiringAI 3-dimension rubric (autonomy, product mindset, impact)" },
+  { key: "candidate_matching", label: "Candidate Matching", description: `Scores every candidate against the role across the ${branding.productName} 3-dimension rubric (autonomy, product mindset, impact)` },
   { key: "shortlist_generation", label: "Shortlist", description: "Ranks the strongest candidates and writes a hiring summary you can share" },
   { key: "sourcing", label: "Sourcing", description: "Brings new candidates into the pipeline before screening. Twin uses POST /workflow/sourcing" },
   { key: "enrichment", label: "Enrichment", description: "Fills in missing details on each candidate (skills, headline, summary) before scoring. Twin uses POST /workflow/enrichment" },

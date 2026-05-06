@@ -8,6 +8,7 @@ import {
   type EmailRevalidationSettings,
   type EmailRevalidationRun,
 } from "@workspace/db";
+import { branding } from "@workspace/branding";
 import { validateEmail } from "./email-validation";
 import { logger } from "./logger";
 import { notifyRegression } from "./notifications";
@@ -254,7 +255,7 @@ async function maybeFireAlert(latestRun: EmailRevalidationRun): Promise<void> {
   );
 
   if (settings.alertEmail) {
-    const subject = `[HiringAI] Email re-validation sweep failing (${streak.length} consecutive failures)`;
+    const subject = `[${branding.productName}] Email re-validation sweep failing (${streak.length} consecutive failures)`;
     const bodyLines = [
       `The email re-validation sweep has failed ${streak.length} time(s) in a row, meeting the configured alert threshold of ${threshold}.`,
       "",

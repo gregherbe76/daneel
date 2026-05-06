@@ -9,6 +9,7 @@ import {
   type RecipientMode,
   type RecipientModes,
 } from "@workspace/db";
+import { branding } from "@workspace/branding";
 import { logger } from "./logger";
 
 const SINGLETON_ID = 1;
@@ -336,9 +337,9 @@ export interface TestNotificationChannelResult {
   error?: string | null;
 }
 
-const TEST_SUBJECT = "HiringAI test notification";
+const TEST_SUBJECT = `${branding.productName} test notification`;
 const TEST_BODY = [
-  "This is a test notification from HiringAI.",
+  `This is a test notification from ${branding.productName}.`,
   "If you received this, the channel is wired up correctly and ready to deliver real email regression alerts.",
   "",
   "You can ignore this message — no candidate email actually changed status.",
@@ -481,7 +482,7 @@ interface DigestWindow {
 function buildDigestSubject(includedRows: DigestRow[], window: DigestWindow): string {
   const label = formatWindowHours(window.windowMs);
   const isBacklog = window.windowMs > window.cadenceMs * BACKLOG_WINDOW_RATIO;
-  const prefix = isBacklog ? "[HiringAI][backlog]" : "[HiringAI]";
+  const prefix = isBacklog ? `[${branding.productName}][backlog]` : `[${branding.productName}]`;
   const count = window.totalCount;
   return `${prefix} ${count} new email regression${count === 1 ? "" : "s"} in the last ${label}`;
 }
@@ -512,7 +513,7 @@ function buildDigestBody(includedRows: DigestRow[], window: DigestWindow): strin
       "",
     );
   }
-  footer.push("— HiringAI");
+  footer.push(`— ${branding.productName}`);
   return [...header, ...lines, ...footer].join("\n");
 }
 

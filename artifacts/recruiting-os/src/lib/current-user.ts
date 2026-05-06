@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import type { TeamMember } from "@workspace/api-client-react";
 
-const STORAGE_KEY = "hiringai.currentUserId";
-const LAST_READ_KEY = "hiringai.mentionsLastReadAt";
+const STORAGE_KEY = "daneel.currentUserId";
+const LAST_READ_KEY = "daneel.mentionsLastReadAt";
 const DEFAULT_USER_ID = "alex";
 
 function readUserId(): string {

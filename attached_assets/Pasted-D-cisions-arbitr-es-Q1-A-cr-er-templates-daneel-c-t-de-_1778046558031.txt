@@ -1,0 +1,114 @@
+Décisions arbitrées :
+
+Q1 : (A) — créer templates/daneel/ à côté de templates/hiringai/, 
+default = daneel, HiringAI reste alternatif
+
+Q2 : (B) — renommer storage keys hiringai:* → daneel:* sans migration. 
+Tu es à 1 utilisateur réel, le coût utilisateur est nul.
+
+Q3 : (B) — basculer [HiringAI] → [Daneel] dans notifications, mettre 
+à jour les 3 tests qui assertent dessus
+
+Q4 : (B) — renommer le flag --all-hiringai en --all-daneel, mettre à 
+jour replit.md en conséquence
+
+Q5 : (B) — mettre à jour RELEASE_NOTES.md pour cohérence avec VISION.md
+
+Q6 : (B) — changer openapi.yaml description, lancer le codegen 
+complet. Si le codegen échoue, ARRÊTE et signale-moi l'erreur. Ne 
+force pas.
+
+Q7 : (B) — renommer les mock emails @hiringai.example → @daneel.example 
+dans team-roster.ts
+
+Q8 : (B) — refactor useBranding() au lieu de remplacement statique. 
+Découpe en deux passes :
+   - Q8a : frontend — créer/utiliser un hook useBranding() ou 
+     équivalent qui lit branding.productName, remplacer les 7 
+     occurrences hardcodées (index.html, onboarding-wizard.tsx, 
+     jobs/index.tsx, jobs/report.tsx, jobs/detail.tsx, 
+     marketplace-admin.tsx)
+   - Q8b : backend — injecter branding.productName dans notifications.ts 
+     et email-revalidation.ts plutôt que les strings hardcodées 
+     [HiringAI]
+
+GOAL POUR L'ÉTAPE 2
+
+Exécuter les 8 décisions en un seul commit final. Si tu rencontres un 
+cas que tu n'avais pas anticipé pendant l'inventaire, ARRÊTE et 
+demande-moi avant de modifier.
+
+ORDRE D'EXÉCUTION SUGGÉRÉ (pour minimiser les conflits)
+
+1. Build cache cleanup : supprimer dist/templates/hireflow/ et 
+   dist/templates/shortlistpro/ (Q préliminaire — sécurise les 
+   fondations)
+
+2. Q1 : créer templates/daneel/ (duplicate de hiringai, strings mises 
+   à jour selon VISION.md : productName "Daneel", tagline "The 
+   open-source agentic workflow engine for recruiting", domain 
+   "daneel.dev", supportEmail à choisir — utilise hello@daneel.dev en 
+   placeholder, j'ajusterai)
+
+3. Q1 suite : faire de "daneel" le default dans lib/branding/src/index.ts 
+   (TemplateName, default, fallback) tout en gardant "hiringai" comme 
+   template alternatif chargeable
+
+4. Q1 suite : mettre à jour les env vars APP_TEMPLATE / VITE_APP_TEMPLATE 
+   à "daneel" dans Dockerfile.web, docker-compose.yml, playwright.config.ts, 
+   playwright.prod.config.ts
+
+5. Q8a : refactor frontend pour utiliser branding.productName via un 
+   hook ou import direct, dans les 7 fichiers identifiés
+
+6. Q8b : refactor backend (notifications.ts, email-revalidation.ts) 
+   pour injecter branding.productName
+
+7. Q3 : mettre à jour les 3 tests qui assertent sur "[HiringAI]"
+
+8. Q2 : renommer toutes les storage keys hiringai:* → daneel:* dans 
+   les 4 fichiers concernés
+
+9. Q4 : renommer le flag --all-hiringai → --all-daneel dans 
+   scripts/src/rescore-3d.ts, mettre à jour replit.md
+
+10. Q5 : réécrire RELEASE_NOTES.md pour refléter Daneel comme nom 
+    principal
+
+11. Q6 : modifier lib/api-spec/openapi.yaml description, lancer 
+    `pnpm --filter @workspace/api-spec run codegen`. Si échec, arrête 
+    et signale.
+
+12. Q7 : remplacer les emails mock @hiringai.example → @daneel.example 
+    dans team-roster.ts
+
+13. Lancer les tests : `pnpm test` (ou équivalent dans la config 
+    actuelle) pour vérifier que rien ne casse, particulièrement les 
+    tests de notifications (Q3) et le codegen (Q6)
+
+14. Si les tests passent : commit + push avec le message
+    "refactor: complete HiringAI → Daneel rebrand, drop HireFlow/ShortlistPro 
+    residuals, default UI branding to Daneel"
+
+CONTRAINTES STRICTES
+
+- Aucune modification de README, VISION.md, NAMING.md (déjà à jour)
+- Aucune modification de l'engine workflow ou des providers
+- Si un test échoue après les modifications, NE PAS forcer le commit. 
+  Arrête, montre-moi l'erreur, on corrige ensemble avant de pousser.
+- Si le codegen openapi échoue, NE PAS forcer le commit. Idem.
+- Si tu trouves une nouvelle famille d'occurrences que l'inventaire 
+  n'avait pas vue, arrête et signale.
+
+DELIVERABLE
+
+- Un seul commit avec toutes les modifications, après que les tests 
+  passent
+- Push sur main
+- Confirmation dans le chat : nombre de fichiers modifiés, statut 
+  des tests, statut du codegen, taille du diff (lignes ajoutées / 
+  retirées)
+
+STOP
+
+Après le commit, attends ma validation avant Tâche 4 (README marketing).

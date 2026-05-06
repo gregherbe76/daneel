@@ -27,7 +27,7 @@ export default defineConfig({
     env: {
       PORT: String(PORT),
       BASE_PATH: "/",
-      VITE_APP_TEMPLATE: "hiringai",
+      VITE_APP_TEMPLATE: "daneel",
     },
   },
 });

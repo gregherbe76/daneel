@@ -13,7 +13,7 @@ RUN pnpm install --frozen-lockfile
 # Build args picked up by Vite at build time.
 ENV PORT=5173
 ENV BASE_PATH=/
-ENV VITE_APP_TEMPLATE=hiringai
+ENV VITE_APP_TEMPLATE=daneel
 RUN pnpm --filter @workspace/recruiting-os run build
 
 FROM nginx:1.27-alpine AS runtime

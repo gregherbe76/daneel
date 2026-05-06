@@ -162,8 +162,8 @@ describe("sendTestNotification", () => {
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://hooks.slack.test/xyz");
     const body = JSON.parse((init as { body: string }).body);
-    expect(body.text).toMatch(/HiringAI test notification/);
-    expect(body.text).toMatch(/test notification from HiringAI/);
+    expect(body.text).toMatch(/Daneel test notification/);
+    expect(body.text).toMatch(/test notification from Daneel/);
   });
 
   it("captures the Slack failure message when the webhook returns non-2xx", async () => {
@@ -206,7 +206,7 @@ describe("sendTestNotification", () => {
     const headers = (init as { headers: Record<string, string> }).headers;
     expect(headers.authorization).toBe("Bearer sg-test-key");
     const body = JSON.parse((init as { body: string }).body);
-    expect(body.subject).toMatch(/HiringAI test notification/);
+    expect(body.subject).toMatch(/Daneel test notification/);
     expect(body.personalizations[0].to).toEqual([
       { email: "alice@example.com" },
       { email: "bob@example.com" },

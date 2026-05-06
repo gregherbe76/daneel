@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Check, ChevronRight, Sparkles, Users, FileText, X, Settings2 } from "lucide-react";
+import { branding } from "@workspace/branding";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
-const STORAGE_KEY = "hiringai.onboarding.dismissed";
+const STORAGE_KEY = "daneel.onboarding.dismissed";
 
 type StepKey = "providers" | "candidates" | "screening" | "picks";
 
@@ -51,7 +52,7 @@ export function OnboardingWizard({
     {
       key: "candidates",
       title: "Add a few candidates",
-      helper: "Paste LinkedIn URLs, upload CVs, or let HiringAI find people for you.",
+      helper: `Paste LinkedIn URLs, upload CVs, or let ${branding.productName} find people for you.`,
       icon: Users,
       done: hasCandidates,
       cta: { label: "Add candidates", onClick: onAddCandidates },
@@ -59,7 +60,7 @@ export function OnboardingWizard({
     {
       key: "screening",
       title: "Run AI Workflow",
-      helper: "We'll score everyone against your role using the HiringAI 3-dimension rubric — usually under a minute.",
+      helper: `We'll score everyone against your role using the ${branding.productName} 3-dimension rubric — usually under a minute.`,
       icon: Sparkles,
       done: hasCompletedRun,
       cta: hasCandidates && !hasCompletedRun ? { label: "Run AI workflow", onClick: onRunScreening } : undefined,
@@ -100,7 +101,7 @@ export function OnboardingWizard({
       <div className="px-5 py-4 border-b border-border/50 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-sm font-semibold">Welcome to HiringAI</h3>
+            <h3 className="text-sm font-semibold">Welcome to {branding.productName}</h3>
             <span className="text-xs text-muted-foreground">
               {completed} of {total} done · {pct}%
             </span>

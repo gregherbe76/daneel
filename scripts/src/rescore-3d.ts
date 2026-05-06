@@ -1,5 +1,6 @@
 /**
- * Re-score historical AI evaluations with the HiringAI 3-dimension rubric.
+ * Re-score historical AI evaluations with the Daneel 3-dimension rubric
+ * (autonomy, product mindset, impact — also used by the HiringAI template).
  *
  * Why: the rubric used to have 4 dimensions (skillsMatch, experienceDepth,
  * autonomy, productMindset) and was later narrowed to 3 startup-tuned ones:
@@ -18,7 +19,7 @@
  * without it to avoid overwriting evaluations from a different rubric variant):
  *   pnpm --filter @workspace/scripts run rescore-3d -- --job 12          # one job
  *   pnpm --filter @workspace/scripts run rescore-3d -- --run 47          # one agent run
- *   pnpm --filter @workspace/scripts run rescore-3d -- --all-hiringai    # every row
+ *   pnpm --filter @workspace/scripts run rescore-3d -- --all-daneel    # every row
  *   pnpm --filter @workspace/scripts run rescore-3d -- --job 12 --dry    # preview, no writes
  *
  * Re-trigger this any time the rubric changes again — see replit.md.
@@ -37,7 +38,7 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import { batchProcess } from "@workspace/integrations-openai-ai-server/batch";
 import { eq, and, desc, inArray } from "drizzle-orm";
 
-// ── HiringAI 3-dimension rubric ──────────────────────────────────────────────
+// ── Daneel 3-dimension rubric ────────────────────────────────────────────────
 const RUBRIC = {
   autonomy: 0.35,
   productMindset: 0.3,
@@ -148,11 +149,11 @@ Return ONLY valid JSON:
 // we REFUSE to run globally unless the caller passes one of:
 //   --job <id>        rescope to a single job
 //   --run <id>        rescope to a single agent run
-//   --all-hiringai    explicit acknowledgement that every row in this DB is a
-//                     HiringAI evaluation and is safe to overwrite
+//   --all-daneel    explicit acknowledgement that every row in this DB is a
+//                     Daneel/HiringAI 3-D rubric evaluation and is safe to overwrite
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry");
-const allowAll = args.includes("--all-hiringai");
+const allowAll = args.includes("--all-daneel");
 const jobArgIdx = args.indexOf("--job");
 const onlyJobId = jobArgIdx >= 0 ? Number(args[jobArgIdx + 1]) : null;
 const runArgIdx = args.indexOf("--run");
@@ -165,7 +166,7 @@ async function main() {
         "  Pass one of:\n" +
         "    --job <id>        rescope to a single job\n" +
         "    --run <id>        rescope to a single agent run\n" +
-        "    --all-hiringai    explicit ack that every ai_evaluations row is HiringAI and safe to overwrite\n" +
+        "    --all-daneel    explicit ack that every ai_evaluations row uses the Daneel 3-D rubric and is safe to overwrite\n" +
         "  Add --dry to preview without writing.",
     );
     await pool.end();
@@ -176,7 +177,7 @@ async function main() {
     ? `run ${onlyRunId}`
     : onlyJobId
     ? `job ${onlyJobId}`
-    : "ALL evaluations (--all-hiringai)";
+    : "ALL evaluations (--all-daneel)";
 
   console.log(
     `[rescore-3d] starting — rubric: autonomy=${RUBRIC.autonomy} productMindset=${RUBRIC.productMindset} impact=${RUBRIC.impact}` +

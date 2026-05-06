@@ -787,7 +787,7 @@ describe("runDigestSweep", () => {
     const init = fetchMock.mock.calls[0]![1];
     const body = JSON.parse((init as { body: string }).body);
     expect(body.subject).not.toContain("[backlog]");
-    expect(body.subject).toContain("[HiringAI]");
+    expect(body.subject).toContain("[Daneel]");
     expect(body.content[0].value).not.toContain("Heads up");
   });
 });

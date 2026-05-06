@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { branding } from "@workspace/branding";
 import { useKickoffDefaults } from "./use-kickoff-defaults";
 import { KickoffWorkflowToggles } from "./kickoff-workflow-toggles";
 import {
@@ -914,7 +915,7 @@ export default function JobDetailPage() {
                     </div>
                     <h3 className="font-semibold text-lg">Ready to find your best candidates?</h3>
                     <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-                      Run the AI workflow — we'll read every profile and rank them against this role across 3 HiringAI dimensions: autonomy, product mindset and impact.
+                      Run the AI workflow — we'll read every profile and rank them against this role across 3 {branding.productName} dimensions: autonomy, product mindset and impact.
                     </p>
                     <Button
                       onClick={handleRunWorkflow}

@@ -1,12 +1,13 @@
 /**
- * Branding loader — Phase 2 of the "1 product + 3 templates" plan.
+ * Branding loader.
  *
  * Resolves which template the app is running as, by reading either:
  *   - `process.env.APP_TEMPLATE`           (Node — api-server)
  *   - `import.meta.env.VITE_APP_TEMPLATE`  (Vite — recruiting-os, build-time inlined)
  *
- * Currently only `hiringai` is shipped. Unknown values fall back to `hiringai`
- * with a warning.
+ * Default template is `daneel` — the engine's own open-source surface.
+ * `hiringai` remains shipped as a startup-tuned alternative template.
+ * Unknown values fall back to `daneel` with a warning.
  *
  * The full template object is exported as `template` for new consumers.
  * For back-compat with existing consumers (`reports.ts`, `report.tsx`), we also
@@ -14,12 +15,15 @@
  * `logoUrl`, and a 4-key color palette.
  */
 
+import { branding as daneel } from "./templates/daneel/branding";
+import { prompts as daneelPrompts } from "./templates/daneel/prompts";
 import { branding as hiringai } from "./templates/hiringai/branding";
 import { prompts as hiringaiPrompts } from "./templates/hiringai/prompts";
 
-export type TemplateName = "hiringai";
+export type TemplateName = "daneel" | "hiringai";
 
 const TEMPLATES = {
+  daneel: { ...daneel, prompts: daneelPrompts },
   hiringai: { ...hiringai, prompts: hiringaiPrompts },
 } as const;
 
@@ -44,9 +48,9 @@ function resolveTemplateName(): TemplateName {
   if (envVal) {
     const v = envVal.toLowerCase();
     if (v in TEMPLATES) return v as TemplateName;
-    g.console?.warn?.(`[branding] Unknown APP_TEMPLATE="${v}", falling back to "hiringai"`);
+    g.console?.warn?.(`[branding] Unknown APP_TEMPLATE="${v}", falling back to "daneel"`);
   }
-  return "hiringai";
+  return "daneel";
 }
 
 export const TEMPLATE_NAME: TemplateName = resolveTemplateName();
@@ -56,7 +60,7 @@ export const template = TEMPLATES[TEMPLATE_NAME];
 
 /** Prompt builders for the active template — used by the workflow engine. */
 export const prompts = template.prompts;
-export type { Prompts } from "./templates/hiringai/prompts";
+export type { Prompts } from "./templates/daneel/prompts";
 
 /**
  * Back-compat flattened branding used by existing report/UI consumers.

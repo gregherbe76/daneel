@@ -26,8 +26,8 @@ import { Loader2, X, Download, AlertCircle, Ban } from "lucide-react";
  * (e.g. a job started in another tab) shows up too.
  */
 
-const TRACKED_KEY = "hiringai:bulk-jobs:tracked:v1";
-const COMPLETED_KEY = "hiringai:bulk-jobs:completed-shown:v1";
+const TRACKED_KEY = "daneel:bulk-jobs:tracked:v1";
+const COMPLETED_KEY = "daneel:bulk-jobs:completed-shown:v1";
 
 type State = {
   tracked: number[];

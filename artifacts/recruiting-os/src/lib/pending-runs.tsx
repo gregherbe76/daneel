@@ -7,8 +7,8 @@ import {
 } from "@workspace/api-client-react";
 import { toast } from "@/hooks/use-toast";
 
-const PENDING_KEY = "hiringai:pending-improve-runs:v1";
-const UNSEEN_KEY = "hiringai:unseen-job-runs:v1";
+const PENDING_KEY = "daneel:pending-improve-runs:v1";
+const UNSEEN_KEY = "daneel:unseen-job-runs:v1";
 
 type PendingRun = {
   runId: number;

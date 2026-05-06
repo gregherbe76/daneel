@@ -1,4 +1,5 @@
 import { useListJobs } from "@workspace/api-client-react";
+import { branding } from "@workspace/branding";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -36,7 +37,7 @@ export default function JobsPage() {
             <Briefcase className="h-6 w-6 text-primary" />
           </div>
           <h3 className="text-lg font-semibold mb-1">Let's open your first role</h3>
-          <p className="text-muted-foreground mb-4">Add a job and HiringAI will guide you all the way to a shortlist.</p>
+          <p className="text-muted-foreground mb-4">Add a job and {branding.productName} will guide you all the way to a shortlist.</p>
           <div className="flex items-center gap-3">
             <Link href="/jobs/new">
               <Button>Create Job</Button>

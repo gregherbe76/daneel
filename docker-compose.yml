@@ -1,4 +1,6 @@
-# One-command local stack for Daneel / HiringAI.
+# One-command local stack for Daneel (default template). Switch the UI to the
+# HiringAI startup-tuned template by setting APP_TEMPLATE=hiringai on the api
+# service and rebuilding the web image with VITE_APP_TEMPLATE=hiringai.
 #
 # Usage (uses prebuilt images from GHCR — near-instant first boot):
 #   cp .env.example .env
@@ -54,7 +56,7 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-me}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      APP_TEMPLATE: hiringai
+      APP_TEMPLATE: daneel
     ports:
       - "3000:3000"
     healthcheck:
