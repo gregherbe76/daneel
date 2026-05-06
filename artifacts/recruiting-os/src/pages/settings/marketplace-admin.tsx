@@ -13,6 +13,7 @@ import {
   useTestProviderConnection,
   useListProviderStepSettings,
   useUpsertProviderStepSetting,
+  useGetProviderEncryptionStatus,
   getListProvidersQueryKey,
   getListProviderStepSettingsQueryKey,
 } from "@workspace/api-client-react";
@@ -69,6 +70,7 @@ import {
   Scale,
   Bot,
   KeyRound,
+  ShieldAlert,
 } from "lucide-react";
 import { track as trackTelemetry } from "@/lib/telemetry";
 import { GithubQueryPreview } from "./github-query-preview";
@@ -1045,6 +1047,61 @@ export function ProviderDialog({
 // Council-only `decision` step — that the marketplace catalog cards alone
 // don't surface.
 
+// Reads /providers/encryption-status and warns admins when saved API keys
+// haven't been re-encrypted under the new `PROVIDER_KEY_SECRET` yet — i.e.
+// they still decrypt only via `PROVIDER_KEY_SECRET_OLD` (or are legacy
+// plaintext, or are unreadable). The banner disappears once every saved key
+// is on the new primary secret, so admins know it's safe to drop OLD.
+function EncryptionRotationBanner() {
+  const { data, isLoading } = useGetProviderEncryptionStatus();
+  if (isLoading || !data) return null;
+  if (data.needsRotation === 0) return null;
+
+  const parts: string[] = [];
+  if (data.oldKey > 0) {
+    parts.push(
+      `${data.oldKey} ${data.oldKey === 1 ? "key is" : "keys are"} still readable only via PROVIDER_KEY_SECRET_OLD`,
+    );
+  }
+  if (data.plaintext > 0) {
+    parts.push(
+      `${data.plaintext} ${data.plaintext === 1 ? "key is" : "keys are"} stored as legacy plaintext`,
+    );
+  }
+  if (data.unreadable > 0) {
+    parts.push(
+      `${data.unreadable} ${data.unreadable === 1 ? "key is" : "keys are"} unreadable under any configured secret`,
+    );
+  }
+
+  return (
+    <div
+      role="alert"
+      data-testid="encryption-rotation-banner"
+      className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/30 p-4 flex gap-3"
+    >
+      <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+      <div className="text-sm">
+        <p className="font-medium text-amber-900 dark:text-amber-100">
+          Saved API keys need rotation
+        </p>
+        <p className="text-amber-800/90 dark:text-amber-100/80 mt-0.5">
+          {parts.join("; ")}. Run{" "}
+          <code className="rounded bg-amber-100 dark:bg-amber-900/50 px-1 py-0.5 text-[12px]">
+            pnpm --filter @workspace/scripts run rotate-provider-keys
+          </code>{" "}
+          to re-encrypt them under the new <code>PROVIDER_KEY_SECRET</code>.
+          Once this banner clears, it&rsquo;s safe to remove
+          {" "}<code>PROVIDER_KEY_SECRET_OLD</code>.
+        </p>
+        <p className="text-xs text-amber-800/70 dark:text-amber-100/60 mt-2">
+          On primary key: {data.primaryKey} · On old key: {data.oldKey} · Plaintext: {data.plaintext} · Unreadable: {data.unreadable}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function AdvancedProvidersSection() {
   const { data: providers = [], isLoading: loadingProviders } = useListProviders();
   const { data: stepSettings = [], isLoading: loadingSteps } = useListProviderStepSettings();
@@ -1087,6 +1144,8 @@ export function AdvancedProvidersSection() {
 
   return (
     <div className="space-y-10">
+      <EncryptionRotationBanner />
+
       {/* Marketplace section */}
       <section>
         <div className="mb-4">

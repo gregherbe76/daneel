@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   _resetProviderSecretKeyForTest,
   decryptProviderSecret,
+  describeProviderSecretEncryption,
   encryptProviderSecret,
   isEncryptedProviderSecret,
   maybeDecryptProviderSecret,
@@ -188,6 +189,45 @@ describe("provider-secrets", () => {
       expect(maybeUpgradeProviderSecretToV2(null)).toBeNull();
       expect(maybeUpgradeProviderSecretToV2(undefined)).toBeNull();
       expect(maybeUpgradeProviderSecretToV2("")).toBeNull();
+    });
+  });
+
+  describe("describeProviderSecretEncryption", () => {
+    it("reports empty for null/empty", () => {
+      expect(describeProviderSecretEncryption(null)).toBe("empty");
+      expect(describeProviderSecretEncryption(undefined)).toBe("empty");
+      expect(describeProviderSecretEncryption("")).toBe("empty");
+    });
+
+    it("reports plaintext for legacy unencrypted values", () => {
+      expect(describeProviderSecretEncryption("legacy-key")).toBe("plaintext");
+    });
+
+    it("reports primary for values encrypted under the current secret", () => {
+      const ct = encryptProviderSecret("hello");
+      expect(describeProviderSecretEncryption(ct)).toBe("primary");
+    });
+
+    it("reports old for values readable only via PROVIDER_KEY_SECRET_OLD", () => {
+      const oldCt = encryptProviderSecret("rotated");
+      process.env["PROVIDER_KEY_SECRET"] = "brand-new-secret";
+      process.env["PROVIDER_KEY_SECRET_OLD"] = "test-secret-please-change";
+      _resetProviderSecretKeyForTest();
+      expect(describeProviderSecretEncryption(oldCt)).toBe("old");
+    });
+
+    it("reports unreadable when neither key can decrypt", () => {
+      const ct = encryptProviderSecret("payload");
+      process.env["PROVIDER_KEY_SECRET"] = "wrong-primary";
+      process.env["PROVIDER_KEY_SECRET_OLD"] = "wrong-old";
+      _resetProviderSecretKeyForTest();
+      expect(describeProviderSecretEncryption(ct)).toBe("unreadable");
+    });
+
+    it("reports unreadable for malformed enc:vN values", () => {
+      expect(describeProviderSecretEncryption("enc:v1:not-enough-segments")).toBe(
+        "unreadable",
+      );
     });
   });
 

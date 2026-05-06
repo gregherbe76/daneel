@@ -814,6 +814,26 @@ paths:
               schema:
                 $ref: "#/components/schemas/AgentProviderRecord"
 
+  /providers/encryption-status:
+    get:
+      operationId: getProviderEncryptionStatus
+      tags: [providers]
+      summary: Report how saved provider keys are distributed across the keyring
+      description: >
+        Counts how many `agent_providers` rows are encrypted under the current
+        `PROVIDER_KEY_SECRET` (primary) versus the rotation-fallback
+        `PROVIDER_KEY_SECRET_OLD`, plus any rows that are still legacy
+        plaintext or fully unreadable. Powers the "saved keys still need
+        rotation" banner on the Providers settings page so admins know when
+        it's safe to remove the OLD secret.
+      responses:
+        "200":
+          description: Encryption-status counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderEncryptionStatus"
+
   /providers/{id}:
     get:
       operationId: getProvider
@@ -2982,6 +3002,33 @@ components:
           minLength: 1
           description: The new plaintext API key. Encrypted at rest by the server.
       required: [apiKeyPlaceholder]
+
+    ProviderEncryptionStatus:
+      type: object
+      description: >
+        How many `agent_providers` rows are encrypted under each key in the
+        configured keyring. `needsRotation` is the convenience sum the
+        Settings UI uses to decide whether to show the rotation banner.
+      properties:
+        totalEncrypted:
+          type: integer
+          description: Number of rows with a non-empty encrypted credential (excludes legacy plaintext).
+        primaryKey:
+          type: integer
+          description: Rows decrypting under the current `PROVIDER_KEY_SECRET`.
+        oldKey:
+          type: integer
+          description: Rows readable only via `PROVIDER_KEY_SECRET_OLD` — these need re-encryption before the OLD secret can be removed.
+        plaintext:
+          type: integer
+          description: Rows still stored as legacy plaintext (no `enc:vN:` prefix).
+        unreadable:
+          type: integer
+          description: Rows that no configured key could decrypt (corruption or missing key).
+        needsRotation:
+          type: integer
+          description: Convenience sum of `oldKey + plaintext + unreadable` — non-zero means the rotation banner should be shown.
+      required: [totalEncrypted, primaryKey, oldKey, plaintext, unreadable, needsRotation]
 
     ToggleProviderBody:
       type: object

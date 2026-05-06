@@ -76,6 +76,7 @@ import type {
   PipelineSummary,
   PreviewGithubQueryBody,
   PreviewGithubQueryResult,
+  ProviderEncryptionStatus,
   ProviderStepSettingWithProvider,
   ReplaceProviderKeyBody,
   RestoreCandidateBatchBody,
@@ -3372,6 +3373,88 @@ export const useCreateProvider = <
 > => {
   return useMutation(getCreateProviderMutationOptions(options));
 };
+
+/**
+ * Counts how many `agent_providers` rows are encrypted under the current `PROVIDER_KEY_SECRET` (primary) versus the rotation-fallback `PROVIDER_KEY_SECRET_OLD`, plus any rows that are still legacy plaintext or fully unreadable. Powers the "saved keys still need rotation" banner on the Providers settings page so admins know when it's safe to remove the OLD secret.
+
+ * @summary Report how saved provider keys are distributed across the keyring
+ */
+export const getGetProviderEncryptionStatusUrl = () => {
+  return `/api/providers/encryption-status`;
+};
+
+export const getProviderEncryptionStatus = async (
+  options?: RequestInit,
+): Promise<ProviderEncryptionStatus> => {
+  return customFetch<ProviderEncryptionStatus>(
+    getGetProviderEncryptionStatusUrl(),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetProviderEncryptionStatusQueryKey = () => {
+  return [`/api/providers/encryption-status`] as const;
+};
+
+export const getGetProviderEncryptionStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProviderEncryptionStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getProviderEncryptionStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetProviderEncryptionStatusQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getProviderEncryptionStatus>>
+  > = ({ signal }) =>
+    getProviderEncryptionStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProviderEncryptionStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetProviderEncryptionStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProviderEncryptionStatus>>
+>;
+export type GetProviderEncryptionStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Report how saved provider keys are distributed across the keyring
+ */
+
+export function useGetProviderEncryptionStatus<
+  TData = Awaited<ReturnType<typeof getProviderEncryptionStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getProviderEncryptionStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetProviderEncryptionStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Get a provider by ID

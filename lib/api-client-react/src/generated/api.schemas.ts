@@ -636,6 +636,25 @@ export interface ReplaceProviderKeyBody {
   apiKeyPlaceholder: string;
 }
 
+/**
+ * How many `agent_providers` rows are encrypted under each key in the configured keyring. `needsRotation` is the convenience sum the Settings UI uses to decide whether to show the rotation banner.
+
+ */
+export interface ProviderEncryptionStatus {
+  /** Number of rows with a non-empty encrypted credential (excludes legacy plaintext). */
+  totalEncrypted: number;
+  /** Rows decrypting under the current `PROVIDER_KEY_SECRET`. */
+  primaryKey: number;
+  /** Rows readable only via `PROVIDER_KEY_SECRET_OLD` — these need re-encryption before the OLD secret can be removed. */
+  oldKey: number;
+  /** Rows still stored as legacy plaintext (no `enc:vN:` prefix). */
+  plaintext: number;
+  /** Rows that no configured key could decrypt (corruption or missing key). */
+  unreadable: number;
+  /** Convenience sum of `oldKey + plaintext + unreadable` — non-zero means the rotation banner should be shown. */
+  needsRotation: number;
+}
+
 export interface ToggleProviderBody {
   enabled: boolean;
 }

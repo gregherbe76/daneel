@@ -318,6 +318,48 @@ export function maybeUpgradeProviderSecretToV2(
   ].join(":");
 }
 
+/**
+ * Describe which key (if any) successfully decrypts `stored`. Powers the
+ * `GET /providers/encryption-status` endpoint so admins can see, from the
+ * Settings UI, how many saved provider keys still need to be rotated under
+ * the new `PROVIDER_KEY_SECRET` before `PROVIDER_KEY_SECRET_OLD` can be
+ * removed.
+ *
+ * Possible results:
+ *   - `"empty"`        — column was null/empty (no key saved).
+ *   - `"plaintext"`    — legacy unencrypted value (no `enc:vN:` prefix);
+ *                        the rotation script will encrypt it on next run.
+ *   - `"primary"`      — decrypts under the current `PROVIDER_KEY_SECRET`.
+ *   - `"old"`          — only decrypts under `PROVIDER_KEY_SECRET_OLD`;
+ *                        a rotation pass is required before the old secret
+ *                        can be unset.
+ *   - `"unreadable"`   — neither key can decrypt the value (corruption or
+ *                        a missing key); needs operator attention.
+ */
+export type ProviderSecretEncryptionStatus =
+  | "empty"
+  | "plaintext"
+  | "primary"
+  | "old"
+  | "unreadable";
+
+export function describeProviderSecretEncryption(
+  v: string | null | undefined,
+): ProviderSecretEncryptionStatus {
+  if (v == null || v === "") return "empty";
+  if (!isEncryptedProviderSecret(v)) return "plaintext";
+  let parsed: ParsedSecret;
+  try {
+    parsed = parseEncryptedSecret(v);
+  } catch {
+    return "unreadable";
+  }
+  const { primary, old } = resolveKeyring();
+  if (tryDecryptWith(primary, parsed) !== null) return "primary";
+  if (old && tryDecryptWith(old, parsed) !== null) return "old";
+  return "unreadable";
+}
+
 /** Convenience wrappers for nullable column reads/writes. */
 export function maybeEncryptProviderSecret(
   v: string | null | undefined,

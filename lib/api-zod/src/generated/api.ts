@@ -1994,6 +1994,44 @@ export const CreateProviderBody = zod.object({
 });
 
 /**
+ * Counts how many `agent_providers` rows are encrypted under the current `PROVIDER_KEY_SECRET` (primary) versus the rotation-fallback `PROVIDER_KEY_SECRET_OLD`, plus any rows that are still legacy plaintext or fully unreadable. Powers the "saved keys still need rotation" banner on the Providers settings page so admins know when it's safe to remove the OLD secret.
+
+ * @summary Report how saved provider keys are distributed across the keyring
+ */
+export const GetProviderEncryptionStatusResponse = zod
+  .object({
+    totalEncrypted: zod
+      .number()
+      .describe(
+        "Number of rows with a non-empty encrypted credential (excludes legacy plaintext).",
+      ),
+    primaryKey: zod
+      .number()
+      .describe("Rows decrypting under the current `PROVIDER_KEY_SECRET`."),
+    oldKey: zod
+      .number()
+      .describe(
+        "Rows readable only via `PROVIDER_KEY_SECRET_OLD` — these need re-encryption before the OLD secret can be removed.",
+      ),
+    plaintext: zod
+      .number()
+      .describe("Rows still stored as legacy plaintext (no `enc:vN:` prefix)."),
+    unreadable: zod
+      .number()
+      .describe(
+        "Rows that no configured key could decrypt (corruption or missing key).",
+      ),
+    needsRotation: zod
+      .number()
+      .describe(
+        "Convenience sum of `oldKey + plaintext + unreadable` — non-zero means the rotation banner should be shown.",
+      ),
+  })
+  .describe(
+    "How many `agent_providers` rows are encrypted under each key in the configured keyring. `needsRotation` is the convenience sum the Settings UI uses to decide whether to show the rotation banner.\n",
+  );
+
+/**
  * @summary Get a provider by ID
  */
 export const GetProviderParams = zod.object({

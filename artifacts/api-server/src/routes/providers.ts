@@ -12,6 +12,7 @@ import { providerFromRow, decisionProviderFromRow } from "./workflows/providers"
 import { GithubSourcingProvider } from "./workflows/providers/github";
 import { logger } from "../lib/logger";
 import {
+  describeProviderSecretEncryption,
   encryptProviderSecret,
   lastFourOfProviderSecret,
   maybeEncryptProviderSecret,
@@ -91,6 +92,57 @@ router.post("/providers", async (req, res) => {
     })
     .returning();
   res.status(201).json(serializeRowForApi(provider!));
+});
+
+// GET /providers/encryption-status  ← must be BEFORE /providers/:id
+//
+// Surfaces, for the Settings UI, how many saved provider keys are still
+// readable only via `PROVIDER_KEY_SECRET_OLD` (i.e. need to be re-encrypted
+// under the new primary before the old secret can be removed). Also reports
+// rows that are still legacy plaintext or fully unreadable so admins know
+// when it's safe to drop the OLD secret.
+router.get("/providers/encryption-status", async (_req, res) => {
+  const rows = await db
+    .select({ apiKeyEncryptedPlaceholder: agentProvidersTable.apiKeyEncryptedPlaceholder })
+    .from(agentProvidersTable);
+
+  let totalEncrypted = 0;
+  let primaryKey = 0;
+  let oldKey = 0;
+  let plaintext = 0;
+  let unreadable = 0;
+
+  for (const row of rows) {
+    const status = describeProviderSecretEncryption(row.apiKeyEncryptedPlaceholder);
+    switch (status) {
+      case "empty":
+        break;
+      case "plaintext":
+        plaintext += 1;
+        break;
+      case "primary":
+        totalEncrypted += 1;
+        primaryKey += 1;
+        break;
+      case "old":
+        totalEncrypted += 1;
+        oldKey += 1;
+        break;
+      case "unreadable":
+        totalEncrypted += 1;
+        unreadable += 1;
+        break;
+    }
+  }
+
+  res.json({
+    totalEncrypted,
+    primaryKey,
+    oldKey,
+    plaintext,
+    unreadable,
+    needsRotation: oldKey + plaintext + unreadable,
+  });
 });
 
 // GET /providers/steps  ← must be BEFORE /providers/:id
