@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
@@ -221,6 +221,56 @@ describe("JobDetailPage pipeline — remembered email source filter", () => {
       await waitFor(() => {
         const params = new URLSearchParams(currentSearch(second.loc));
         expect(params.get("emailSource")).toBeNull();
+      });
+    },
+  );
+
+  it(
+    "calling setSelectedSources and setEmailFilter back-to-back in the " +
+      "same tick drops both URL params (no stale-closure clobber)",
+    async () => {
+      // Land with both filters active so we can observe both being cleared.
+      const { loc } = await renderJobAt(
+        "/jobs/1?emailSource=profile&email=valid",
+      );
+
+      await waitFor(() => {
+        const params = new URLSearchParams(currentSearch(loc));
+        expect(params.get("emailSource")).toBe("profile");
+        expect(params.get("email")).toBe("valid");
+      });
+
+      // Grab the status filter "All" chip BEFORE opening the source
+      // dropdown — Radix marks the rest of the page aria-hidden while the
+      // dropdown is open, which would hide the chip from accessible queries.
+      const statusGroup = screen.getByRole("group", {
+        name: /filter by email deliverability/i,
+      });
+      const allStatus = within(statusGroup).getByRole("button", {
+        name: /^all/i,
+      });
+
+      await userEvent.click(
+        screen.getByRole("button", { name: /email source/i }),
+      );
+      const clearSource = await screen.findByRole("button", {
+        name: /clear filter/i,
+      });
+
+      // Dispatch both click handlers synchronously inside one act so React 18
+      // batches the renders. Without the searchRef guard in detail.tsx, the
+      // second updateUrl call would read the pre-batch `search` and clobber
+      // the first navigate(), leaving one of the two params behind. With the
+      // guard, both updates compose and both params drop.
+      await act(async () => {
+        fireEvent.click(clearSource);
+        fireEvent.click(allStatus);
+      });
+
+      await waitFor(() => {
+        const params = new URLSearchParams(currentSearch(loc));
+        expect(params.get("emailSource")).toBeNull();
+        expect(params.get("email")).toBeNull();
       });
     },
   );
