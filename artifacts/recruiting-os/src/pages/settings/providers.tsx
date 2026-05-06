@@ -886,7 +886,7 @@ function stepLabel(step: WorkflowStep): string {
   return WORKFLOW_STEPS.find((s) => s.key === step)?.label ?? step;
 }
 
-function ScoutMarketplaceCard({ providers }: { providers: Provider[] }) {
+export function ScoutMarketplaceCard({ providers }: { providers: Provider[] }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [deleteOpen, setDeleteOpen] = useState(false);
