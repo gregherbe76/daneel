@@ -9,7 +9,16 @@ import type { CodeMatchProviderConfig } from "@workspace/db";
 import { logger } from "../../../lib/logger";
 
 const DEFAULT_BASE_URL = "https://assess.codes/api/v1";
-const REQUEST_TIMEOUT_MS = 30_000;
+// CodeMatch performs a synchronous GitHub crawl + scoring. Real evaluations
+// of mid/large accounts can take well over a minute, so we give the request
+// a generous ceiling. The validateConnection probe uses its own short
+// timeout (see VALIDATE_TIMEOUT_MS).
+const REQUEST_TIMEOUT_MS = 180_000;
+const VALIDATE_TIMEOUT_MS = 8_000;
+// Probing a guaranteed-404 username keeps validateConnection cheap — we
+// never trigger a real crawl, and the server still proves the API key
+// (would otherwise reply 401) and that the /evaluate route is alive.
+const VALIDATE_PROBE_USERNAME = "__daneel_codematch_probe_does_not_exist__";
 const USER_AGENT = "Daneel/1.0 (CodeMatch provider)";
 
 interface CodeMatchEvaluateResponse {
@@ -136,12 +145,16 @@ export class CodeMatchProvider implements EvaluationProvider {
       return { ok: false, error: "API key is not set" };
     }
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5_000);
+    const timer = setTimeout(() => controller.abort(), VALIDATE_TIMEOUT_MS);
     try {
+      // We deliberately POST a username that cannot exist so CodeMatch
+      // short-circuits to 404 (~500ms) instead of starting a multi-minute
+      // crawl on a real account. A 404 here proves both that the API key
+      // is accepted (would be 401 otherwise) and that the route is alive.
       const response = await fetch(`${this.baseUrl}/evaluate`, {
         method: "POST",
         headers: this.headers(),
-        body: JSON.stringify({ github_username: "torvalds" }),
+        body: JSON.stringify({ github_username: VALIDATE_PROBE_USERNAME }),
         signal: controller.signal,
       });
       if (response.status === 401 || response.status === 403) {
@@ -159,7 +172,10 @@ export class CodeMatchProvider implements EvaluationProvider {
       return { ok: false, error: `CodeMatch unreachable: HTTP ${response.status}` };
     } catch (err) {
       if ((err as Error)?.name === "AbortError") {
-        return { ok: false, error: "CodeMatch connection timed out after 5s" };
+        return {
+          ok: false,
+          error: `CodeMatch connection timed out after ${Math.round(VALIDATE_TIMEOUT_MS / 1000)}s`,
+        };
       }
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     } finally {
