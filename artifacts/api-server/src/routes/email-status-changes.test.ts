@@ -247,6 +247,134 @@ describe("GET /api/email-status-changes?candidateId=...", () => {
     }
   });
 
+  it("?unnotified=true returns only rows where notificationSentAt is null", async () => {
+    // Seed a fresh candidate so we can lock in exactly which rows belong
+    // to this assertion regardless of other history rows in the DB.
+    const candId = await insertCandidate({
+      name: `ESH Unnotified ${uniqueSuffix}`,
+      email: `esh-unnotified-${uniqueSuffix}@example.com`,
+    });
+    const silentRow = await insertChange({
+      candidateId: candId,
+      previousStatus: "valid",
+      newStatus: "invalid",
+      previousReason: "smtp ok",
+      newReason: "mailbox bounced",
+      changedAt: new Date(Date.now() - 10 * 60 * 1000),
+      notificationSentAt: null,
+    });
+    const notifiedRow = await insertChange({
+      candidateId: candId,
+      previousStatus: "valid",
+      newStatus: "risky",
+      previousReason: "smtp ok",
+      newReason: "catch-all detected",
+      changedAt: new Date(Date.now() - 9 * 60 * 1000),
+      notificationSentAt: new Date(Date.now() - 5 * 60 * 1000),
+    });
+
+    // Without the filter, both rows are returned.
+    const baseline = await request(app)
+      .get("/api/email-status-changes")
+      .query({ candidateId: candId });
+    expect(baseline.status).toBe(200);
+    const baselineIds = (baseline.body as Array<{ id: number }>).map((r) => r.id);
+    expect(baselineIds).toContain(silentRow.id);
+    expect(baselineIds).toContain(notifiedRow.id);
+
+    // With ?unnotified=true, the row that already pinged out is filtered away.
+    const filtered = await request(app)
+      .get("/api/email-status-changes")
+      .query({ candidateId: candId, unnotified: true });
+    expect(filtered.status).toBe(200);
+    const filteredIds = (filtered.body as Array<{ id: number }>).map(
+      (r) => r.id,
+    );
+    expect(filteredIds).toContain(silentRow.id);
+    expect(filteredIds).not.toContain(notifiedRow.id);
+    for (const r of filtered.body as Array<{ notificationSentAt: string | null }>) {
+      expect(r.notificationSentAt).toBeNull();
+    }
+  });
+
+  it("?unnotified=true combines with ?unread=true and ?candidateId=", async () => {
+    // Build a candidate with all four combinations of (notified?, read?) so we
+    // can assert AND semantics across the three filters.
+    const candId = await insertCandidate({
+      name: `ESH Combo ${uniqueSuffix}`,
+      email: `esh-combo-${uniqueSuffix}@example.com`,
+    });
+    const otherCandId = await insertCandidate({
+      name: `ESH Combo Other ${uniqueSuffix}`,
+      email: `esh-combo-other-${uniqueSuffix}@example.com`,
+    });
+
+    const mkRow = async (
+      cId: number,
+      tag: string,
+      opts: { notified: boolean; read: boolean },
+    ) => {
+      const [row] = await db
+        .insert(emailStatusChangesTable)
+        .values({
+          candidateId: cId,
+          previousStatus: "valid",
+          newStatus: "invalid",
+          previousReason: "smtp ok",
+          newReason: tag,
+          changedAt: new Date(),
+          notificationSentAt: opts.notified ? new Date() : null,
+          notifiedAt: opts.read ? new Date() : null,
+        })
+        .returning({ id: emailStatusChangesTable.id });
+      return row.id;
+    };
+
+    const silentUnread = await mkRow(candId, "silent-unread", {
+      notified: false,
+      read: false,
+    });
+    const silentRead = await mkRow(candId, "silent-read", {
+      notified: false,
+      read: true,
+    });
+    const notifiedUnread = await mkRow(candId, "notified-unread", {
+      notified: true,
+      read: false,
+    });
+    const notifiedRead = await mkRow(candId, "notified-read", {
+      notified: true,
+      read: true,
+    });
+    // A matching row on a different candidate to ensure candidateId still scopes.
+    const otherSilentUnread = await mkRow(otherCandId, "other-silent-unread", {
+      notified: false,
+      read: false,
+    });
+
+    const res = await request(app)
+      .get("/api/email-status-changes")
+      .query({ candidateId: candId, unread: true, unnotified: true });
+    expect(res.status).toBe(200);
+
+    const ids = (res.body as Array<{ id: number }>).map((r) => r.id);
+    expect(ids).toContain(silentUnread);
+    expect(ids).not.toContain(silentRead);
+    expect(ids).not.toContain(notifiedUnread);
+    expect(ids).not.toContain(notifiedRead);
+    expect(ids).not.toContain(otherSilentUnread);
+
+    for (const r of res.body as Array<{
+      notificationSentAt: string | null;
+      notifiedAt: string | null;
+      candidateId: number;
+    }>) {
+      expect(r.notificationSentAt).toBeNull();
+      expect(r.notifiedAt).toBeNull();
+      expect(r.candidateId).toBe(candId);
+    }
+  });
+
   it("count of rows for one candidate matches the badge value the UI renders", async () => {
     // The candidate detail page renders <Badge>{emailHistory.length}</Badge>
     // next to "Email status history". Lock that count in here.

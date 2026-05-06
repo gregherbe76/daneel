@@ -218,7 +218,7 @@ export default function MentionsPage() {
             })}
           </ul>
         </section>
-      ) : null}
+      )}
 
       {/* Mentions section */}
       <section>
