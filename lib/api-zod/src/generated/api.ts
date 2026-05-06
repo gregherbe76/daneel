@@ -3965,6 +3965,18 @@ export const ListJobRunsResponseItem = zod.object({
     .string()
     .nullish()
     .describe("Error message if the sourcing step failed."),
+  sourcingProviderName: zod
+    .string()
+    .nullish()
+    .describe(
+      'Display name of the sourcing provider that produced this run\'s stats (e.g. \"Apify\", \"Web Search\"). Null for legacy runs that were logged before the engine started denormalizing this onto the agent log output.\n',
+    ),
+  sourcingProviderType: zod
+    .string()
+    .nullish()
+    .describe(
+      'Provider type discriminator (e.g. \"apify\", \"websearch\", \"github\", \"native_openai_sourcing\") for the sourcing provider that produced this run\'s stats. Lets the UI render provider-specific affordances without re-fetching the provider row.\n',
+    ),
 });
 export const ListJobRunsResponse = zod.array(ListJobRunsResponseItem);
 

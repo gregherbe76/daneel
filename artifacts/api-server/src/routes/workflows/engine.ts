@@ -197,6 +197,11 @@ async function runSourcing(
       generated: candidates.length,
       saved: newCandidateIds.length,
       skippedNoIdentity,
+      // Provider name + type are denormalized onto the log output so the
+      // run-detail UI can label which provider (e.g. "Apify") produced the
+      // numbers without having to re-fetch agent_provider rows or join input.
+      providerName: provider.name,
+      providerType: provider.type,
       // Persisted so the run-detail UI can explain why a "0 candidates" run
       // was actually filtered (empty bios / stale activity) vs. a broken search.
       stats: sourcingStats,
@@ -204,6 +209,8 @@ async function runSourcing(
     return newCandidateIds;
   } catch (err) {
     await logStep(runId, "sourcing", "failed", { jobTitle: job.title, provider: provider.name }, {
+      providerName: provider.name,
+      providerType: provider.type,
       error: err instanceof Error ? err.message : String(err),
     });
     throw err;

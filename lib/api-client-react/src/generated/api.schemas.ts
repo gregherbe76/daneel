@@ -1155,6 +1155,12 @@ export interface JobRunSummary {
   sourcingSaved?: number | null;
   /** Error message if the sourcing step failed. */
   sourcingError?: string | null;
+  /** Display name of the sourcing provider that produced this run's stats (e.g. "Apify", "Web Search"). Null for legacy runs that were logged before the engine started denormalizing this onto the agent log output.
+   */
+  sourcingProviderName?: string | null;
+  /** Provider type discriminator (e.g. "apify", "websearch", "github", "native_openai_sourcing") for the sourcing provider that produced this run's stats. Lets the UI render provider-specific affordances without re-fetching the provider row.
+   */
+  sourcingProviderType?: string | null;
 }
 
 export interface AgentLog {

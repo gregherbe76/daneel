@@ -164,6 +164,8 @@ router.get("/workflows/jobs/:jobId/runs", async (req, res) => {
       stats?: unknown;
       saved?: number;
       error?: string;
+      providerName?: string;
+      providerType?: string;
     } | null;
     return {
       ...r,
@@ -171,6 +173,10 @@ router.get("/workflows/jobs/:jobId/runs", async (req, res) => {
       sourcingStats: out?.stats ?? null,
       sourcingSaved: typeof out?.saved === "number" ? out.saved : null,
       sourcingError: typeof out?.error === "string" ? out.error : null,
+      sourcingProviderName:
+        typeof out?.providerName === "string" ? out.providerName : null,
+      sourcingProviderType:
+        typeof out?.providerType === "string" ? out.providerType : null,
     };
   });
 

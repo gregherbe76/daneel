@@ -965,8 +965,11 @@ export default function JobDetailPage() {
                         saved?: number;
                         error?: string;
                         stats?: SourcingStats | null;
+                        providerName?: string;
+                        providerType?: string;
                       } | null;
                       const stats = output?.stats ?? null;
+                      const providerName = output?.providerName ?? null;
                       const totalDropped =
                         (stats?.droppedNoBio ?? 0) +
                         (stats?.droppedStale ?? 0) +
@@ -990,6 +993,14 @@ export default function JobDetailPage() {
                               {sourcingLog.status === "completed"
                                 ? `Sourcing complete — ${output?.saved ?? 0} new candidates generated`
                                 : "Sourcing step failed"}
+                              {providerName && (
+                                <span
+                                  className="ml-2 text-xs font-normal text-muted-foreground"
+                                  data-testid="sourcing-provider-name"
+                                >
+                                  via {providerName}
+                                </span>
+                              )}
                             </p>
                             {sourcingLog.status === "failed" && output?.error && (
                               <p className="text-xs text-destructive mt-1">{output.error}</p>
@@ -1128,6 +1139,14 @@ export default function JobDetailPage() {
                                       )}
                                       <span className="text-xs font-medium truncate">{label}</span>
                                       <span className="text-[11px] text-muted-foreground shrink-0">· {date}</span>
+                                      {r.sourcingProviderName && (
+                                        <span
+                                          className="text-[11px] text-muted-foreground shrink-0"
+                                          data-testid={`past-sourcing-provider-${r.id}`}
+                                        >
+                                          · {r.sourcingProviderName}
+                                        </span>
+                                      )}
                                     </div>
                                     <Badge
                                       variant="outline"
