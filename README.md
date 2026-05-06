@@ -85,7 +85,8 @@ Technical integrations, not commercial offerings of the project maintainer.
 | Connector             | Description                                                |
 | --------------------- | ---------------------------------------------------------- |
 | Twin Agent Browser    | Bring your own Twin account and templates                  |
-| Custom Webhook        | Any other HTTP service                                     |
+
+(`Custom Webhook` from the built-in table also lives here conceptually — listed once above to keep the contributor mental model simple: any HTTP endpoint speaking the provider contract is a valid Daneel provider.)
 
 ### Commercial extensions ⭐
 
