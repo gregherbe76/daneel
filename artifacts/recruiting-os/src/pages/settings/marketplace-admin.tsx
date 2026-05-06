@@ -460,7 +460,7 @@ function StepAssignmentRow({
 
 // ── provider form dialog ──────────────────────────────────────────────────────
 
-function ProviderDialog({
+export function ProviderDialog({
   open,
   onOpenChange,
   editProvider,
