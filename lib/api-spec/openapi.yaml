@@ -2665,9 +2665,14 @@ components:
         webhookUrl:
           type: string
           nullable: true
-        apiKeyEncryptedPlaceholder:
+        apiKeyLast4:
           type: string
           nullable: true
+          description: >
+            Last 4 characters of the saved API key, or null when no key is
+            stored. The full key is never returned over the wire — the
+            Settings UI shows this as a "•••• abcd" hint and exposes a
+            Replace key affordance instead of pre-populating the live value.
         config:
           allOf:
             - $ref: "#/components/schemas/AgentProviderConfig"

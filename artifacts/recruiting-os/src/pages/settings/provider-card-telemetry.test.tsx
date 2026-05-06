@@ -62,7 +62,7 @@ function makeProvider(overrides: Partial<Record<string, unknown>> = {}) {
     type: "custom_webhook",
     baseUrl: null,
     webhookUrl: "https://example.com/hook",
-    apiKeyEncryptedPlaceholder: null,
+    apiKeyLast4: null,
     config: null,
     enabled: true,
     createdAt: new Date().toISOString(),

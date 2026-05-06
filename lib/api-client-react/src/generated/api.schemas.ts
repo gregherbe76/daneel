@@ -571,7 +571,9 @@ export interface AgentProviderRecord {
   type: ProviderType;
   baseUrl?: string | null;
   webhookUrl?: string | null;
-  apiKeyEncryptedPlaceholder?: string | null;
+  /** Last 4 characters of the saved API key, or null when no key is stored. The full key is never returned over the wire — the Settings UI shows this as a "•••• abcd" hint and exposes a Replace key affordance instead of pre-populating the live value.
+   */
+  apiKeyLast4?: string | null;
   config?: AgentProviderConfig | null;
   enabled: boolean;
   createdAt: string;

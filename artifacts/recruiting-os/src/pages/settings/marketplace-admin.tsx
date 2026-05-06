@@ -90,7 +90,12 @@ interface Provider {
   type: ProviderType;
   baseUrl?: string | null;
   webhookUrl?: string | null;
-  apiKeyEncryptedPlaceholder?: string | null;
+  /**
+   * Last 4 chars of the saved API key, or null when no key is stored. The
+   * full key is never returned to the browser — see `serializeRowForApi` in
+   * `artifacts/api-server/src/routes/providers.ts`.
+   */
+  apiKeyLast4?: string | null;
   config?: {
     github?: GithubProviderConfig | null;
     web_search?: WebSearchProviderConfig | null;
@@ -441,7 +446,10 @@ function ProviderDialog({
           type: editProvider.type,
           baseUrl: editProvider.baseUrl ?? "",
           webhookUrl: editProvider.webhookUrl ?? "",
-          apiKeyPlaceholder: editProvider.apiKeyEncryptedPlaceholder ?? "",
+          // Never prefill the live API key — it isn't returned by the API.
+          // The dialog shows a "•••• last4" hint instead and only sends a
+          // value when the recruiter actually types a replacement.
+          apiKeyPlaceholder: "",
           enabled: editProvider.enabled,
           githubExtraKeywords: editProvider.config?.github?.extraKeywords ?? "",
           githubExcludeOrgs: editProvider.config?.github?.excludeOrgs ?? "",
@@ -610,11 +618,18 @@ function ProviderDialog({
                 <Input
                   {...register("apiKeyPlaceholder")}
                   type="password"
-                  placeholder="sk-council-..."
+                  placeholder={
+                    editProvider?.apiKeyLast4
+                      ? `•••• ${editProvider.apiKeyLast4} — leave blank to keep`
+                      : "sk-council-..."
+                  }
                   autoComplete="new-password"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Paste from Council → Settings → API Keys. Sent as <code className="text-xs">Authorization: Bearer …</code>; never exposed to the frontend.
+                  {editProvider?.apiKeyLast4
+                    ? "A key is already saved. Leave blank to keep it, or type a new value to replace it."
+                    : "Paste from Council → Settings → API Keys."}{" "}
+                  Sent as <code className="text-xs">Authorization: Bearer …</code>; never exposed to the frontend.
                 </p>
               </div>
               <div className="space-y-1.5">
@@ -652,10 +667,19 @@ function ProviderDialog({
               <Input
                 {...register("apiKeyPlaceholder")}
                 type="password"
-                placeholder="sk-..."
+                placeholder={
+                  editProvider?.apiKeyLast4
+                    ? `•••• ${editProvider.apiKeyLast4} — leave blank to keep`
+                    : "sk-..."
+                }
                 autoComplete="new-password"
               />
-              <p className="text-xs text-muted-foreground">Sent as <code className="text-xs">Authorization: Bearer …</code> — stored as a placeholder, never exposed to the frontend</p>
+              <p className="text-xs text-muted-foreground">
+                {editProvider?.apiKeyLast4
+                  ? "A key is already saved. Leave blank to keep it, or type a new value to replace it. "
+                  : ""}
+                Sent as <code className="text-xs">Authorization: Bearer …</code> — stored encrypted, never exposed to the frontend.
+              </p>
             </div>
           )}
 

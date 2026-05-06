@@ -11,23 +11,29 @@ import { providerFromRow, decisionProviderFromRow } from "./workflows/providers"
 import { GithubSourcingProvider } from "./workflows/providers/github";
 import { logger } from "../lib/logger";
 import {
-  maybeDecryptProviderSecret,
+  encryptProviderSecret,
+  lastFourOfProviderSecret,
   maybeEncryptProviderSecret,
 } from "../lib/provider-secrets";
 
 /**
- * Decrypt the credential before returning a provider row to API clients so
- * the Settings UI can pre-populate the edit form. The column itself stays
- * encrypted at rest.
+ * Strip the encrypted credential out of a provider row before sending it to
+ * API clients, replacing it with a `apiKeyLast4` hint so the Settings UI can
+ * render a masked placeholder like "•••• abcd" without ever exposing the
+ * live key over the wire. The column itself stays encrypted at rest.
  */
-function decryptRowForApi<T extends { apiKeyEncryptedPlaceholder?: string | null }>(
-  row: T,
-): T {
+function serializeRowForApi<
+  T extends { apiKeyEncryptedPlaceholder?: string | null },
+>(row: T): Omit<T, "apiKeyEncryptedPlaceholder"> & {
+  apiKeyLast4: string | null;
+} {
+  // Deliberately drop the encrypted column so even the ciphertext never
+  // leaves the server — clients only see the last-4 hint.
+  const { apiKeyEncryptedPlaceholder: _omit, ...rest } = row;
+  void _omit;
   return {
-    ...row,
-    apiKeyEncryptedPlaceholder: maybeDecryptProviderSecret(
-      row.apiKeyEncryptedPlaceholder,
-    ),
+    ...rest,
+    apiKeyLast4: lastFourOfProviderSecret(row.apiKeyEncryptedPlaceholder),
   };
 }
 
@@ -39,7 +45,7 @@ router.get("/providers", async (_req, res) => {
     .select()
     .from(agentProvidersTable)
     .orderBy(agentProvidersTable.createdAt);
-  res.json(providers.map(decryptRowForApi));
+  res.json(providers.map(serializeRowForApi));
 });
 
 // POST /providers
@@ -57,7 +63,7 @@ router.post("/providers", async (req, res) => {
       enabled: body.enabled ?? true,
     })
     .returning();
-  res.status(201).json(decryptRowForApi(provider!));
+  res.status(201).json(serializeRowForApi(provider!));
 });
 
 // GET /providers/steps  ← must be BEFORE /providers/:id
@@ -70,7 +76,7 @@ router.get("/providers/steps", async (_req, res) => {
     const provider = providerMap.get(s.providerId);
     return {
       ...s,
-      provider: provider ? decryptRowForApi(provider) : provider,
+      provider: provider ? serializeRowForApi(provider) : provider,
     };
   });
   res.json(result);
@@ -162,7 +168,7 @@ router.post("/providers/steps", async (req, res) => {
       .returning();
   }
 
-  res.json({ ...setting, provider: decryptRowForApi(provider) });
+  res.json({ ...setting, provider: serializeRowForApi(provider) });
 });
 
 // GET /providers/:id
@@ -176,13 +182,22 @@ router.get("/providers/:id", async (req, res) => {
     res.status(404).json({ error: "Provider not found" });
     return;
   }
-  res.json(decryptRowForApi(provider));
+  res.json(serializeRowForApi(provider));
 });
 
 // PUT /providers/:id
 router.put("/providers/:id", async (req, res) => {
   const id = parseInt(req.params.id, 10);
   const body = CreateProviderBody.parse(req.body);
+
+  // The Settings UI never pre-populates the live API key field — it only
+  // shows a "•••• last4" hint and a Replace key affordance. So an empty /
+  // null `apiKeyPlaceholder` from the client means "leave the saved key
+  // alone", not "clear the key". Only persist a new value when the body
+  // actually carries one.
+  const incomingKey = body.apiKeyPlaceholder;
+  const updateApiKey = incomingKey != null && incomingKey !== "";
+
   const [provider] = await db
     .update(agentProvidersTable)
     .set({
@@ -190,7 +205,9 @@ router.put("/providers/:id", async (req, res) => {
       type: body.type,
       baseUrl: body.baseUrl ?? null,
       webhookUrl: body.webhookUrl ?? null,
-      apiKeyEncryptedPlaceholder: maybeEncryptProviderSecret(body.apiKeyPlaceholder),
+      ...(updateApiKey
+        ? { apiKeyEncryptedPlaceholder: encryptProviderSecret(incomingKey) }
+        : {}),
       config: body.config ?? null,
       enabled: body.enabled ?? true,
       updatedAt: new Date(),
@@ -201,7 +218,7 @@ router.put("/providers/:id", async (req, res) => {
     res.status(404).json({ error: "Provider not found" });
     return;
   }
-  res.json(decryptRowForApi(provider));
+  res.json(serializeRowForApi(provider));
 });
 
 // DELETE /providers/:id
@@ -224,7 +241,7 @@ router.post("/providers/:id/toggle", async (req, res) => {
     res.status(404).json({ error: "Provider not found" });
     return;
   }
-  res.json(provider);
+  res.json(serializeRowForApi(provider));
 });
 
 // POST /providers/:id/test

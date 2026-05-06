@@ -141,3 +141,21 @@ export function maybeDecryptProviderSecret(
     return null;
   }
 }
+
+/**
+ * Return the last 4 characters of the (decrypted) provider secret so the
+ * Settings UI can show a masked hint like "•••• abcd" without ever sending
+ * the live key over the wire. Returns null when the column is empty or the
+ * secret can't be decrypted (e.g. PROVIDER_KEY_SECRET rotated without a
+ * re-encrypt run).
+ *
+ * Secrets shorter than 4 chars produce null too — emitting a partial value
+ * for tiny strings would effectively leak the whole thing.
+ */
+export function lastFourOfProviderSecret(
+  v: string | null | undefined,
+): string | null {
+  const plain = maybeDecryptProviderSecret(v);
+  if (!plain || plain.length < 4) return null;
+  return plain.slice(-4);
+}

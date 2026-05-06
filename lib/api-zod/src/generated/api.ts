@@ -1598,7 +1598,12 @@ export const ListProvidersResponseItem = zod.object({
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
-  apiKeyEncryptedPlaceholder: zod.string().nullish(),
+  apiKeyLast4: zod
+    .string()
+    .nullish()
+    .describe(
+      'Last 4 characters of the saved API key, or null when no key is stored. The full key is never returned over the wire — the Settings UI shows this as a \"•••• abcd\" hint and exposes a Replace key affordance instead of pre-populating the live value.\n',
+    ),
   config: zod
     .object({
       github: zod
@@ -1928,7 +1933,12 @@ export const GetProviderResponse = zod.object({
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
-  apiKeyEncryptedPlaceholder: zod.string().nullish(),
+  apiKeyLast4: zod
+    .string()
+    .nullish()
+    .describe(
+      'Last 4 characters of the saved API key, or null when no key is stored. The full key is never returned over the wire — the Settings UI shows this as a \"•••• abcd\" hint and exposes a Replace key affordance instead of pre-populating the live value.\n',
+    ),
   config: zod
     .object({
       github: zod
@@ -2254,7 +2264,12 @@ export const UpdateProviderResponse = zod.object({
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
-  apiKeyEncryptedPlaceholder: zod.string().nullish(),
+  apiKeyLast4: zod
+    .string()
+    .nullish()
+    .describe(
+      'Last 4 characters of the saved API key, or null when no key is stored. The full key is never returned over the wire — the Settings UI shows this as a \"•••• abcd\" hint and exposes a Replace key affordance instead of pre-populating the live value.\n',
+    ),
   config: zod
     .object({
       github: zod
@@ -2433,7 +2448,12 @@ export const ToggleProviderResponse = zod.object({
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
-  apiKeyEncryptedPlaceholder: zod.string().nullish(),
+  apiKeyLast4: zod
+    .string()
+    .nullish()
+    .describe(
+      'Last 4 characters of the saved API key, or null when no key is stored. The full key is never returned over the wire — the Settings UI shows this as a \"•••• abcd\" hint and exposes a Replace key affordance instead of pre-populating the live value.\n',
+    ),
   config: zod
     .object({
       github: zod
@@ -2716,7 +2736,12 @@ export const ListProviderStepSettingsResponseItem = zod.object({
     ]),
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
-    apiKeyEncryptedPlaceholder: zod.string().nullish(),
+    apiKeyLast4: zod
+      .string()
+      .nullish()
+      .describe(
+        'Last 4 characters of the saved API key, or null when no key is stored. The full key is never returned over the wire — the Settings UI shows this as a \"•••• abcd\" hint and exposes a Replace key affordance instead of pre-populating the live value.\n',
+      ),
     config: zod
       .object({
         github: zod
@@ -2911,7 +2936,12 @@ export const UpsertProviderStepSettingResponse = zod.object({
     ]),
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
-    apiKeyEncryptedPlaceholder: zod.string().nullish(),
+    apiKeyLast4: zod
+      .string()
+      .nullish()
+      .describe(
+        'Last 4 characters of the saved API key, or null when no key is stored. The full key is never returned over the wire — the Settings UI shows this as a \"•••• abcd\" hint and exposes a Replace key affordance instead of pre-populating the live value.\n',
+      ),
     config: zod
       .object({
         github: zod
