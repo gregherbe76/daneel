@@ -116,6 +116,20 @@ events that are short-circuited by consent/dev/missing-key never appear. This
 gives recruiters a way to verify the no-PII guarantee themselves without
 opening dev tools.
 
+### Downloading the buffer as a JSON audit log
+
+The Recent events section also includes a **Download JSON** button that
+exports the current in-memory buffer as `telemetry-recent-events.json` for
+sharing with security/legal/privacy reviewers. The exported file matches the
+in-memory buffer 1:1 and contains only:
+
+- `event` — the event name (one of the six allow-listed names)
+- `timestamp` — the ISO 8601 UTC timestamp of the event
+- `payloadKeys` — the sorted list of payload key names (never the values)
+
+No raw payload values, no candidate data, no JD content. The button is
+disabled when the buffer is empty.
+
 ## Implementation pointers
 
 - Wrapper module: `artifacts/recruiting-os/src/lib/telemetry.ts`

@@ -71,6 +71,21 @@ export function getRecentEvents(): readonly RecentTelemetryEntry[] {
   return recentBuffer.slice();
 }
 
+/**
+ * Builds the JSON-safe export payload for the in-memory recent-events ring
+ * buffer. The shape is intentionally a plain array of `{event, timestamp,
+ * payloadKeys}` entries so that the exported file matches `getRecentEvents()`
+ * 1:1 — only event names, timestamps, and sorted payload key names, never the
+ * raw payload values.
+ */
+export function buildRecentEventsExport(): RecentTelemetryEntry[] {
+  return recentBuffer.map((entry) => ({
+    event: entry.event,
+    timestamp: entry.timestamp,
+    payloadKeys: entry.payloadKeys.slice(),
+  }));
+}
+
 export function subscribeRecentEvents(listener: () => void): () => void {
   recentListeners.add(listener);
   return () => {

@@ -382,6 +382,123 @@ describe("telemetry — recent events ring buffer", () => {
   });
 });
 
+describe("telemetry — buildRecentEventsExport()", () => {
+  it("returns an empty array when nothing has been tracked yet", async () => {
+    const t = await loadTelemetry({
+      DEV: false,
+      VITE_POSTHOG_KEY: "phc_test_key",
+    });
+    expect(t.buildRecentEventsExport()).toEqual([]);
+  });
+
+  it(
+    "returns a JSON-safe array that matches the in-memory ring buffer 1:1 — " +
+      "same length, same order, and only event/timestamp/payloadKeys per entry",
+    async () => {
+      const t = await loadTelemetry({
+        DEV: false,
+        VITE_POSTHOG_KEY: "phc_test_key",
+      });
+      t.setConsent(true);
+      await flushMicrotasks();
+
+      t.track("provider_connected", {
+        provider: "Custom Webhook",
+        workflow_step: "candidate_matching",
+      });
+      t.track("workflow_started");
+      t.track("provider_card_viewed", { provider: "GitHub Agent" });
+
+      const buffer = t.getRecentEvents();
+      const exported = t.buildRecentEventsExport();
+
+      // 1:1 with the in-memory buffer.
+      expect(exported).toHaveLength(buffer.length);
+      expect(exported).toEqual(
+        buffer.map((e) => ({
+          event: e.event,
+          timestamp: e.timestamp,
+          payloadKeys: e.payloadKeys,
+        })),
+      );
+
+      // Survives a JSON round-trip without losing or gaining fields.
+      const roundTripped = JSON.parse(JSON.stringify(exported));
+      expect(roundTripped).toEqual(exported);
+
+      // Every entry exposes exactly the three allow-listed top-level fields.
+      for (const entry of exported) {
+        expect(Object.keys(entry).sort()).toEqual([
+          "event",
+          "payloadKeys",
+          "timestamp",
+        ]);
+      }
+    },
+  );
+
+  it(
+    "never exposes raw payload values in the export — even when callers passed " +
+      "PII-shaped fields, only the (already-stripped) sorted key names are present",
+    async () => {
+      const t = await loadTelemetry({
+        DEV: false,
+        VITE_POSTHOG_KEY: "phc_test_key",
+      });
+      t.setConsent(true);
+      await flushMicrotasks();
+
+      (t.track as unknown as (
+        e: string,
+        p?: Record<string, unknown>,
+      ) => void)("workflow_started", {
+        provider: "GitHub Agent",
+        workflow_step: "sourcing",
+        candidateEmail: "alice@example.com",
+        candidateName: "Alice Example",
+        jobDescription: "secret JD body",
+      });
+
+      const exported = t.buildRecentEventsExport();
+      expect(exported).toHaveLength(1);
+      expect(exported[0].payloadKeys).toEqual([
+        "provider",
+        "timestamp",
+        "workflow_step",
+      ]);
+
+      const serialized = JSON.stringify(exported);
+      expect(serialized).not.toContain("alice@example.com");
+      expect(serialized).not.toContain("Alice Example");
+      expect(serialized).not.toContain("secret JD body");
+      expect(serialized).not.toContain("GitHub Agent");
+      expect(serialized).not.toContain("candidateEmail");
+    },
+  );
+
+  it("returns a defensive copy — mutating the export does not affect the buffer", async () => {
+    const t = await loadTelemetry({
+      DEV: false,
+      VITE_POSTHOG_KEY: "phc_test_key",
+    });
+    t.setConsent(true);
+    await flushMicrotasks();
+
+    t.track("workflow_started");
+    const exported = t.buildRecentEventsExport();
+    exported.push({
+      event: "workflow_completed",
+      timestamp: "tampered",
+      payloadKeys: ["nope"],
+    });
+    exported[0].payloadKeys.push("tampered-key");
+
+    const fresh = t.buildRecentEventsExport();
+    expect(fresh).toHaveLength(1);
+    expect(fresh[0].payloadKeys).toEqual(["timestamp"]);
+  });
+});
+
 describe("telemetry — compile-time payload guard", () => {
   it("rejects forbidden payload keys and unknown event names at compile time", async () => {
     const t = await loadTelemetry({

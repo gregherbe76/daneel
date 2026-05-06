@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
-import { BarChart3, ChevronDown } from "lucide-react";
+import { BarChart3, ChevronDown, Download } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   Collapsible,
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/collapsible";
 import { SettingsTabs } from "@/components/settings-tabs";
 import {
+  buildRecentEventsExport,
   getConsent,
   getRecentEvents,
   setConsent,
@@ -46,6 +48,21 @@ export default function TelemetrySettingsPage() {
   const onToggle = (next: boolean) => {
     setConsent(next);
     setLocalConsent(next ? "granted" : "denied");
+  };
+
+  const onDownload = () => {
+    const payload = buildRecentEventsExport();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "telemetry-recent-events.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -125,7 +142,20 @@ export default function TelemetrySettingsPage() {
               />
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="border-t border-border px-5 py-4">
+              <div className="border-t border-border px-5 py-4 space-y-4">
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onDownload}
+                    disabled={recent.length === 0}
+                    data-testid="recent-events-download"
+                  >
+                    <Download className="h-3.5 w-3.5 mr-1.5" />
+                    Download JSON
+                  </Button>
+                </div>
                 {recent.length === 0 ? (
                   <p
                     className="text-xs text-muted-foreground"
