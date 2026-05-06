@@ -59,6 +59,7 @@ type ProviderRecord = {
     github?: GithubProviderConfig | null;
     web_search?: WebSearchProviderConfig | null;
     twin_agent?: TwinAgentProviderConfig | null;
+    apify?: ApifyProviderConfig | null;
   } | null;
 };
 
@@ -80,6 +81,14 @@ interface WebSearchProviderConfig {
 interface TwinAgentProviderConfig {
   baseUrl?: string | null;
   streaming?: boolean | null;
+}
+
+interface ApifyProviderConfig {
+  actorId?: string | null;
+  extraKeywords?: string | null;
+  targetSites?: string[] | null;
+  excludeSites?: string[] | null;
+  resultsPerPage?: number | null;
 }
 
 type WorkflowStep =
@@ -349,6 +358,13 @@ function ConnectDialog({
   const [twinBaseUrl, setTwinBaseUrl] = useState("");
   const [twinStreaming, setTwinStreaming] = useState(false);
 
+  // Apify tuning
+  const [apifyActorId, setApifyActorId] = useState("");
+  const [apifyExtraKeywords, setApifyExtraKeywords] = useState("");
+  const [apifyTargetSites, setApifyTargetSites] = useState("");
+  const [apifyExcludeSites, setApifyExcludeSites] = useState("");
+  const [apifyResultsPerPage, setApifyResultsPerPage] = useState("");
+
   const existing = useMemo(() => {
     if (!entry) return null;
     return findProviderForEntry(entry, providers);
@@ -386,6 +402,16 @@ function ConnectDialog({
       const cfg = existing?.config?.twin_agent ?? null;
       setTwinBaseUrl(cfg?.baseUrl ?? "");
       setTwinStreaming(cfg?.streaming === true);
+    }
+    if (entry.connectType === "apify") {
+      const cfg = existing?.config?.apify ?? null;
+      setApifyActorId(cfg?.actorId ?? "");
+      setApifyExtraKeywords(cfg?.extraKeywords ?? "");
+      setApifyTargetSites(cfg?.targetSites?.join(", ") ?? "");
+      setApifyExcludeSites(cfg?.excludeSites?.join(", ") ?? "");
+      setApifyResultsPerPage(
+        cfg?.resultsPerPage != null ? String(cfg.resultsPerPage) : "",
+      );
     }
   }, [open, entry, existing]);
 
@@ -504,6 +530,19 @@ function ConnectDialog({
             "Paste your Twin API key from twin.aplayer.ai → Settings to enable agent-browsed sourcing.",
         });
       } else if (entry.connectType === "apify") {
+        const apifyConfig: ApifyProviderConfig = {
+          actorId: apifyActorId.trim() || null,
+          extraKeywords: apifyExtraKeywords.trim() || null,
+          targetSites: splitSites(apifyTargetSites),
+          excludeSites: splitSites(apifyExcludeSites),
+          resultsPerPage: parsePositiveInt(apifyResultsPerPage),
+        };
+        const hasApifyConfig =
+          !!apifyConfig.actorId ||
+          !!apifyConfig.extraKeywords ||
+          (apifyConfig.targetSites && apifyConfig.targetSites.length > 0) ||
+          (apifyConfig.excludeSites && apifyConfig.excludeSites.length > 0) ||
+          apifyConfig.resultsPerPage != null;
         const payload = {
           name: "Apify Scrapers",
           type: "apify" as const,
@@ -512,7 +551,7 @@ function ConnectDialog({
           apiKeyPlaceholder: apiKey
             ? apiKey
             : existing?.apiKeyPlaceholder ?? null,
-          config: null,
+          config: hasApifyConfig ? { apify: apifyConfig } : null,
           enabled: true,
         };
         if (existing) {
@@ -791,23 +830,108 @@ function ConnectDialog({
         )}
 
         {entry.connectType === "apify" && (
-          <div className="space-y-2">
-            <Label htmlFor="apify-key">Apify API token</Label>
-            <Input
-              id="apify-key"
-              type="password"
-              placeholder="apify_api_…"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              autoComplete="new-password"
-              data-testid="apify-key"
-            />
-            <p className="text-xs text-muted-foreground">
-              The token is sent to the Apify API as <code className="text-xs">Authorization: Bearer …</code>.
-              You can override it by setting the <code className="text-xs">APIFY_TOKEN</code> env
-              secret on the API server. Then assign Apify to the sourcing step in Workflow Step
-              Assignments.
-            </p>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="apify-key">Apify API token</Label>
+              <Input
+                id="apify-key"
+                type="password"
+                placeholder="apify_api_…"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                autoComplete="new-password"
+                data-testid="apify-key"
+              />
+              <p className="text-xs text-muted-foreground">
+                The token is sent to the Apify API as <code className="text-xs">Authorization: Bearer …</code>.
+                You can override it by setting the <code className="text-xs">APIFY_TOKEN</code> env
+                secret on the API server. Then assign Apify to the sourcing step in Workflow Step
+                Assignments.
+              </p>
+            </div>
+
+            <AdvancedToggle open={advancedOpen} onToggle={setAdvancedOpen} />
+
+            {advancedOpen && (
+              <div
+                className="space-y-3 rounded-md border border-border p-3"
+                data-testid="apify-advanced"
+              >
+                <div className="space-y-1.5">
+                  <Label>Actor ID</Label>
+                  <Input
+                    placeholder="apify/google-search-scraper"
+                    value={apifyActorId}
+                    onChange={(e) => setApifyActorId(e.target.value)}
+                    data-testid="apify-actor-id"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Defaults to <code className="text-xs">apify/google-search-scraper</code> for
+                    broad Boolean queries. Other compatible actors:{" "}
+                    <code className="text-xs">curious_coder/linkedin-people-search-scraper</code>{" "}
+                    for dedicated LinkedIn sourcing, or{" "}
+                    <code className="text-xs">apify/bing-search-scraper</code> as a Google
+                    alternative. The actor must return rows shaped like Google organic results
+                    (<code className="text-xs">title</code>, <code className="text-xs">url</code>,{" "}
+                    <code className="text-xs">description</code>) — either flat or nested under{" "}
+                    <code className="text-xs">organicResults[]</code>.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Extra keywords</Label>
+                  <Input
+                    placeholder="e.g. remote fintech open-source"
+                    value={apifyExtraKeywords}
+                    onChange={(e) => setApifyExtraKeywords(e.target.value)}
+                    data-testid="apify-extra-keywords"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Free-text terms appended verbatim to every query.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Target sites</Label>
+                  <Input
+                    placeholder="e.g. linkedin.com/in, github.com"
+                    value={apifyTargetSites}
+                    onChange={(e) => setApifyTargetSites(e.target.value)}
+                    data-testid="apify-target-sites"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated. Defaults to <code className="text-xs">linkedin.com/in</code>{" "}
+                    and <code className="text-xs">github.com</code> when empty.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Exclude sites</Label>
+                  <Input
+                    placeholder="e.g. pinterest.com, slideshare.net"
+                    value={apifyExcludeSites}
+                    onChange={(e) => setApifyExcludeSites(e.target.value)}
+                    data-testid="apify-exclude-sites"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Comma-separated domains dropped via{" "}
+                    <code className="text-xs">-site:</code>.
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Max results per run</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={100}
+                    placeholder="20"
+                    value={apifyResultsPerPage}
+                    onChange={(e) => setApifyResultsPerPage(e.target.value)}
+                    data-testid="apify-results-per-page"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Caps the dataset size the actor returns. Defaults to 20; max 100.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
