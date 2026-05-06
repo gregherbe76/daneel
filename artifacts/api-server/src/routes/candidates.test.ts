@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import express from "express";
 import { eq, inArray, isNull } from "drizzle-orm";
 import { db, candidatesTable } from "@workspace/db";
+import { RETENTION_MS } from "../lib/candidate-trash";
 import candidatesRouter from "./candidates";
 
 // Mounted on /api so the route paths in this test match the production prefix.
@@ -31,7 +32,7 @@ afterEach(async () => {
 // Tiny helper to call an express handler with JSON in/out without pulling in
 // a supertest dependency.
 async function call(
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "DELETE",
   url: string,
   body?: unknown,
 ): Promise<{ status: number; body: any }> {
@@ -176,5 +177,185 @@ describe("bulk delete + restore", () => {
     const visibleIds = visible.map((r) => r.id);
     expect(visibleIds).toContain(live.id);
     expect(visibleIds).not.toContain(trashed.id);
+  });
+});
+
+describe("trash bin endpoints", () => {
+  it("GET /candidates/trash returns the listed rows with daysRemaining + batchSize", async () => {
+    const a = await seedCandidate("trash-list-a");
+    const b = await seedCandidate("trash-list-b");
+    const solo = await seedCandidate("trash-list-solo");
+    seededIds.push(a.id, b.id, solo.id);
+
+    // Two rows in one bulk batch, one separate single-row delete.
+    const bulk = await call("POST", "/api/candidates/bulk", {
+      ids: [a.id, b.id],
+      action: "delete",
+    });
+    expect(bulk.status).toBe(200);
+    const batchId = bulk.body.deletionBatchId as string;
+
+    const soloDel = await call("POST", "/api/candidates/bulk", {
+      ids: [solo.id],
+      action: "delete",
+    });
+    const soloBatchId = soloDel.body.deletionBatchId as string;
+
+    const trash = await call("GET", "/api/candidates/trash");
+    expect(trash.status).toBe(200);
+    expect(trash.body.retentionDays).toBe(
+      Math.floor(RETENTION_MS / (24 * 60 * 60 * 1000)),
+    );
+
+    const items = trash.body.items as Array<{
+      id: number;
+      deletionBatchId: string | null;
+      batchSize: number;
+      daysRemaining: number;
+    }>;
+    const byId = new Map(items.map((i) => [i.id, i]));
+
+    const aRow = byId.get(a.id);
+    const bRow = byId.get(b.id);
+    const soloRow = byId.get(solo.id);
+    expect(aRow).toBeDefined();
+    expect(bRow).toBeDefined();
+    expect(soloRow).toBeDefined();
+
+    // Two rows that share the bulk batch report a batchSize of 2; the
+    // solo-deleted row's batch only contains itself.
+    expect(aRow!.deletionBatchId).toBe(batchId);
+    expect(bRow!.deletionBatchId).toBe(batchId);
+    expect(aRow!.batchSize).toBe(2);
+    expect(bRow!.batchSize).toBe(2);
+    expect(soloRow!.deletionBatchId).toBe(soloBatchId);
+    expect(soloRow!.batchSize).toBe(1);
+
+    // Just deleted -> daysRemaining is one short of the full retention
+    // window (Math.floor on a value slightly less than RETENTION_MS / day,
+    // since `now` has advanced microseconds past `deletedAt`). It must be
+    // within [retentionDays - 1, retentionDays].
+    const retentionDays = Math.floor(
+      RETENTION_MS / (24 * 60 * 60 * 1000),
+    );
+    expect(aRow!.daysRemaining).toBeGreaterThanOrEqual(retentionDays - 1);
+    expect(aRow!.daysRemaining).toBeLessThanOrEqual(retentionDays);
+  });
+
+  it("GET /candidates/trash collapses daysRemaining to 0 for rows about to purge", async () => {
+    const stale = await seedCandidate("trash-stale");
+    seededIds.push(stale.id);
+
+    // Soft-delete via the API, then back-date deletedAt to "almost expired"
+    // so the daysRemaining math collapses to 0 without us having to wait.
+    await call("POST", "/api/candidates/bulk", {
+      ids: [stale.id],
+      action: "delete",
+    });
+    const almostExpired = new Date(Date.now() - RETENTION_MS + 60_000);
+    await db
+      .update(candidatesTable)
+      .set({ deletedAt: almostExpired })
+      .where(eq(candidatesTable.id, stale.id));
+
+    const trash = await call("GET", "/api/candidates/trash");
+    const item = (trash.body.items as Array<{ id: number; daysRemaining: number }>).find(
+      (i) => i.id === stale.id,
+    );
+    expect(item).toBeDefined();
+    expect(item!.daysRemaining).toBe(0);
+  });
+
+  it("POST /candidates/restore-by-id only restores rows with deletedAt IS NOT NULL", async () => {
+    const trashed = await seedCandidate("restore-trashed");
+    const live = await seedCandidate("restore-live");
+    seededIds.push(trashed.id, live.id);
+
+    await call("POST", "/api/candidates/bulk", {
+      ids: [trashed.id],
+      action: "delete",
+    });
+
+    // `live` has never been deleted — the restore call should silently skip
+    // it rather than touching the row.
+    const liveBefore = (
+      await db
+        .select()
+        .from(candidatesTable)
+        .where(eq(candidatesTable.id, live.id))
+    )[0]!;
+
+    const restored = await call("POST", "/api/candidates/restore-by-id", {
+      ids: [trashed.id, live.id],
+    });
+    expect(restored.status).toBe(200);
+    expect(restored.body.restored).toBe(1);
+
+    const after = await db
+      .select()
+      .from(candidatesTable)
+      .where(inArray(candidatesTable.id, [trashed.id, live.id]));
+    const byId = new Map(after.map((r) => [r.id, r]));
+    expect(byId.get(trashed.id)?.deletedAt).toBeNull();
+    expect(byId.get(trashed.id)?.deletionBatchId).toBeNull();
+    // Live row's updatedAt was NOT bumped — proof the WHERE filtered it out.
+    expect(byId.get(live.id)?.deletedAt).toBeNull();
+    expect(byId.get(live.id)?.updatedAt?.getTime()).toBe(
+      liveBefore.updatedAt?.getTime(),
+    );
+  });
+
+  it("POST /candidates/restore-by-id de-duplicates ids in the request", async () => {
+    const trashed = await seedCandidate("restore-dedupe");
+    seededIds.push(trashed.id);
+
+    await call("POST", "/api/candidates/bulk", {
+      ids: [trashed.id],
+      action: "delete",
+    });
+
+    const restored = await call("POST", "/api/candidates/restore-by-id", {
+      ids: [trashed.id, trashed.id, trashed.id],
+    });
+    // Even though we passed the id three times, the DB row only flips back
+    // once and the response reports a single restore.
+    expect(restored.body.restored).toBe(1);
+  });
+
+  it("DELETE /candidates/trash hard-deletes every soft-deleted row in one shot", async () => {
+    const a = await seedCandidate("empty-a");
+    const b = await seedCandidate("empty-b");
+    const live = await seedCandidate("empty-live");
+    seededIds.push(a.id, b.id, live.id);
+
+    await call("POST", "/api/candidates/bulk", {
+      ids: [a.id, b.id],
+      action: "delete",
+    });
+
+    const empty = await call("DELETE", "/api/candidates/trash");
+    expect(empty.status).toBe(200);
+    expect(empty.body.ok).toBe(true);
+    expect(empty.body.purged).toBeGreaterThanOrEqual(2);
+
+    const remaining = await db
+      .select({ id: candidatesTable.id })
+      .from(candidatesTable)
+      .where(inArray(candidatesTable.id, [a.id, b.id, live.id]));
+    const remainingIds = remaining.map((r) => r.id);
+    // The two trashed rows are gone; the never-deleted row is untouched.
+    expect(remainingIds).not.toContain(a.id);
+    expect(remainingIds).not.toContain(b.id);
+    expect(remainingIds).toContain(live.id);
+
+    // Drop the hard-deleted ids so afterEach doesn't try to clean them up.
+    seededIds.length = 0;
+    seededIds.push(live.id);
+
+    // The trash listing should be effectively empty for our test rows now.
+    const trash = await call("GET", "/api/candidates/trash");
+    const trashedIds = (trash.body.items as Array<{ id: number }>).map((i) => i.id);
+    expect(trashedIds).not.toContain(a.id);
+    expect(trashedIds).not.toContain(b.id);
   });
 });
