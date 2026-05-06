@@ -7,6 +7,7 @@ import { memoryLocation } from "wouter/memory-location";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // ── Mutable in-memory trash store driving the mocked hooks ───────────────
+type AttachedJob = { id: number; title: string; exists: boolean };
 type TrashRow = {
   id: number;
   name: string;
@@ -19,6 +20,8 @@ type TrashRow = {
   deletionBatchId: string | null;
   batchSize: number;
   daysRemaining: number;
+  attachedJobs: AttachedJob[];
+  archivedJobCount: number;
 };
 
 const STATE = vi.hoisted(() => ({
@@ -33,6 +36,8 @@ const STATE = vi.hoisted(() => ({
     deletedAt: string;
     deletionBatchId: string | null;
     daysRemaining: number;
+    attachedJobs: Array<{ id: number; title: string; exists: boolean }>;
+    archivedJobCount: number;
   }>,
   retentionDays: 7,
   listeners: new Set<() => void>(),
@@ -133,6 +138,14 @@ beforeEach(() => {
       deletedAt: new Date().toISOString(),
       deletionBatchId: "batch-bulk",
       daysRemaining: 6,
+      // Alice's snapshot has one live job and one archived/deleted job —
+      // the row should render the warning badge and the toast description
+      // should call out the lost pipeline context.
+      attachedJobs: [
+        { id: 100, title: "Staff Engineer", exists: true },
+        { id: 101, title: "Closed Role", exists: false },
+      ],
+      archivedJobCount: 1,
     },
     {
       id: 2,
@@ -145,6 +158,8 @@ beforeEach(() => {
       deletedAt: new Date().toISOString(),
       deletionBatchId: "batch-bulk",
       daysRemaining: 6,
+      attachedJobs: [{ id: 100, title: "Staff Engineer", exists: true }],
+      archivedJobCount: 0,
     },
     {
       id: 3,
@@ -157,6 +172,11 @@ beforeEach(() => {
       deletedAt: new Date().toISOString(),
       deletionBatchId: "batch-solo",
       daysRemaining: 6,
+      // Sam was deleted with no job attachments at all — the row should
+      // show "Not attached to any jobs at delete time" and the restore
+      // toast should still surface a description (no silent undefined).
+      attachedJobs: [],
+      archivedJobCount: 0,
     },
   ];
   toastSpy.mockClear();
@@ -197,9 +217,69 @@ describe("TrashPage", () => {
     // The other rows in the same batch are untouched.
     expect(screen.getByTestId("trash-row-2")).toBeInTheDocument();
     expect(screen.getByTestId("trash-row-3")).toBeInTheDocument();
-    // The user got a confirmation toast naming the candidate they restored.
+    // The user got a confirmation toast naming the candidate they restored,
+    // AND the toast description echoed back the lost-pipeline warning so the
+    // recruiter sees the same context they saw on the row before clicking.
     expect(toastSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ title: expect.stringMatching(/Alice Anderson/) }),
+      expect.objectContaining({
+        title: expect.stringMatching(/Alice Anderson/),
+        description: expect.stringMatching(/1 archived\/deleted/i),
+      }),
+    );
+  });
+
+  it("renders the attachment warning badge for rows with archived/deleted jobs", () => {
+    renderPage();
+
+    // Alice has one live job + one archived/deleted job → the row should
+    // show the live chip, the archived chip with the lost-job title, and
+    // the amber "1 archived/deleted" warning badge.
+    const aliceRow = screen.getByTestId("trash-row-1");
+    expect(
+      within(aliceRow).getByTestId("attached-job-live-1-100"),
+    ).toHaveTextContent("Staff Engineer");
+    expect(
+      within(aliceRow).getByTestId("attached-job-archived-1-101"),
+    ).toHaveTextContent("Closed Role");
+    expect(
+      within(aliceRow).getByTestId("archived-jobs-badge-1"),
+    ).toHaveTextContent(/1 archived\/deleted/i);
+
+    // Bob's only attached job is still live → no warning badge.
+    const bobRow = screen.getByTestId("trash-row-2");
+    expect(
+      within(bobRow).queryByTestId("archived-jobs-badge-2"),
+    ).not.toBeInTheDocument();
+
+    // Sam was deleted with zero attachments → "Not attached to any jobs"
+    // message renders (so recruiters know restoring will yield a
+    // pipeline-less candidate) and no warning badge.
+    const samRow = screen.getByTestId("trash-row-3");
+    expect(
+      within(samRow).getByText(/not attached to any jobs at delete time/i),
+    ).toBeInTheDocument();
+    expect(
+      within(samRow).queryByTestId("archived-jobs-badge-3"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("restore toast description always renders, including the no-attachments case", async () => {
+    renderPage();
+
+    await userEvent.click(screen.getByTestId("restore-3"));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("trash-row-3")).not.toBeInTheDocument(),
+    );
+    // Sam had no attachments — the toast should still surface a sentence
+    // (no silent undefined description).
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringMatching(/Solo Sam/),
+        description: expect.stringMatching(
+          /not attached to any jobs at delete time/i,
+        ),
+      }),
     );
   });
 

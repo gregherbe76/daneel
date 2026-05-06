@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, real, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, real, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { isNull, sql, type SQL } from "drizzle-orm";
 import { z } from "zod/v4";
@@ -48,6 +48,14 @@ export const candidatesTable = pgTable(
     // than restoring unrelated rows that happen to be in the trash).
     deletedAt: timestamp("deleted_at"),
     deletionBatchId: text("deletion_batch_id"),
+    // Snapshot of the candidate's job attachments at the moment of soft-delete.
+    // Recorded so the Trash view can show pipeline context ("attached to N
+    // jobs, M now archived/deleted") even after a job has been hard-deleted
+    // and the cascade dropped the application row. Cleared back to null on
+    // restore. Null on legacy rows soft-deleted before this column existed.
+    deletedAttachmentSnapshot: jsonb("deleted_attachment_snapshot").$type<
+      Array<{ jobId: number; title: string }>
+    >(),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },

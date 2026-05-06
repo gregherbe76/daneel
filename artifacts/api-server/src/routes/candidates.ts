@@ -148,12 +148,40 @@ router.get("/candidates/trash", async (_req, res) => {
       );
     }
   }
+  // Look up which jobs from each candidate's delete-time snapshot still
+  // exist. The snapshot is the authoritative source for "originally attached
+  // to N jobs" — we cannot derive it from the live applications table because
+  // the FK cascade drops application rows when their job is hard-deleted.
+  // Comparing the snapshot against the current jobs table tells us exactly
+  // which originally-attached jobs were archived/deleted while the candidate
+  // sat in the trash, which is the warning the Trash UI surfaces.
+  const allSnapshotJobIds = new Set<number>();
+  for (const r of rows) {
+    for (const att of r.deletedAttachmentSnapshot ?? []) {
+      allSnapshotJobIds.add(att.jobId);
+    }
+  }
+  const liveJobIds = new Set<number>();
+  if (allSnapshotJobIds.size > 0) {
+    const liveRows = await db
+      .select({ id: jobsTable.id })
+      .from(jobsTable)
+      .where(inArray(jobsTable.id, Array.from(allSnapshotJobIds)));
+    for (const lr of liveRows) liveJobIds.add(lr.id);
+  }
   const now = Date.now();
   const items = rows.map((r) => {
     const deletedAtMs = r.deletedAt ? r.deletedAt.getTime() : now;
     const purgeAt = deletedAtMs + RETENTION_MS;
     const msRemaining = Math.max(0, purgeAt - now);
     const daysRemaining = Math.floor(msRemaining / (24 * 60 * 60 * 1000));
+    const snapshot = r.deletedAttachmentSnapshot ?? [];
+    const attachedJobs = snapshot.map((s) => ({
+      id: s.jobId,
+      title: s.title,
+      exists: liveJobIds.has(s.jobId),
+    }));
+    const archivedJobCount = attachedJobs.filter((j) => !j.exists).length;
     return {
       id: r.id,
       name: r.name,
@@ -166,6 +194,8 @@ router.get("/candidates/trash", async (_req, res) => {
       deletionBatchId: r.deletionBatchId ?? null,
       batchSize: r.deletionBatchId ? (batchCounts.get(r.deletionBatchId) ?? 1) : 1,
       daysRemaining,
+      attachedJobs,
+      archivedJobCount,
     };
   });
   res.json({
@@ -199,6 +229,10 @@ router.post("/candidates/restore-by-id", async (req, res) => {
     .set({
       deletedAt: null,
       deletionBatchId: null,
+      // Clear the delete-time attachment snapshot — it's only meaningful
+      // while the row sits in trash. Leaving stale data behind would confuse
+      // a future delete cycle that re-snapshots into the same column.
+      deletedAttachmentSnapshot: null,
       updatedAt: new Date(),
     })
     .where(
@@ -276,17 +310,51 @@ router.put("/candidates/:id", async (req, res) => {
   res.json(candidate);
 });
 
+// Snapshot a candidate's job attachments at delete time. Stored on the
+// candidates row as `deletedAttachmentSnapshot` so the Trash view can show
+// "originally attached to N jobs (M now archived/deleted)" even after a job
+// has been hard-deleted and the FK cascade dropped the application row. We
+// snapshot only `{ jobId, title }` (no stage, no notes) — the warning is
+// informational, not a backup.
+async function snapshotAttachmentsForCandidates(
+  candidateIds: number[],
+): Promise<Map<number, Array<{ jobId: number; title: string }>>> {
+  const result = new Map<number, Array<{ jobId: number; title: string }>>();
+  if (candidateIds.length === 0) return result;
+  const rows = await db
+    .select({
+      candidateId: applicationsTable.candidateId,
+      jobId: applicationsTable.jobId,
+      jobTitle: jobsTable.title,
+    })
+    .from(applicationsTable)
+    .innerJoin(jobsTable, eq(applicationsTable.jobId, jobsTable.id))
+    .where(inArray(applicationsTable.candidateId, candidateIds));
+  for (const r of rows) {
+    const list = result.get(r.candidateId) ?? [];
+    // De-dupe per (candidateId, jobId) — a candidate may have multiple
+    // applications to the same job and we only want to surface distinct jobs.
+    if (!list.some((j) => j.jobId === r.jobId)) {
+      list.push({ jobId: r.jobId, title: r.jobTitle });
+    }
+    result.set(r.candidateId, list);
+  }
+  return result;
+}
+
 // Delete a candidate. Mirrors the bulk soft-delete behavior so a single-row
 // delete from the candidate detail page is just as recoverable as a bulk one
 // — the trash sweeper will hard-delete it after the retention window.
 router.delete("/candidates/:id", async (req, res) => {
   const { id } = DeleteCandidateParams.parse({ id: Number(req.params.id) });
   const now = new Date();
+  const snapshots = await snapshotAttachmentsForCandidates([id]);
   await db
     .update(candidatesTable)
     .set({
       deletedAt: now,
       deletionBatchId: randomUUID(),
+      deletedAttachmentSnapshot: snapshots.get(id) ?? [],
       updatedAt: now,
     })
     .where(and(eq(candidatesTable.id, id), activeCandidateFilter));
@@ -336,20 +404,34 @@ router.post("/candidates/bulk", async (req, res) => {
     // the retention window unfairly).
     const deletionBatchId = randomUUID();
     const now = new Date();
-    const deleted = await db
-      .update(candidatesTable)
-      .set({
-        deletedAt: now,
-        deletionBatchId,
-        updatedAt: now,
-      })
-      .where(
-        and(
-          inArray(candidatesTable.id, ids),
-          activeCandidateFilter,
-        ),
-      )
-      .returning({ id: candidatesTable.id });
+    // Identify which ids will actually be flipped (filtering out already
+    // soft-deleted rows) so we only snapshot — and persist snapshots for —
+    // candidates we're really sending to the trash. Doing this up front lets
+    // us write each row's per-candidate snapshot in the same UPDATE chain
+    // below.
+    const eligibleRows = await db
+      .select({ id: candidatesTable.id })
+      .from(candidatesTable)
+      .where(and(inArray(candidatesTable.id, ids), activeCandidateFilter));
+    const eligibleIds = eligibleRows.map((r) => r.id);
+    const snapshots = await snapshotAttachmentsForCandidates(eligibleIds);
+    // Per-candidate UPDATE so we can stamp each row with its own attachment
+    // snapshot. Bulk requests are capped well below the level where this
+    // would matter for latency.
+    const deleted: Array<{ id: number }> = [];
+    for (const cid of eligibleIds) {
+      const updated = await db
+        .update(candidatesTable)
+        .set({
+          deletedAt: now,
+          deletionBatchId,
+          deletedAttachmentSnapshot: snapshots.get(cid) ?? [],
+          updatedAt: now,
+        })
+        .where(and(eq(candidatesTable.id, cid), activeCandidateFilter))
+        .returning({ id: candidatesTable.id });
+      if (updated[0]) deleted.push(updated[0]);
+    }
     res.json({
       ok: true,
       action: body.action,
@@ -504,6 +586,10 @@ router.post("/candidates/restore", async (req, res) => {
     .set({
       deletedAt: null,
       deletionBatchId: null,
+      // Same rationale as restore-by-id: clear the snapshot once the row is
+      // back in the recruiter's pipeline so it's not re-served by a future
+      // Trash GET if the candidate gets re-deleted.
+      deletedAttachmentSnapshot: null,
       updatedAt: new Date(),
     })
     .where(eq(candidatesTable.deletionBatchId, body.deletionBatchId))

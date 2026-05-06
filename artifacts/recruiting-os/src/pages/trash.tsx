@@ -22,7 +22,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Undo2, Loader2, AlertTriangle } from "lucide-react";
+import { Trash2, Undo2, Loader2, AlertTriangle, Briefcase } from "lucide-react";
 
 function formatDeletedAt(input: string | Date): string {
   const d = typeof input === "string" ? new Date(input) : input;
@@ -80,10 +80,47 @@ export default function TrashPage() {
     ]);
   };
 
-  const handleRestoreOne = async (id: number, name: string) => {
+  // Build a one-line "attached to X jobs (Y archived)" summary that the
+  // restore toast can echo back, so the recruiter sees what pipeline state
+  // they just brought a candidate (or batch) back into.
+  const summarizeAttachments = (
+    rows: Array<{
+      attachedJobs?: Array<{ exists: boolean }>;
+      archivedJobCount?: number;
+    }>,
+  ): string => {
+    // Defensive defaults match the row UI — see the note in the row render
+    // about legacy / version-skew payloads. Do NOT crash the toast just
+    // because the snapshot column is missing.
+    const total = rows.reduce(
+      (n, r) => n + (r.attachedJobs?.length ?? 0),
+      0,
+    );
+    const archived = rows.reduce(
+      (n, r) => n + (r.archivedJobCount ?? 0),
+      0,
+    );
+    // Always return a sentence — including for the "no attachments" case —
+    // so the restore toast surfaces the same context the recruiter saw on
+    // the row before clicking, instead of falling back to a bare title.
+    if (total === 0) return "Was not attached to any jobs at delete time.";
+    const base = `Originally attached to ${total} job${total === 1 ? "" : "s"}`;
+    return archived > 0
+      ? `${base} — ${archived} archived/deleted while in trash, restored without that pipeline context.`
+      : `${base}, all still active.`;
+  };
+
+  const handleRestoreOne = async (
+    id: number,
+    name: string,
+    row: (typeof items)[number],
+  ) => {
     const res = await restore.mutateAsync({ data: { ids: [id] } });
     if (res.restored > 0) {
-      toast({ title: `Restored ${name}` });
+      toast({
+        title: `Restored ${name}`,
+        description: summarizeAttachments([row]),
+      });
     } else {
       toast({
         title: "Nothing to restore",
@@ -94,10 +131,14 @@ export default function TrashPage() {
     await refreshLists();
   };
 
-  const handleRestoreBatch = async (ids: number[]) => {
+  const handleRestoreBatch = async (
+    ids: number[],
+    rows: Array<(typeof items)[number]>,
+  ) => {
     const res = await restore.mutateAsync({ data: { ids } });
     toast({
       title: `Restored ${res.restored} candidate${res.restored === 1 ? "" : "s"}`,
+      description: summarizeAttachments(rows),
     });
     await refreshLists();
   };
@@ -178,7 +219,12 @@ export default function TrashPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleRestoreBatch(batchRows.map((r) => r.id))}
+                      onClick={() =>
+                        handleRestoreBatch(
+                          batchRows.map((r) => r.id),
+                          batchRows,
+                        )
+                      }
                       disabled={isMutating}
                       data-testid={`restore-batch-${batch.batchId}`}
                     >
@@ -214,6 +260,71 @@ export default function TrashPage() {
                           {row.headline ? ` · ${row.headline}` : ""}
                           {row.currentCompany ? ` · ${row.currentCompany}` : ""}
                         </div>
+                        {/* Pipeline-context warning: tells the recruiter how
+                            many jobs the candidate will land back in if
+                            restored, and flags any that have been
+                            archived/deleted while the candidate was in the
+                            trash. The amber row appears even when 0 jobs
+                            remain (so the recruiter knows the restored
+                            candidate will sit pipeline-less). */}
+                        <div
+                          className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs"
+                          data-testid={`attached-jobs-${row.id}`}
+                        >
+                          <Briefcase className="h-3 w-3 text-muted-foreground" />
+                          {/* Defensive defaults so legacy rows or version-skew
+                              payloads (no snapshot column yet) don't crash
+                              the page — they just render "no jobs at delete
+                              time" instead. */}
+                          {(() => {
+                            const attached = row.attachedJobs ?? [];
+                            return attached.length === 0 ? (
+                              <span className="text-muted-foreground">
+                                Not attached to any jobs at delete time
+                              </span>
+                            ) : (
+                              <>
+                                <span className="text-muted-foreground">
+                                  Originally attached to {attached.length} job
+                                  {attached.length === 1 ? "" : "s"}
+                                </span>
+                                {attached.slice(0, 3).map((j) => (
+                                  <Badge
+                                    key={j.id}
+                                    variant="secondary"
+                                    className={
+                                      j.exists
+                                        ? "font-normal"
+                                        : "font-normal line-through opacity-70"
+                                    }
+                                    title={
+                                      j.exists
+                                        ? undefined
+                                        : "This job has been archived/deleted while the candidate was in the trash."
+                                    }
+                                    data-testid={
+                                      j.exists
+                                        ? `attached-job-live-${row.id}-${j.id}`
+                                        : `attached-job-archived-${row.id}-${j.id}`
+                                    }
+                                  >
+                                    {j.title}
+                                  </Badge>
+                                ))}
+                              </>
+                            );
+                          })()}
+                          {(row.archivedJobCount ?? 0) > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="border-amber-300 text-amber-700 dark:text-amber-400"
+                              data-testid={`archived-jobs-badge-${row.id}`}
+                            >
+                              <AlertTriangle className="mr-1 h-3 w-3" />
+                              {row.archivedJobCount} archived/deleted
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-xs text-muted-foreground mb-1">
@@ -224,7 +335,7 @@ export default function TrashPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleRestoreOne(row.id, row.name)}
+                          onClick={() => handleRestoreOne(row.id, row.name, row)}
                           disabled={isMutating}
                           data-testid={`restore-${row.id}`}
                         >

@@ -340,6 +340,14 @@ export interface EmptyCandidateTrashResult {
   purged: number;
 }
 
+export type TrashedCandidateAttachedJobsItem = {
+  id: number;
+  /** Job title captured at delete time. Stable even after the underlying job is deleted. */
+  title: string;
+  /** True when the job is still in the jobs table at GET time; false when it has been archived/deleted since the candidate was trashed. */
+  exists: boolean;
+};
+
 /**
  * A soft-deleted candidate row exposed via the Trash view, augmented with retention metadata.
  */
@@ -359,6 +367,12 @@ export interface TrashedCandidate {
   batchSize: number;
   /** Whole days left before the trash sweeper hard-deletes this row. Floored to 0 for rows already past the retention window but not yet swept. */
   daysRemaining: number;
+  /** Snapshot of the jobs this candidate was attached to at the moment they were sent to the trash. Captured from a delete-time snapshot on the candidates row — NOT from the live `applications` table — so the list survives even if a job is hard-deleted while the candidate sits in trash. `exists: false` means the originally-attached job has since been archived/deleted; the recruiter should expect a candidate restored without that pipeline context. Empty array (and a zero `archivedJobCount`) means the candidate had no attachments at delete time, or was soft-deleted before this column existed (legacy rows).
+   */
+  attachedJobs: TrashedCandidateAttachedJobsItem[];
+  /** How many of `attachedJobs` point at jobs that have been archived/deleted while the candidate was in the trash (i.e. `attachedJobs.filter(j => !j.exists).length`). The Trash UI uses this to render the "N archived/deleted" warning badge and the corresponding restore-toast description.
+   */
+  archivedJobCount: number;
 }
 
 export interface Application {

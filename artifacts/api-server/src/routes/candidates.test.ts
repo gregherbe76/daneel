@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import express from "express";
 import { eq, inArray, isNull } from "drizzle-orm";
-import { db, candidatesTable } from "@workspace/db";
+import {
+  db,
+  candidatesTable,
+  jobsTable,
+  applicationsTable,
+} from "@workspace/db";
 import { RETENTION_MS } from "../lib/candidate-trash";
 import candidatesRouter from "./candidates";
 
@@ -320,6 +325,161 @@ describe("trash bin endpoints", () => {
     // Even though we passed the id three times, the DB row only flips back
     // once and the response reports a single restore.
     expect(restored.body.restored).toBe(1);
+  });
+
+  it("GET /candidates/trash exposes attachedJobs and flags archived/deleted ones", async () => {
+    const cand = await seedCandidate("trash-attached-jobs");
+    seededIds.push(cand.id);
+
+    // One live job + one job we'll delete to simulate "the originally-attached
+    // job was archived/deleted in the meantime". We can't soft-delete a job
+    // (no archived flag in the schema today), so a hard-delete + cascade is
+    // the equivalent in-the-wild scenario the recruiter sees.
+    const [liveJob] = await db
+      .insert(jobsTable)
+      .values({
+        title: `${TEST_MARKER}live job`,
+        description: "live",
+        location: "Remote",
+        seniority: "Mid",
+      })
+      .returning();
+    const [doomedJob] = await db
+      .insert(jobsTable)
+      .values({
+        title: `${TEST_MARKER}doomed job`,
+        description: "doomed",
+        location: "Remote",
+        seniority: "Mid",
+      })
+      .returning();
+
+    await db.insert(applicationsTable).values([
+      { candidateId: cand.id, jobId: liveJob!.id, stage: "Sourced" },
+      { candidateId: cand.id, jobId: doomedJob!.id, stage: "Sourced" },
+    ]);
+
+    await call("POST", "/api/candidates/bulk", {
+      ids: [cand.id],
+      action: "delete",
+    });
+
+    // First read: both jobs still exist, so the snapshot taken at delete
+    // time reports two originally-attached jobs and zero archived/deleted
+    // ones.
+    const trashBefore = await call("GET", "/api/candidates/trash");
+    const beforeRow = (
+      trashBefore.body.items as Array<{
+        id: number;
+        attachedJobs: Array<{ id: number; title: string; exists: boolean }>;
+        archivedJobCount: number;
+      }>
+    ).find((i) => i.id === cand.id);
+    expect(beforeRow).toBeDefined();
+    expect(beforeRow!.attachedJobs).toHaveLength(2);
+    expect(beforeRow!.archivedJobCount).toBe(0);
+    expect(beforeRow!.attachedJobs.every((j) => j.exists)).toBe(true);
+    // Snapshot includes both job titles, sorted by insertion order.
+    const beforeTitles = beforeRow!.attachedJobs.map((j) => j.title).sort();
+    expect(beforeTitles).toEqual(
+      [`${TEST_MARKER}live job`, `${TEST_MARKER}doomed job`].sort(),
+    );
+
+    // Hard-delete the doomed job. The FK cascade drops the live application
+    // row, but the snapshot stamped on the candidate row at delete time is
+    // independent of the applications table — so the trash payload still
+    // reports the original count of 2, with `archivedJobCount: 1` flagging
+    // exactly the job that vanished. This is the real product warning the
+    // task asks for.
+    await db.delete(jobsTable).where(eq(jobsTable.id, doomedJob!.id));
+
+    const trashAfter = await call("GET", "/api/candidates/trash");
+    const afterRow = (
+      trashAfter.body.items as Array<{
+        id: number;
+        attachedJobs: Array<{ id: number; title: string; exists: boolean }>;
+        archivedJobCount: number;
+      }>
+    ).find((i) => i.id === cand.id);
+    expect(afterRow).toBeDefined();
+    expect(afterRow!.attachedJobs).toHaveLength(2);
+    expect(afterRow!.archivedJobCount).toBe(1);
+    const live = afterRow!.attachedJobs.find((j) => j.exists);
+    const lost = afterRow!.attachedJobs.find((j) => !j.exists);
+    expect(live).toBeDefined();
+    expect(live!.id).toBe(liveJob!.id);
+    expect(live!.title).toBe(`${TEST_MARKER}live job`);
+    expect(lost).toBeDefined();
+    expect(lost!.id).toBe(doomedJob!.id);
+    expect(lost!.title).toBe(`${TEST_MARKER}doomed job`);
+
+    // Cleanup the live job (afterEach handles the candidate row).
+    await db.delete(jobsTable).where(eq(jobsTable.id, liveJob!.id));
+  });
+
+  it("clears the attachment snapshot on restore so a future delete starts fresh", async () => {
+    const cand = await seedCandidate("trash-snapshot-clear");
+    seededIds.push(cand.id);
+
+    const [job] = await db
+      .insert(jobsTable)
+      .values({
+        title: `${TEST_MARKER}snapshot-clear job`,
+        description: "x",
+        location: "Remote",
+        seniority: "Mid",
+      })
+      .returning();
+    await db.insert(applicationsTable).values({
+      candidateId: cand.id,
+      jobId: job!.id,
+      stage: "Sourced",
+    });
+
+    // First trash → snapshot captured.
+    await call("POST", "/api/candidates/bulk", {
+      ids: [cand.id],
+      action: "delete",
+    });
+    let row = (
+      await db
+        .select()
+        .from(candidatesTable)
+        .where(eq(candidatesTable.id, cand.id))
+    )[0]!;
+    expect(row.deletedAttachmentSnapshot).toEqual([
+      { jobId: job!.id, title: `${TEST_MARKER}snapshot-clear job` },
+    ]);
+
+    // Restore (by id) → snapshot must be cleared so a future delete does
+    // not serve stale pipeline context.
+    await call("POST", "/api/candidates/restore-by-id", { ids: [cand.id] });
+    row = (
+      await db
+        .select()
+        .from(candidatesTable)
+        .where(eq(candidatesTable.id, cand.id))
+    )[0]!;
+    expect(row.deletedAttachmentSnapshot).toBeNull();
+
+    // Detach the candidate from the job, then trash again → the new
+    // snapshot is empty (proves we didn't reuse the stale one).
+    await db
+      .delete(applicationsTable)
+      .where(eq(applicationsTable.candidateId, cand.id));
+    await call("POST", "/api/candidates/bulk", {
+      ids: [cand.id],
+      action: "delete",
+    });
+    row = (
+      await db
+        .select()
+        .from(candidatesTable)
+        .where(eq(candidatesTable.id, cand.id))
+    )[0]!;
+    expect(row.deletedAttachmentSnapshot).toEqual([]);
+
+    await db.delete(jobsTable).where(eq(jobsTable.id, job!.id));
   });
 
   it("DELETE /candidates/trash hard-deletes every soft-deleted row in one shot", async () => {
