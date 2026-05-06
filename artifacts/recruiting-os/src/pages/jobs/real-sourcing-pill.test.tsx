@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { Router } from "wouter";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { Route, Router, Switch } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -119,13 +119,24 @@ async function renderJobsListAt(initialPath: string) {
     defaultOptions: { queries: { retry: false } },
   });
   const { default: JobsPage } = await import("./index");
-  return render(
+  const utils = render(
     <QueryClientProvider client={queryClient}>
       <Router hook={loc.hook}>
-        <JobsPage />
+        <Switch>
+          <Route path="/jobs" component={JobsPage} />
+          <Route path="/jobs/:id">
+            {(params) => (
+              <div data-testid="job-detail-stub">job-detail:{params.id}</div>
+            )}
+          </Route>
+          <Route path="/settings/marketplace">
+            <div data-testid="marketplace-stub">marketplace</div>
+          </Route>
+        </Switch>
       </Router>
     </QueryClientProvider>,
   );
+  return { ...utils, location: loc };
 }
 
 async function renderJobDetailAt(initialPath: string) {
@@ -164,6 +175,30 @@ describe("JobsPage — Real sourcing ready / Demo mode pill", () => {
 
     expect(await screen.findByText("Demo mode")).toBeDefined();
     expect(screen.queryByText("Real sourcing ready")).toBeNull();
+  });
+
+  it("opens an explanatory popover with a Marketplace CTA when the Demo mode pill is clicked, without navigating to the job", async () => {
+    state.jobs = [makeJob({ id: 7, hasRealSourcingProvider: false })];
+    const { location } = await renderJobsListAt("/jobs");
+
+    const trigger = await screen.findByTestId("real-sourcing-pill-demo");
+    fireEvent.pointerDown(trigger, { button: 0 });
+    fireEvent.click(trigger);
+
+    // Critical: clicking the pill must NOT bubble up to the parent <Link>
+    // wrapping the job card, otherwise the popover is unreachable.
+    expect(location.history[location.history.length - 1]).toBe("/jobs");
+    expect(screen.queryByTestId("job-detail-stub")).toBeNull();
+
+    const popover = await screen.findByTestId(
+      "real-sourcing-pill-demo-popover",
+    );
+    expect(popover.textContent ?? "").toContain("Demo mode");
+    expect(popover.textContent ?? "").toContain("No real sourcing provider");
+
+    const cta = await screen.findByTestId("real-sourcing-pill-demo-cta");
+    expect(cta.getAttribute("href")).toBe("/settings/marketplace");
+    expect(cta.textContent ?? "").toContain("Configure real sourcing");
   });
 });
 
