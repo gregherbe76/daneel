@@ -3,6 +3,7 @@ import { db, agentProvidersTable, workflowProviderSettingsTable, jobsTable } fro
 import { eq } from "drizzle-orm";
 import {
   CreateProviderBody,
+  ReplaceProviderKeyBody,
   ToggleProviderBody,
   UpsertProviderStepSettingBody,
   PreviewGithubQueryBody,
@@ -255,6 +256,31 @@ router.delete("/providers/:id", async (req, res) => {
   const id = parseInt(req.params.id, 10);
   await db.delete(agentProvidersTable).where(eq(agentProvidersTable.id, id));
   res.status(204).send();
+});
+
+// POST /providers/:id/replace-key
+//
+// Tiny rotation endpoint: updates only the encrypted API key column on a
+// stored provider, leaving every other field (name, type, baseUrl, config,
+// enabled, …) untouched. Backs the "Replace key" mini-action on the Settings
+// → Providers card so admins can rotate a key without re-typing the whole
+// provider form.
+router.post("/providers/:id/replace-key", async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { apiKeyPlaceholder } = ReplaceProviderKeyBody.parse(req.body);
+  const [provider] = await db
+    .update(agentProvidersTable)
+    .set({
+      apiKeyEncryptedPlaceholder: encryptProviderSecret(apiKeyPlaceholder),
+      updatedAt: new Date(),
+    })
+    .where(eq(agentProvidersTable.id, id))
+    .returning();
+  if (!provider) {
+    res.status(404).json({ error: "Provider not found" });
+    return;
+  }
+  res.json(serializeRowForApi(provider));
 });
 
 // POST /providers/:id/toggle

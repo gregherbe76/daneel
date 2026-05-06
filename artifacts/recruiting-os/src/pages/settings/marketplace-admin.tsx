@@ -9,6 +9,7 @@ import {
   useUpdateProvider,
   useDeleteProvider,
   useToggleProvider,
+  useReplaceProviderKey,
   useTestProviderConnection,
   useListProviderStepSettings,
   useUpsertProviderStepSetting,
@@ -67,6 +68,7 @@ import {
   Globe,
   Scale,
   Bot,
+  KeyRound,
 } from "lucide-react";
 import { track as trackTelemetry } from "@/lib/telemetry";
 import { GithubQueryPreview } from "./github-query-preview";
@@ -230,6 +232,88 @@ function TestResult({ ok, error, latencyMs }: { ok: boolean; error?: string | nu
   );
 }
 
+// ── replace-key mini dialog ──────────────────────────────────────────────────
+//
+// Tiny rotation flow: opens from the provider card, asks for ONLY the new
+// API key, and POSTs to /providers/:id/replace-key. Lets admins rotate a
+// stored key without re-typing the rest of the provider form.
+function ReplaceKeyDialog({
+  provider,
+  open,
+  onOpenChange,
+}: {
+  provider: Provider;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+}) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const replaceKey = useReplaceProviderKey();
+  const [value, setValue] = useState("");
+
+  // Clear the field whenever the dialog is closed so the next open starts
+  // fresh — important since the input holds a sensitive secret.
+  useEffect(() => {
+    if (!open) setValue("");
+  }, [open]);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    try {
+      await replaceKey.mutateAsync({ id: provider.id, data: { apiKeyPlaceholder: trimmed } });
+      qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
+      toast({ title: "Key replaced", description: `${provider.name} is now using the new API key.` });
+      onOpenChange(false);
+    } catch (err) {
+      toast({
+        title: "Couldn't replace key",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Replace API key</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={onSubmit} className="space-y-3">
+          <div>
+            <Label htmlFor="replace-key-input" className="text-sm">
+              New API key for <span className="font-medium">{provider.name}</span>
+            </Label>
+            <Input
+              id="replace-key-input"
+              type="password"
+              autoComplete="off"
+              autoFocus
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder={provider.apiKeyLast4 ? `Replaces •••• ${provider.apiKeyLast4}` : "Paste the new key"}
+              className="mt-1.5"
+            />
+            <p className="text-xs text-muted-foreground mt-1.5">
+              Only the API key changes. Other settings on this provider stay the same.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!value.trim() || replaceKey.isPending}>
+              {replaceKey.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Replace key"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── provider card ────────────────────────────────────────────────────────────
 
 function ProviderCard({
@@ -245,6 +329,7 @@ function ProviderCard({
   const { toast } = useToast();
   const [testResult, setTestResult] = useState<{ ok: boolean; error?: string | null; latencyMs?: number | null } | null>(null);
   const [testing, setTesting] = useState(false);
+  const [replaceKeyOpen, setReplaceKeyOpen] = useState(false);
 
   const toggle = useToggleProvider();
   const testConn = useTestProviderConnection();
@@ -330,6 +415,28 @@ function ProviderCard({
         </div>
       </div>
 
+      {provider.apiKeyLast4 && (
+        <div
+          className="mt-3 flex items-center justify-between gap-3 text-xs"
+          data-testid={`provider-key-row-${provider.id}`}
+        >
+          <span className="text-muted-foreground font-mono">
+            •••• {provider.apiKeyLast4}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1.5 text-xs"
+            onClick={() => setReplaceKeyOpen(true)}
+            data-testid={`provider-replace-key-${provider.id}`}
+          >
+            <KeyRound className="h-3 w-3" />
+            Replace key
+          </Button>
+        </div>
+      )}
+
       <div className="mt-4 flex items-center gap-3">
         <Button
           variant="outline"
@@ -351,6 +458,12 @@ function ProviderCard({
         </Button>
         {testResult && <TestResult {...testResult} />}
       </div>
+
+      <ReplaceKeyDialog
+        provider={provider}
+        open={replaceKeyOpen}
+        onOpenChange={setReplaceKeyOpen}
+      />
     </div>
   );
 }

@@ -624,6 +624,18 @@ export interface CreateProviderBody {
   enabled?: boolean;
 }
 
+/**
+ * Body for the "Replace key" mini-action on the provider card. Carries only the new API key — every other column on the provider row is left untouched on the server.
+
+ */
+export interface ReplaceProviderKeyBody {
+  /**
+   * The new plaintext API key. Encrypted at rest by the server.
+   * @minLength 1
+   */
+  apiKeyPlaceholder: string;
+}
+
 export interface ToggleProviderBody {
   enabled: boolean;
 }

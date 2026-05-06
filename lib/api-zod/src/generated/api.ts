@@ -2682,6 +2682,192 @@ export const ToggleProviderResponse = zod.object({
 });
 
 /**
+ * Tiny rotation endpoint used by the Settings → Providers card. Updates only the encrypted API key column — name / type / config / baseUrl / webhookUrl / enabled are left untouched. The full PUT endpoint still works for non-key fields.
+
+ * @summary Replace just the API key on a stored provider
+ */
+export const ReplaceProviderKeyParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ReplaceProviderKeyBody = zod
+  .object({
+    apiKeyPlaceholder: zod
+      .string()
+      .min(1)
+      .describe("The new plaintext API key. Encrypted at rest by the server."),
+  })
+  .describe(
+    'Body for the \"Replace key\" mini-action on the provider card. Carries only the new API key — every other column on the provider row is left untouched on the server.\n',
+  );
+
+export const ReplaceProviderKeyResponse = zod.object({
+  id: zod.number(),
+  name: zod.string(),
+  type: zod.enum([
+    "native_openai",
+    "custom_webhook",
+    "twin_webhook",
+    "github",
+    "web_search",
+    "apify",
+    "council",
+    "twin_agent",
+  ]),
+  baseUrl: zod.string().nullish(),
+  webhookUrl: zod.string().nullish(),
+  apiKeyLast4: zod
+    .string()
+    .nullish()
+    .describe(
+      'Last 4 characters of the saved API key, or null when no key is stored. The full key is never returned over the wire — the Settings UI shows this as a \"•••• abcd\" hint and exposes a Replace key affordance instead of pre-populating the live value.\n',
+    ),
+  config: zod
+    .object({
+      github: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the search query (e.g. \"open source\", \"fintech\").',
+            ),
+          excludeOrgs: zod
+            .string()
+            .nullish()
+            .describe(
+              'Comma- or space-separated GitHub org\/user logins to exclude from results (e.g. \"google, microsoft\").',
+            ),
+          minFollowers: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum follower count (adds `followers:>=N` to the query).",
+            ),
+          minRepos: zod
+            .number()
+            .nullish()
+            .describe(
+              "Minimum public repo count (adds `repos:>=N` to the query).",
+            ),
+          requireBio: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "Drop candidates with empty profile bios (post-fetch filter).",
+            ),
+          activeWithinMonths: zod
+            .number()
+            .nullish()
+            .describe(
+              "Drop candidates whose latest public event is older than N months (post-fetch filter).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the GitHub Agent's user-search query.",
+        ),
+      web_search: zod
+        .object({
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              'Free-text keywords appended verbatim to the Google query (e.g. \"remote\", \"fintech\").',
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              'Domains\/paths excluded via `-site:` operators (e.g. \"pinterest.com\").',
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Web Search (SerpAPI) provider's Google query.",
+        ),
+      apify: zod
+        .object({
+          actorId: zod
+            .string()
+            .nullish()
+            .describe(
+              "Apify actor ID (e.g. `apify\/google-search-scraper`). Defaults to\nthe Google Search Scraper actor — its organic-result schema is\ncompatible with the shared `extractCandidates` extractor.\n",
+            ),
+          extraKeywords: zod
+            .string()
+            .nullish()
+            .describe(
+              "Free-text keywords appended verbatim to the constructed Boolean query.",
+            ),
+          targetSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe(
+              "Sites the search should focus on, joined as `(site:a OR site:b ...)`. Defaults to\n`linkedin.com\/in` and `github.com` when empty\/omitted.\n",
+            ),
+          excludeSites: zod
+            .array(zod.string())
+            .nullish()
+            .describe("Domains\/paths excluded via `-site:` operators."),
+          resultsPerPage: zod
+            .number()
+            .nullish()
+            .describe(
+              "Results per page to ask the actor for (caps dataset size per run).",
+            ),
+        })
+        .optional()
+        .describe("Recruiter-tunable knobs for the Apify Scrapers provider."),
+      council: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Council backend base URL. Defaults to Council's hosted prod deployment when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Council decision provider. The Council\nAPI key flows through the existing `apiKeyPlaceholder` field on the\nprovider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
+      twin_agent: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Twin backend base URL. Defaults to Twin's hosted prod deployment when omitted.",
+            ),
+          streaming: zod
+            .boolean()
+            .nullish()
+            .describe(
+              "When true, open an SSE stream to receive partial candidate cards as Twin's browser agent finds them. Defaults to false (sync JSON response).",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
+    })
+    .describe(
+      "Per-provider tuning knobs. Only the section matching the provider type is read.",
+    )
+    .nullish(),
+  enabled: zod.boolean(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
  * @summary Test a provider connection
  */
 export const TestProviderConnectionParams = zod.object({

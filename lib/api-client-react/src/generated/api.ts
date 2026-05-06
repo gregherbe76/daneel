@@ -77,6 +77,7 @@ import type {
   PreviewGithubQueryBody,
   PreviewGithubQueryResult,
   ProviderStepSettingWithProvider,
+  ReplaceProviderKeyBody,
   RestoreCandidateBatchBody,
   RestoreCandidateBatchResult,
   RestoreCandidatesByIdBody,
@@ -3715,6 +3716,95 @@ export const useToggleProvider = <
   TContext
 > => {
   return useMutation(getToggleProviderMutationOptions(options));
+};
+
+/**
+ * Tiny rotation endpoint used by the Settings → Providers card. Updates only the encrypted API key column — name / type / config / baseUrl / webhookUrl / enabled are left untouched. The full PUT endpoint still works for non-key fields.
+
+ * @summary Replace just the API key on a stored provider
+ */
+export const getReplaceProviderKeyUrl = (id: number) => {
+  return `/api/providers/${id}/replace-key`;
+};
+
+export const replaceProviderKey = async (
+  id: number,
+  replaceProviderKeyBody: ReplaceProviderKeyBody,
+  options?: RequestInit,
+): Promise<AgentProviderRecord> => {
+  return customFetch<AgentProviderRecord>(getReplaceProviderKeyUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(replaceProviderKeyBody),
+  });
+};
+
+export const getReplaceProviderKeyMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof replaceProviderKey>>,
+    TError,
+    { id: number; data: BodyType<ReplaceProviderKeyBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof replaceProviderKey>>,
+  TError,
+  { id: number; data: BodyType<ReplaceProviderKeyBody> },
+  TContext
+> => {
+  const mutationKey = ["replaceProviderKey"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof replaceProviderKey>>,
+    { id: number; data: BodyType<ReplaceProviderKeyBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return replaceProviderKey(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ReplaceProviderKeyMutationResult = NonNullable<
+  Awaited<ReturnType<typeof replaceProviderKey>>
+>;
+export type ReplaceProviderKeyMutationBody = BodyType<ReplaceProviderKeyBody>;
+export type ReplaceProviderKeyMutationError = ErrorType<void>;
+
+/**
+ * @summary Replace just the API key on a stored provider
+ */
+export const useReplaceProviderKey = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof replaceProviderKey>>,
+    TError,
+    { id: number; data: BodyType<ReplaceProviderKeyBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof replaceProviderKey>>,
+  TError,
+  { id: number; data: BodyType<ReplaceProviderKeyBody> },
+  TContext
+> => {
+  return useMutation(getReplaceProviderKeyMutationOptions(options));
 };
 
 /**

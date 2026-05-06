@@ -896,6 +896,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/AgentProviderRecord"
 
+  /providers/{id}/replace-key:
+    post:
+      operationId: replaceProviderKey
+      tags: [providers]
+      summary: Replace just the API key on a stored provider
+      description: >
+        Tiny rotation endpoint used by the Settings → Providers card.
+        Updates only the encrypted API key column — name / type / config /
+        baseUrl / webhookUrl / enabled are left untouched. The full PUT
+        endpoint still works for non-key fields.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReplaceProviderKeyBody"
+      responses:
+        "200":
+          description: Key replaced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentProviderRecord"
+        "404":
+          description: Provider not found
+
   /providers/{id}/test:
     post:
       operationId: testProviderConnection
@@ -2937,6 +2969,19 @@ components:
         enabled:
           type: boolean
       required: [name, type]
+
+    ReplaceProviderKeyBody:
+      type: object
+      description: >
+        Body for the "Replace key" mini-action on the provider card. Carries
+        only the new API key — every other column on the provider row is left
+        untouched on the server.
+      properties:
+        apiKeyPlaceholder:
+          type: string
+          minLength: 1
+          description: The new plaintext API key. Encrypted at rest by the server.
+      required: [apiKeyPlaceholder]
 
     ToggleProviderBody:
       type: object
