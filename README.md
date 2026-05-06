@@ -8,7 +8,7 @@ Give Daneel a job description and a list of candidates. It runs an agentic workf
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6.svg)](https://www.typescriptlang.org/)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#)
 
-[⭐ Star on GitHub](https://github.com/gregherbe76/Recruit-Pipeline) · [📖 Docs](DEVELOPER_GUIDE.md) · [🚀 Live demo coming soon](#)
+[⭐ Star on GitHub](https://github.com/gregherbe76/daneel) · [📖 Docs](DEVELOPER_GUIDE.md) · [🚀 Live demo coming soon](#)
 
 ---
 
@@ -66,7 +66,7 @@ All commercial providers are optional. The engine is fully functional with built
 ## Quick Start
 
 ```bash
-git clone https://github.com/gregherbe76/Recruit-Pipeline daneel
+git clone https://github.com/gregherbe76/daneel
 cd daneel
 cp .env.example .env
 docker compose up
@@ -119,6 +119,18 @@ Every workflow step calls `provider.run({ step, payload })` and stores the resul
 
 ---
 
+## Data modes
+
+Daneel enforces strict separation between simulated and real candidate data. Three modes are supported:
+
+- **mock** — AI-generated profiles only. Used for demos, tests, development.
+- **real** — Imported and provider-sourced candidates only. Production mode.
+- **fallback** — Imported only, triggered when a sourcing provider fails.
+
+Reports are clearly labelled. Mock and real data are never silently mixed.
+
+---
+
 ## Use this repo as a template
 
 | Goal | What to change |
@@ -163,6 +175,8 @@ Step-by-step recipes for the most common extensions:
 ## Disclosure & License
 
 Daneel is MIT-licensed and the engine is fully functional without any commercial provider. Commercial providers (Scout, Extend, CodeMatch, Council) are maintained by A-Player and ship as optional plug-ins; they are listed in the marketplace UI but never required for the core workflow. Full commercial framing and the "engine ↔ providers ↔ connectors" model is documented in [VISION.md](VISION.md). License terms in [LICENSE](LICENSE).
+
+Daneel includes opt-in usage telemetry. Disabled by default, fully documented in [docs/TELEMETRY.md](docs/TELEMETRY.md).
 
 ## Built by
 

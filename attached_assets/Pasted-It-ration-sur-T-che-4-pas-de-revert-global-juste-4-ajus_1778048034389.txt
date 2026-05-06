@@ -1,0 +1,70 @@
+Itération sur Tâche 4 — pas de revert global, juste 4 ajustements 
+ciblés.
+
+ACTION PRÉALABLE (côté humain, pas toi)
+J'aurai renommé le repo GitHub de "Recruit-Pipeline" à "daneel" avant 
+que tu lances ces modifications. Vérifie en début de session que le 
+repo s'appelle bien gregherbe76/daneel (pas Recruit-Pipeline).
+
+AJUSTEMENTS
+
+1. URL git clone dans la section Quick Start :
+   - Remplacer la ligne actuelle par :
+     git clone https://github.com/gregherbe76/daneel
+   - Pas de renommage de dossier local. Le clone créera un dossier 
+     "daneel" naturellement.
+
+2. Réintégrer la section "Data modes" :
+   - À insérer entre "Architecture for builders" et "Use this repo as 
+     a template"
+   - Titre : "## Data modes"
+   - 4-5 lignes max, ton informatif :
+     "Daneel enforces strict separation between simulated and real 
+     candidate data. Three modes are supported:
+     - **mock** — AI-generated profiles only. Used for demos, tests, 
+       development.
+     - **real** — Imported and provider-sourced candidates only. 
+       Production mode.
+     - **fallback** — Imported only, triggered when a sourcing provider 
+       fails.
+     Reports are clearly labelled. Mock and real data are never silently 
+     mixed."
+
+3. Réintégrer la mention télémétrie :
+   - Dans la section "Disclosure & License", ajouter UNE ligne :
+     "Daneel includes opt-in usage telemetry. Disabled by default, 
+     fully documented in [docs/TELEMETRY.md](docs/TELEMETRY.md)."
+
+4. Bascule du badge "Tests passing" :
+   - Ouvre .github/workflows/ et identifie le workflow qui exécute les 
+     tests (probablement nommé ci.yml, test.yml, ou similaire)
+   - Si un workflow de tests existe, remplace le badge statique par :
+     ![CI](https://github.com/gregherbe76/daneel/actions/workflows/<NOM_FICHIER>.yml/badge.svg)
+     en remplaçant <NOM_FICHIER> par le nom réel
+   - Si AUCUN workflow de tests n'existe (le seul workflow trouvé est 
+     docker-publish.yml par exemple) : garde le badge statique 
+     "Tests passing" et signale-le moi dans le chat — on traitera la 
+     création du CI en Phase 6.
+
+CONTRAINTES
+
+- Aucune modification autre que ces 4 points
+- Aucun touch sur VISION.md, NAMING.md, LICENSE, le code
+- Le commit final remplace celui prévu initialement (auto-checkpoint au 
+  mark_task_complete) avec le message :
+  "docs: rewrite README to pitch Daneel + 4 commercial providers + 
+  BYOK connectors"
+
+DELIVERABLE
+
+- README.md ajusté avec les 4 modifications
+- Confirmation dans le chat que :
+  a) le repo a bien été renommé en gregherbe76/daneel (vérification de 
+     ton côté)
+  b) le badge CI est dynamique ou tu signales l'absence de workflow 
+  c) le diff final est lisible et les 4 sections sont correctes
+
+STOP
+
+Après le push, j'irai relire le README sur GitHub. Si OK, Tâche 4 
+validée et clôturée. Phase 1 = done.
