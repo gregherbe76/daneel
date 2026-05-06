@@ -7,6 +7,7 @@ import {
   type BulkJob,
 } from "@workspace/db";
 import { revalidateCandidateEmail } from "./email-revalidation";
+import { getBulkJobsSettings } from "./bulk-jobs-settings";
 import { logger } from "./logger";
 
 /**
@@ -24,17 +25,26 @@ const RECHECK_CONCURRENCY = 5;
 const POLL_INTERVAL_MS = 2_000;
 
 /**
- * How long completed/failed/canceled bulk-job rows are kept before the
- * retention sweep deletes them. Each row carries the full id list and, for
- * `export-csv`, the assembled CSV blob in `result`, so without retention the
- * table grows unbounded. Configurable via `BULK_JOBS_RETENTION_DAYS`.
+ * Hard floor used when the persisted setting is missing/invalid. The live
+ * value comes from `bulk_jobs_settings` (singleton row), seeded from
+ * `BULK_JOBS_RETENTION_DAYS` on first boot. Each row carries the full id list
+ * and, for `export-csv`, the assembled CSV blob in `result`, so without
+ * retention the table would grow unbounded.
  */
 const DEFAULT_RETENTION_DAYS = 7;
-function retentionDays(): number {
-  const raw = process.env.BULK_JOBS_RETENTION_DAYS;
-  if (!raw) return DEFAULT_RETENTION_DAYS;
-  const n = Number(raw);
-  return Number.isFinite(n) && n > 0 ? n : DEFAULT_RETENTION_DAYS;
+async function retentionDays(): Promise<number> {
+  try {
+    const settings = await getBulkJobsSettings();
+    return Number.isFinite(settings.retentionDays) && settings.retentionDays > 0
+      ? settings.retentionDays
+      : DEFAULT_RETENTION_DAYS;
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err) },
+      "Bulk-job retention: failed to load settings, falling back to default",
+    );
+    return DEFAULT_RETENTION_DAYS;
+  }
 }
 
 /** How often the worker runs the retention sweep. */
@@ -47,7 +57,8 @@ let lastRetentionSweepAt = 0;
  * never trim a row that is still in flight.
  */
 export async function sweepBulkJobRetention(now: Date = new Date()): Promise<number> {
-  const cutoff = new Date(now.getTime() - retentionDays() * 24 * 60 * 60 * 1000);
+  const days = await retentionDays();
+  const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
   const deleted = await db
     .delete(bulkJobsTable)
     .where(

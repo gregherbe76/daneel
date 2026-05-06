@@ -26,6 +26,7 @@ import type {
   BulkCandidateActionBody,
   BulkCandidateActionResult,
   BulkCandidateJob,
+  BulkJobsSettings,
   Candidate,
   CandidateComment,
   CandidateNote,
@@ -85,6 +86,7 @@ import type {
   ToggleProviderBody,
   UpdateApplicationBody,
   UpdateBrandingSettingsBody,
+  UpdateBulkJobsSettingsBody,
   UpdateEmailRevalidationSettingsBody,
   UpdateNotificationSettingsBody,
   UploadUrlRequest,
@@ -4896,6 +4898,168 @@ export const useRunEmailRevalidationSweepNow = <
   TContext
 > => {
   return useMutation(getRunEmailRevalidationSweepNowMutationOptions(options));
+};
+
+/**
+ * @summary Get the current bulk-job retention settings
+ */
+export const getGetBulkJobsSettingsUrl = () => {
+  return `/api/settings/bulk-jobs`;
+};
+
+export const getBulkJobsSettings = async (
+  options?: RequestInit,
+): Promise<BulkJobsSettings> => {
+  return customFetch<BulkJobsSettings>(getGetBulkJobsSettingsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetBulkJobsSettingsQueryKey = () => {
+  return [`/api/settings/bulk-jobs`] as const;
+};
+
+export const getGetBulkJobsSettingsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBulkJobsSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getBulkJobsSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetBulkJobsSettingsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBulkJobsSettings>>
+  > = ({ signal }) => getBulkJobsSettings({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBulkJobsSettings>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetBulkJobsSettingsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBulkJobsSettings>>
+>;
+export type GetBulkJobsSettingsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get the current bulk-job retention settings
+ */
+
+export function useGetBulkJobsSettings<
+  TData = Awaited<ReturnType<typeof getBulkJobsSettings>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getBulkJobsSettings>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetBulkJobsSettingsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update the bulk-job retention settings
+ */
+export const getUpdateBulkJobsSettingsUrl = () => {
+  return `/api/settings/bulk-jobs`;
+};
+
+export const updateBulkJobsSettings = async (
+  updateBulkJobsSettingsBody: UpdateBulkJobsSettingsBody,
+  options?: RequestInit,
+): Promise<BulkJobsSettings> => {
+  return customFetch<BulkJobsSettings>(getUpdateBulkJobsSettingsUrl(), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateBulkJobsSettingsBody),
+  });
+};
+
+export const getUpdateBulkJobsSettingsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateBulkJobsSettings>>,
+    TError,
+    { data: BodyType<UpdateBulkJobsSettingsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateBulkJobsSettings>>,
+  TError,
+  { data: BodyType<UpdateBulkJobsSettingsBody> },
+  TContext
+> => {
+  const mutationKey = ["updateBulkJobsSettings"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateBulkJobsSettings>>,
+    { data: BodyType<UpdateBulkJobsSettingsBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateBulkJobsSettings(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateBulkJobsSettingsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateBulkJobsSettings>>
+>;
+export type UpdateBulkJobsSettingsMutationBody =
+  BodyType<UpdateBulkJobsSettingsBody>;
+export type UpdateBulkJobsSettingsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update the bulk-job retention settings
+ */
+export const useUpdateBulkJobsSettings = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateBulkJobsSettings>>,
+    TError,
+    { data: BodyType<UpdateBulkJobsSettingsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateBulkJobsSettings>>,
+  TError,
+  { data: BodyType<UpdateBulkJobsSettingsBody> },
+  TContext
+> => {
+  return useMutation(getUpdateBulkJobsSettingsMutationOptions(options));
 };
 
 /**

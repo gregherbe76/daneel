@@ -23,6 +23,7 @@ import CandidateDetailPage from "./pages/candidates/detail";
 import AgentProvidersPage from "./pages/settings/providers";
 import MarketplacePage from "./pages/settings/marketplace";
 import EmailRevalidationSettingsPage from "./pages/settings/email-revalidation";
+import BulkJobsSettingsPage from "./pages/settings/bulk-jobs";
 import BrandingSettingsPage from "./pages/settings/branding";
 import NotificationsSettingsPage from "./pages/settings/notifications";
 import TelemetrySettingsPage from "./pages/settings/telemetry";
@@ -68,6 +69,7 @@ function AppRoutes() {
         <Route path="/settings/marketplace" component={MarketplacePage} />
         <Route path="/settings/providers/legacy" component={AgentProvidersPage} />
         <Route path="/settings/email-revalidation" component={EmailRevalidationSettingsPage} />
+        <Route path="/settings/bulk-jobs" component={BulkJobsSettingsPage} />
         <Route path="/settings/branding" component={BrandingSettingsPage} />
         <Route path="/settings/notifications" component={NotificationsSettingsPage} />
         <Route path="/settings/telemetry/dashboard" component={TelemetryDashboardPage} />

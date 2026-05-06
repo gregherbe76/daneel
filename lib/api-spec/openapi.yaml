@@ -1179,6 +1179,36 @@ paths:
               schema:
                 $ref: "#/components/schemas/EmailRevalidationRun"
 
+  /settings/bulk-jobs:
+    get:
+      operationId: getBulkJobsSettings
+      tags: [settings]
+      summary: Get the current bulk-job retention settings
+      responses:
+        "200":
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkJobsSettings"
+    put:
+      operationId: updateBulkJobsSettings
+      tags: [settings]
+      summary: Update the bulk-job retention settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBulkJobsSettingsBody"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkJobsSettings"
+
   /settings/notifications:
     get:
       operationId: getNotificationSettings
@@ -2941,6 +2971,29 @@ components:
       required: [workflowStep, providerId, enabled]
 
     # ── SETTINGS ──
+    BulkJobsSettings:
+      type: object
+      description: Singleton settings controlling the bulk-job retention sweep.
+      properties:
+        retentionDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+          description: How many days terminal (completed/failed/canceled) bulk-job rows are kept before the retention sweep deletes them.
+        updatedAt:
+          type: string
+          format: date-time
+      required: [retentionDays, updatedAt]
+
+    UpdateBulkJobsSettingsBody:
+      type: object
+      properties:
+        retentionDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+      required: [retentionDays]
+
     EmailRevalidationSettings:
       type: object
       properties:

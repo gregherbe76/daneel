@@ -1,8 +1,13 @@
 import { Router, type IRouter } from "express";
 import {
+  UpdateBulkJobsSettingsBody,
   UpdateEmailRevalidationSettingsBody,
   UpdateNotificationSettingsBody,
 } from "@workspace/api-zod";
+import {
+  getBulkJobsSettings,
+  updateBulkJobsSettings,
+} from "../lib/bulk-jobs-settings";
 import {
   getEmailRevalidationSettings,
   updateEmailRevalidationSettings,
@@ -19,6 +24,37 @@ import {
 } from "../lib/notifications";
 
 const router: IRouter = Router();
+
+function shapeBulkJobsSettings(row: {
+  retentionDays: number;
+  updatedAt: Date;
+}): { retentionDays: number; updatedAt: Date } {
+  // The DB row also has the singleton `id`, but the OpenAPI contract only
+  // exposes retentionDays + updatedAt. Strip extras so the response matches
+  // the generated types exactly.
+  return { retentionDays: row.retentionDays, updatedAt: row.updatedAt };
+}
+
+router.get("/settings/bulk-jobs", async (_req, res): Promise<void> => {
+  const settings = await getBulkJobsSettings();
+  res.json(shapeBulkJobsSettings(settings));
+});
+
+router.put("/settings/bulk-jobs", async (req, res): Promise<void> => {
+  const parsed = UpdateBulkJobsSettingsBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const updated = await updateBulkJobsSettings({
+    retentionDays: parsed.data.retentionDays,
+  });
+  req.log.info(
+    { retentionDays: updated.retentionDays },
+    "Bulk-job retention settings updated",
+  );
+  res.json(shapeBulkJobsSettings(updated));
+});
 
 router.get("/settings/email-revalidation", async (_req, res): Promise<void> => {
   const settings = await getEmailRevalidationSettings();

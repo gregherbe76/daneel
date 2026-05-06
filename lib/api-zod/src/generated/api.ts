@@ -3496,6 +3496,51 @@ export const RunEmailRevalidationSweepNowResponse = zod.object({
 });
 
 /**
+ * @summary Get the current bulk-job retention settings
+ */
+export const getBulkJobsSettingsResponseRetentionDaysMax = 365;
+
+export const GetBulkJobsSettingsResponse = zod
+  .object({
+    retentionDays: zod
+      .number()
+      .min(1)
+      .max(getBulkJobsSettingsResponseRetentionDaysMax)
+      .describe(
+        "How many days terminal (completed\/failed\/canceled) bulk-job rows are kept before the retention sweep deletes them.",
+      ),
+    updatedAt: zod.coerce.date(),
+  })
+  .describe("Singleton settings controlling the bulk-job retention sweep.");
+
+/**
+ * @summary Update the bulk-job retention settings
+ */
+export const updateBulkJobsSettingsBodyRetentionDaysMax = 365;
+
+export const UpdateBulkJobsSettingsBody = zod.object({
+  retentionDays: zod
+    .number()
+    .min(1)
+    .max(updateBulkJobsSettingsBodyRetentionDaysMax),
+});
+
+export const updateBulkJobsSettingsResponseRetentionDaysMax = 365;
+
+export const UpdateBulkJobsSettingsResponse = zod
+  .object({
+    retentionDays: zod
+      .number()
+      .min(1)
+      .max(updateBulkJobsSettingsResponseRetentionDaysMax)
+      .describe(
+        "How many days terminal (completed\/failed\/canceled) bulk-job rows are kept before the retention sweep deletes them.",
+      ),
+    updatedAt: zod.coerce.date(),
+  })
+  .describe("Singleton settings controlling the bulk-job retention sweep.");
+
+/**
  * @summary Get the current outbound notification preferences
  */
 

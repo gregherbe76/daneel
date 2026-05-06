@@ -765,6 +765,27 @@ export interface UpsertStepSettingBody {
   enabled: boolean;
 }
 
+/**
+ * Singleton settings controlling the bulk-job retention sweep.
+ */
+export interface BulkJobsSettings {
+  /**
+   * How many days terminal (completed/failed/canceled) bulk-job rows are kept before the retention sweep deletes them.
+   * @minimum 1
+   * @maximum 365
+   */
+  retentionDays: number;
+  updatedAt: string;
+}
+
+export interface UpdateBulkJobsSettingsBody {
+  /**
+   * @minimum 1
+   * @maximum 365
+   */
+  retentionDays: number;
+}
+
 export interface EmailRevalidationSettings {
   /**
    * Days after which a previously validated email is considered stale.
