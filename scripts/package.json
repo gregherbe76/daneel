@@ -8,6 +8,7 @@
     "rescore-3d": "tsx ./src/rescore-3d.ts",
     "backfill-email-validation": "tsx ./src/backfill-email-validation.ts",
     "encrypt-provider-keys": "tsx ./src/encrypt-provider-keys.ts",
+    "rotate-provider-keys": "tsx ./src/rotate-provider-keys.ts",
     "seed-demo": "tsx ./src/seed-demo.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

@@ -10,11 +10,13 @@ import { logger } from "./logger";
  * Symmetric encryption helper for provider credentials stored in the
  * `agent_providers.apiKeyEncryptedPlaceholder` column.
  *
- * Wire format (string column, easy to grep/migrate):
- *   `enc:v1:<iv_b64>:<tag_b64>:<ciphertext_b64>`
+ * Wire formats (string column, easy to grep/migrate):
+ *   `enc:v1:<iv_b64>:<tag_b64>:<ciphertext_b64>`            (5 segments, no key id)
+ *   `enc:v2:<keyId>:<iv_b64>:<tag_b64>:<ciphertext_b64>`    (6 segments, tagged with key id)
  *
- * The `enc:v1:` prefix is the version sentinel — values without it are
- * treated as legacy plaintext (so reads keep working before the one-shot
+ * The `enc:v1:` / `enc:v2:` prefixes are the version sentinels — values
+ * matching neither are treated as legacy plaintext (so reads keep working
+ * before the one-shot
  * `encrypt-provider-keys` backfill has run, and so test fixtures that use
  * literal strings continue to work).
  *
@@ -24,99 +26,249 @@ import { logger } from "./logger";
  * back to a deterministic dev-only key so local development and tests
  * don't have to wire it up — but we log a loud warning. In production,
  * encryption *requires* PROVIDER_KEY_SECRET; missing it throws.
+ *
+ * Key rotation:
+ *   - During rotation, set `PROVIDER_KEY_SECRET_OLD` to the previous secret
+ *     so existing rows can still be decrypted while the rotation script
+ *     re-encrypts them.
+ *   - Set `PROVIDER_KEY_ID` to opt new writes into the v2 wire format with
+ *     an explicit key id (e.g. `2026-05`). Without it, new writes use v1.
+ *   - `PROVIDER_KEY_ID_OLD` (default `"old"`) tags the fallback key id used
+ *     when reading rows that were written under the previous secret.
+ *
+ * See `scripts/src/rotate-provider-keys.ts` for the rotation runbook.
  */
 
-const VERSION_PREFIX = "enc:v1:";
+const VERSION_PREFIX_V1 = "enc:v1:";
+const VERSION_PREFIX_V2 = "enc:v2:";
 const ALGO = "aes-256-gcm";
 const KEY_LEN = 32;
 const IV_LEN = 12;
 const SCRYPT_SALT = "daneel:provider-secrets:v1";
+const DEV_INSECURE_SECRET = "dev-insecure-provider-key";
+const DEFAULT_OLD_KEY_ID = "old";
 
-let cachedKey: Buffer | null = null;
-let warnedAboutDevKey = false;
-
-function resolveKey(): Buffer {
-  if (cachedKey) return cachedKey;
-  const secret = process.env["PROVIDER_KEY_SECRET"];
-  if (secret && secret.length > 0) {
-    cachedKey = scryptSync(secret, SCRYPT_SALT, KEY_LEN);
-    return cachedKey;
-  }
-  if (process.env["NODE_ENV"] === "production") {
-    throw new Error(
-      "PROVIDER_KEY_SECRET is not set. Refusing to encrypt/decrypt provider credentials in production without it.",
-    );
-  }
-  if (!warnedAboutDevKey) {
-    warnedAboutDevKey = true;
-    logger.warn(
-      "PROVIDER_KEY_SECRET is not set — using insecure dev-only key for provider credential encryption. Set PROVIDER_KEY_SECRET before deploying.",
-    );
-  }
-  cachedKey = scryptSync("dev-insecure-provider-key", SCRYPT_SALT, KEY_LEN);
-  return cachedKey;
+interface KeyringEntry {
+  /** Optional key id; null means "untagged primary". */
+  id: string | null;
+  key: Buffer;
 }
 
-/** For tests — re-resolve the key after env mutations. */
+interface Keyring {
+  primary: KeyringEntry;
+  /** Optional previous key, used during rotation windows. */
+  old: KeyringEntry | null;
+}
+
+let cachedKeyring: Keyring | null = null;
+let warnedAboutDevKey = false;
+
+function deriveKey(secret: string): Buffer {
+  return scryptSync(secret, SCRYPT_SALT, KEY_LEN);
+}
+
+const KEY_ID_PATTERN = /^[A-Za-z0-9_.-]+$/;
+
+function validateKeyId(value: string | undefined, envName: string): string | null {
+  if (!value) return null;
+  if (!KEY_ID_PATTERN.test(value)) {
+    throw new Error(
+      `${envName} contains invalid characters. Allowed: letters, digits, '_', '.', '-' (no ':' since it is the wire-format delimiter).`,
+    );
+  }
+  return value;
+}
+
+function resolveKeyring(): Keyring {
+  if (cachedKeyring) return cachedKeyring;
+
+  const primarySecret = process.env["PROVIDER_KEY_SECRET"];
+  const primaryId = validateKeyId(process.env["PROVIDER_KEY_ID"], "PROVIDER_KEY_ID");
+  const oldSecret = process.env["PROVIDER_KEY_SECRET_OLD"];
+  const oldId =
+    validateKeyId(process.env["PROVIDER_KEY_ID_OLD"], "PROVIDER_KEY_ID_OLD") ||
+    DEFAULT_OLD_KEY_ID;
+
+  let primary: KeyringEntry;
+
+  if (primarySecret && primarySecret.length > 0) {
+    primary = { id: primaryId, key: deriveKey(primarySecret) };
+  } else {
+    if (process.env["NODE_ENV"] === "production") {
+      throw new Error(
+        "PROVIDER_KEY_SECRET is not set. Refusing to encrypt/decrypt provider credentials in production without it.",
+      );
+    }
+    if (!warnedAboutDevKey) {
+      warnedAboutDevKey = true;
+      logger.warn(
+        "PROVIDER_KEY_SECRET is not set — using insecure dev-only key for provider credential encryption. Set PROVIDER_KEY_SECRET before deploying.",
+      );
+    }
+    primary = { id: primaryId, key: deriveKey(DEV_INSECURE_SECRET) };
+  }
+
+  const old: KeyringEntry | null =
+    oldSecret && oldSecret.length > 0
+      ? { id: oldId, key: deriveKey(oldSecret) }
+      : null;
+
+  cachedKeyring = { primary, old };
+  return cachedKeyring;
+}
+
+/** For tests — re-resolve the keyring after env mutations. */
 export function _resetProviderSecretKeyForTest(): void {
-  cachedKey = null;
+  cachedKeyring = null;
   warnedAboutDevKey = false;
 }
 
-/** Returns true when `value` is in the `enc:v1:` wire format. */
+/** Returns true when `value` is in the `enc:v1:` or `enc:v2:` wire format. */
 export function isEncryptedProviderSecret(value: string): boolean {
-  return value.startsWith(VERSION_PREFIX);
+  return (
+    value.startsWith(VERSION_PREFIX_V1) || value.startsWith(VERSION_PREFIX_V2)
+  );
 }
 
 /**
  * Encrypt a provider credential for at-rest storage. Re-encrypting an
  * already-encrypted value is a no-op (idempotent) so callers don't have to
  * track which path the value came from.
+ *
+ * Writes the v2 wire format (with explicit key id) when `PROVIDER_KEY_ID`
+ * is set; otherwise writes the legacy v1 format for byte-for-byte
+ * compatibility with rows produced before key rotation was supported.
  */
 export function encryptProviderSecret(plaintext: string): string {
   if (isEncryptedProviderSecret(plaintext)) return plaintext;
-  const key = resolveKey();
+  const { primary } = resolveKeyring();
   const iv = randomBytes(IV_LEN);
-  const cipher = createCipheriv(ALGO, key, iv);
+  const cipher = createCipheriv(ALGO, primary.key, iv);
   const ciphertext = Buffer.concat([
     cipher.update(plaintext, "utf8"),
     cipher.final(),
   ]);
   const tag = cipher.getAuthTag();
+  if (primary.id) {
+    return [
+      "enc:v2",
+      primary.id,
+      iv.toString("base64"),
+      tag.toString("base64"),
+      ciphertext.toString("base64"),
+    ].join(":");
+  }
   return [
-    VERSION_PREFIX.slice(0, -1), // "enc:v1" without trailing colon
+    "enc:v1",
     iv.toString("base64"),
     tag.toString("base64"),
     ciphertext.toString("base64"),
   ].join(":");
 }
 
+interface ParsedSecret {
+  /** Key id from the wire format, or null for v1 (untagged). */
+  keyId: string | null;
+  iv: Buffer;
+  tag: Buffer;
+  ct: Buffer;
+}
+
+function parseEncryptedSecret(stored: string): ParsedSecret {
+  const parts = stored.split(":");
+  if (stored.startsWith(VERSION_PREFIX_V1)) {
+    if (parts.length !== 5) {
+      throw new Error(
+        "Malformed enc:v1 provider secret: expected 5 segments",
+      );
+    }
+    const [, , ivB64, tagB64, ctB64] = parts as [
+      string,
+      string,
+      string,
+      string,
+      string,
+    ];
+    return {
+      keyId: null,
+      iv: Buffer.from(ivB64, "base64"),
+      tag: Buffer.from(tagB64, "base64"),
+      ct: Buffer.from(ctB64, "base64"),
+    };
+  }
+  if (stored.startsWith(VERSION_PREFIX_V2)) {
+    if (parts.length !== 6) {
+      throw new Error(
+        "Malformed enc:v2 provider secret: expected 6 segments",
+      );
+    }
+    const [, , keyId, ivB64, tagB64, ctB64] = parts as [
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+    ];
+    return {
+      keyId,
+      iv: Buffer.from(ivB64, "base64"),
+      tag: Buffer.from(tagB64, "base64"),
+      ct: Buffer.from(ctB64, "base64"),
+    };
+  }
+  throw new Error("Malformed provider secret: unknown version prefix");
+}
+
+function tryDecryptWith(
+  entry: KeyringEntry,
+  parsed: ParsedSecret,
+): string | null {
+  try {
+    const decipher = createDecipheriv(ALGO, entry.key, parsed.iv);
+    decipher.setAuthTag(parsed.tag);
+    const plaintext = Buffer.concat([
+      decipher.update(parsed.ct),
+      decipher.final(),
+    ]);
+    return plaintext.toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Decrypt a provider credential. Legacy plaintext values (no `enc:v1:`
+ * Decrypt a provider credential. Legacy plaintext values (no `enc:vN:`
  * prefix) are returned as-is so the runtime keeps working before the
  * backfill script has been run.
+ *
+ * During a rotation window where both `PROVIDER_KEY_SECRET` and
+ * `PROVIDER_KEY_SECRET_OLD` are configured, this method transparently
+ * tries both keys: the one matching the embedded key id first (for v2),
+ * then falls back to whichever key is available.
  */
 export function decryptProviderSecret(stored: string): string {
   if (!isEncryptedProviderSecret(stored)) return stored;
-  const parts = stored.split(":");
-  if (parts.length !== 5) {
-    throw new Error("Malformed encrypted provider secret: expected 5 segments");
+  const parsed = parseEncryptedSecret(stored);
+  const { primary, old } = resolveKeyring();
+
+  // Build an ordered list of candidate keys. If the wire format carries a
+  // key id, prefer the entry whose id matches; otherwise try primary first.
+  const candidates: KeyringEntry[] = [];
+  if (parsed.keyId !== null) {
+    if (primary.id === parsed.keyId) candidates.push(primary);
+    if (old && old.id === parsed.keyId) candidates.push(old);
   }
-  const [, , ivB64, tagB64, ctB64] = parts as [
-    string,
-    string,
-    string,
-    string,
-    string,
-  ];
-  const key = resolveKey();
-  const iv = Buffer.from(ivB64, "base64");
-  const tag = Buffer.from(tagB64, "base64");
-  const ct = Buffer.from(ctB64, "base64");
-  const decipher = createDecipheriv(ALGO, key, iv);
-  decipher.setAuthTag(tag);
-  const plaintext = Buffer.concat([decipher.update(ct), decipher.final()]);
-  return plaintext.toString("utf8");
+  if (!candidates.includes(primary)) candidates.push(primary);
+  if (old && !candidates.includes(old)) candidates.push(old);
+
+  for (const candidate of candidates) {
+    const result = tryDecryptWith(candidate, parsed);
+    if (result !== null) return result;
+  }
+  throw new Error(
+    "Failed to decrypt provider secret under any configured key. Check PROVIDER_KEY_SECRET / PROVIDER_KEY_SECRET_OLD.",
+  );
 }
 
 /** Convenience wrappers for nullable column reads/writes. */
@@ -136,7 +288,7 @@ export function maybeDecryptProviderSecret(
   } catch (err) {
     logger.error(
       { err },
-      "Failed to decrypt provider secret — returning null. Check PROVIDER_KEY_SECRET.",
+      "Failed to decrypt provider secret — returning null. Check PROVIDER_KEY_SECRET / PROVIDER_KEY_SECRET_OLD.",
     );
     return null;
   }

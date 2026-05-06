@@ -23,6 +23,7 @@ import { eq, isNotNull } from "drizzle-orm";
 import { createCipheriv, randomBytes, scryptSync } from "node:crypto";
 
 const VERSION_PREFIX = "enc:v1:";
+const VERSION_PREFIX_V2 = "enc:v2:";
 const ALGO = "aes-256-gcm";
 const KEY_LEN = 32;
 const IV_LEN = 12;
@@ -45,7 +46,12 @@ function resolveKey(): Buffer {
 }
 
 function isEncrypted(value: string): boolean {
-  return value.startsWith(VERSION_PREFIX);
+  // Recognize both wire formats so this backfill never re-encrypts a row
+  // that was already encrypted under v1 *or* v2 (added when key rotation
+  // landed). See `rotate-provider-keys.ts` for the rotation flow.
+  return (
+    value.startsWith(VERSION_PREFIX) || value.startsWith(VERSION_PREFIX_V2)
+  );
 }
 
 function encrypt(plaintext: string, key: Buffer): string {
