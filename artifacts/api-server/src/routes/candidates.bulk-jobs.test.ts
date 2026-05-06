@@ -236,6 +236,53 @@ describe("GET /candidates/bulk-jobs/:id", () => {
     expect(res.body.results).toBeNull();
   });
 
+  it("cancels a pending job — status flips to canceled and finishedAt is set", async () => {
+    const candidateId = await seedCandidate("cancel-pending");
+    const jobId = await seedBulkJob({
+      action: "delete",
+      ids: [candidateId],
+      status: "pending",
+    });
+
+    const res = await call("POST", `/api/candidates/bulk-jobs/${jobId}/cancel`);
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(jobId);
+    expect(res.body.status).toBe("canceled");
+    expect(res.body.finishedAt).toBeTruthy();
+  });
+
+  it("does not overwrite a terminal job — completed rows are returned unchanged", async () => {
+    const candidateId = await seedCandidate("cancel-completed");
+    const csv = "name\nBob";
+    const jobId = await seedBulkJob({
+      action: "export-csv",
+      ids: [candidateId],
+      status: "completed",
+      processed: 1,
+      result: { csv },
+    });
+
+    const before = await call("GET", `/api/candidates/bulk-jobs/${jobId}`);
+    expect(before.status).toBe(200);
+    expect(before.body.status).toBe("completed");
+
+    const res = await call("POST", `/api/candidates/bulk-jobs/${jobId}/cancel`);
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe(jobId);
+    expect(res.body.status).toBe("completed");
+    expect(res.body.csv).toBe(csv);
+    expect(res.body.processed).toBe(1);
+  });
+
+  it("returns 404 when cancelling an unknown id", async () => {
+    const res = await call(
+      "POST",
+      "/api/candidates/bulk-jobs/2147483601/cancel",
+    );
+    expect(res.status).toBe(404);
+    expect(res.body?.error).toMatch(/not found/i);
+  });
+
   it("serializes a completed recheck-email job's results field", async () => {
     const candidateId = await seedCandidate("recheck");
     const results = [
