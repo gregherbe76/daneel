@@ -1,0 +1,234 @@
+CONTEXT
+
+Tu travailles sur Daneel (https://github.com/gregherbe76/daneel), un 
+workflow engine OSS pour le recrutement. Le repo a déjà :
+
+- Une interface AgentProvider générique
+- Plusieurs providers existants : native-openai, custom-webhook, 
+  twin-webhook, twin-agent, github, web-search, apify, council
+- Un marketplace UI à /settings/marketplace avec des cartes pour 
+  chaque provider commercial
+- Une étape "decision" déjà implémentée (Council)
+
+Sous-tâche 4.2 : intégrer CodeMatch comme nouveau provider d'évaluation 
+technique GitHub. CodeMatch est un SaaS commercial closed-source 
+(https://assess.codes) maintenu par le même auteur (Greg Herbé / 
+A-Player). Il expose une API publique POST /api/v1/evaluate documentée 
+qui prend un github_username et retourne un scoring sur 5 dimensions 
++ strengths + red_flags.
+
+CodeMatch est un produit commercial ⭐ (premium), pas un connecteur BYOK 
+gratuit comme Twin. Daneel doit afficher CodeMatch dans la section 
+Commercial Providers du marketplace.
+
+ÉTAPE 1 — DIAGNOSTIC AVANT MODIFICATION
+
+Avant de modifier quoi que ce soit, réponds dans le chat :
+
+1. Cherche si une interface "EvaluationProvider" ou équivalent existe 
+   déjà dans artifacts/api-server/src/routes/workflows/providers/. 
+   Liste tout ce que tu trouves comme types de providers (Sourcing, 
+   Matching, Decision, etc.).
+
+2. Cherche si une étape "evaluation" (ou similaire : technical_eval, 
+   code_eval) existe déjà dans le workflow engine. Si oui, où ?
+
+3. Liste les fichiers de providers existants dans le dossier 
+   providers/ avec une ligne descriptive chacun.
+
+4. Ouvre le fichier interface.ts (ou equivalent) du workflow engine 
+   et donne-moi le contenu de l'interface AgentProvider de base, 
+   pour que je voie le contrat exact à respecter.
+
+5. Cherche dans la marketplace UI 
+   (artifacts/recruiting-os/src/pages/settings/marketplace.tsx ou 
+   similaire) comment les providers commerciaux ⭐ sont rendus. 
+   Donne-moi le pattern utilisé pour Scout et Council.
+
+6. Cherche comment les credentials (clés API) des providers sont 
+   stockées et chiffrées. Daneel a-t-il un système de provider_config 
+   chiffré ?
+
+7. Cherche dans la spec OpenAPI (lib/api-spec/openapi.yaml) si une 
+   route d'évaluation existe déjà, ou si je dois en ajouter une.
+
+STOP intermédiaire. Affiche le diagnostic dans le chat. Aucune 
+modification de fichier. Attends mon OK avant l'étape 2.
+
+ÉTAPE 2 — IMPLÉMENTATION (après mon OK)
+
+A. Définir EvaluationProvider interface (si pas déjà présente)
+
+   - Dans interface.ts ou un nouveau fichier evaluation-interface.ts
+   - Méthode evaluate(input) → EvaluationResult
+   - input: { candidate: { github_username?: string, ...other fields } }
+   - EvaluationResult :
+     {
+       evaluated: boolean,
+       provider_name: string,
+       scores: {
+         technical_depth: number,
+         ownership: number,
+         consistency: number,
+         taste: number,
+         impact: number,
+         overall: number
+       } | null,
+       strengths: string[],
+       red_flags: string[],
+       summary: string,
+       evaluated_at: string,
+       report_url: string | null,
+       error: string | null
+     }
+   - Si le candidat n'a pas de github_username : retourne 
+     { evaluated: false, error: "no_github_username", ... }
+
+B. Ajouter l'étape "evaluation" au workflow engine
+
+   - Étape OPTIONNELLE entre candidate_matching et 
+     shortlist_generation (ou en parallèle, selon ce qui fait sens 
+     dans l'engine actuel)
+   - Doit pouvoir s'activer/se désactiver par job
+   - Quand activée, appelle le provider d'évaluation configuré pour 
+     chaque candidat avec un github_username
+   - Stocke le résultat dans la table candidates (nouveau champ 
+     evaluation_result JSON ou nouvelle table candidate_evaluations 
+     selon le pattern existant — préfère le pattern le plus simple)
+
+C. Créer codematch-provider.ts
+
+   - artifacts/api-server/src/routes/workflows/providers/codematch-provider.ts
+   - Implémente EvaluationProvider
+   - Lit la config provider depuis la BDD : api_key (chiffré), 
+     api_url (default https://assess.codes/api/v1)
+   - Méthode evaluate :
+     1. Si pas de github_username → retourne early avec evaluated:false
+     2. Appelle POST {api_url}/evaluate avec Bearer {api_key} et 
+        body { github_username }
+     3. Gère les erreurs HTTP :
+        - 401/403 → log "CodeMatch API key invalid", retourne 
+          evaluated:false, error:"auth_failed"
+        - 402 → log "CodeMatch user not Premium", retourne 
+          evaluated:false, error:"premium_required"
+        - 404 → retourne evaluated:false, error:"github_user_not_found"
+        - 429 → log rate limit, retourne evaluated:false, 
+          error:"rate_limited"
+        - 5xx → retourne evaluated:false, error:"server_error"
+        - timeout 30s → retourne evaluated:false, error:"timeout"
+     4. Si 200 : map la réponse JSON CodeMatch vers EvaluationResult
+     5. Headers à respecter : User-Agent: "Daneel/1.0 (CodeMatch 
+        provider)"
+
+D. Enregistrer codematch dans la registry
+
+   - registry.ts : ajouter "codematch" comme provider type pour 
+     l'étape "evaluation"
+   - Créer un default config si nécessaire
+
+E. Marketplace UI : carte CodeMatch
+
+   - Suivre le pattern de Scout (commercial provider)
+   - Carte affiche :
+     - Nom : "CodeMatch"
+     - Tagline : "GitHub-based technical evaluation"
+     - Badge : ⭐ A-Player
+     - Status : Disconnected / Connected / Action Required
+     - Bouton "Connect" → modal qui demande l'API key CodeMatch
+   - Modal Connect :
+     - Champ API Key (password input)
+     - Lien "Don't have one yet? Get a CodeMatch API key" → ouvre 
+       https://assess.codes/settings/api-keys dans nouveau tab
+     - Bouton "Save & Test" : appelle le provider avec un 
+       github_username de test (ex: "torvalds") pour valider que 
+       la clé marche, sauvegarde si OK
+     - Si test échoue : affiche l'erreur exacte (premium_required, 
+       auth_failed, etc.)
+
+F. Configuration par job : enable evaluation
+
+   - Page job detail : checkbox "Enable technical evaluation 
+     (requires CodeMatch)"
+   - Si pas de provider d'évaluation configuré : checkbox grisée 
+     avec lien vers marketplace
+   - Si activée : à chaque run du workflow, l'étape evaluation 
+     tourne pour les candidats avec github_username
+
+G. UI de rendu des résultats d'évaluation
+
+   - Dans la page candidat (artifacts/recruiting-os/src/pages/jobs/
+     candidate detail ou équivalent) : nouvelle section "Technical 
+     Evaluation"
+   - Si evaluated:true :
+     - Score breakdown 5 dimensions (radar chart ou bar chart, à toi 
+       de voir ce qui est plus simple avec recharts si déjà installé)
+     - Overall score en grand
+     - Strengths en liste verte
+     - Red flags en liste rouge
+     - Summary
+     - Si report_url présent : bouton "Download full PDF report"
+     - Petit label "Powered by CodeMatch" en bas
+   - Si evaluated:false : message neutre "No technical evaluation 
+     available" + raison (no_github_username, premium_required, etc.)
+
+H. Tests
+
+   - Au moins 4 tests pour codematch-provider.ts :
+     - evaluate() avec candidate sans github_username → returns 
+       evaluated:false
+     - evaluate() avec mock fetch retournant 200 → returns mapped 
+       EvaluationResult correctly
+     - evaluate() avec mock fetch retournant 402 → returns 
+       evaluated:false, error:"premium_required"
+     - evaluate() avec mock fetch retournant 429 → returns 
+       evaluated:false, error:"rate_limited"
+   - Suivre le pattern de tests existants dans le projet (vitest)
+
+I. Documentation
+
+   - Créer docs/providers/codematch.md
+   - Sections : 
+     - What it does (1 paragraphe)
+     - How to connect (étapes pour générer une clé sur assess.codes)
+     - Pricing (renvoie vers assess.codes/pricing)
+     - Workflow integration (quand l'étape evaluation tourne)
+     - Error states (tous les error codes possibles)
+
+CONTRAINTES STRICTES
+
+- Aucune modification de l'engine workflow existant autre que l'ajout 
+  de l'étape evaluation
+- Aucune modification des autres providers (Scout, Council, etc.)
+- Aucune modification de VISION.md, NAMING.md, README.md
+- Pas de hardcode de l'API URL ou de la clé — tout doit être dans 
+  le provider config
+- Pas de hardcode du nom "CodeMatch" en dur dans l'engine — l'engine 
+  ne connaît que "evaluation" comme étape, le provider est résolu 
+  par la registry
+- Si une migration de DB est nécessaire, passe par drizzle-kit, pas 
+  en éditant manuellement
+- Si une nouvelle dépendance npm est nécessaire (ex: pour le radar 
+  chart si recharts pas installé), arrête-toi et demande-moi avant 
+  d'ajouter
+
+DELIVERABLE
+
+Après l'implémentation :
+1. Commit local hash : <sha7>
+2. Liste des fichiers modifiés/créés
+3. Output des tests
+4. Capture d'écran ou description du marketplace UI montrant la 
+   nouvelle carte CodeMatch
+
+Le push vers GitHub sera fait par moi.
+
+Commit message exact :
+"feat: add CodeMatch as evaluation provider with marketplace 
+integration (Phase 4.2)"
+
+STOP
+
+Après le commit local, attends ma confirmation. Je vais tester 
+l'intégration en local (connect CodeMatch via la marketplace UI, 
+lancer un workflow avec evaluation activée), puis push vers GitHub, 
+puis donner le go pour Sous-tâche 4.3 (UI polish + PDF reports).
