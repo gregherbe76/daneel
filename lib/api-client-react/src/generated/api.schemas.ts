@@ -104,6 +104,8 @@ export interface Job {
   clientName?: string | null;
   clientLogoUrl?: string | null;
   scoringWeights: ScoringWeights;
+  /** When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking. */
+  technicalEvaluationEnabled: boolean;
   createdAt: string;
   updatedAt: string;
   /** True when the sourcing workflow step is configured with an
@@ -131,6 +133,8 @@ export interface CreateJobBody {
   seniority: Seniority;
   mustHaveSkills: string[];
   scoringWeights?: ScoringWeights;
+  /** Optional. When true, the `technical_evaluation` workflow step runs (requires a configured evaluation provider). Defaults to false. */
+  technicalEvaluationEnabled?: boolean;
 }
 
 /**
@@ -496,6 +500,7 @@ export const ProviderType = {
   apify: "apify",
   council: "council",
   twin_agent: "twin_agent",
+  codematch: "codematch",
 } as const;
 
 export type WorkflowStepName =
@@ -509,6 +514,7 @@ export const WorkflowStepName = {
   sourcing: "sourcing",
   enrichment: "enrichment",
   decision: "decision",
+  technical_evaluation: "technical_evaluation",
 } as const;
 
 /**
@@ -589,6 +595,18 @@ export interface TwinAgentProviderConfig {
 }
 
 /**
+ * Recruiter-tunable knobs for the CodeMatch technical-evaluation
+provider. The CodeMatch API key flows through the existing
+`apiKeyPlaceholder` field on the provider record (sent as
+`Authorization: Bearer <key>`).
+
+ */
+export interface CodeMatchProviderConfig {
+  /** Override for the CodeMatch backend base URL. Defaults to the hosted production deployment (`https://assess.codes/api/v1`) when omitted. */
+  baseUrl?: string | null;
+}
+
+/**
  * Per-provider tuning knobs. Only the section matching the provider type is read.
  */
 export interface AgentProviderConfig {
@@ -597,6 +615,7 @@ export interface AgentProviderConfig {
   apify?: ApifyProviderConfig;
   council?: CouncilProviderConfig;
   twin_agent?: TwinAgentProviderConfig;
+  codematch?: CodeMatchProviderConfig;
 }
 
 export interface AgentProviderRecord {
@@ -1362,10 +1381,45 @@ export interface SourcingCandidateResult {
   source?: string | null;
 }
 
+export interface TechnicalEvaluationScores {
+  technical_depth: number;
+  ownership: number;
+  consistency: number;
+  taste: number;
+  impact: number;
+  overall: number;
+}
+
+/**
+ * One row from `technical_evaluations`. Always returned per
+(run, candidate) pair when the technical_evaluation step ran —
+including failure rows (`evaluated: false`) so the UI can explain
+WHY a candidate wasn't scored.
+
+ */
+export interface TechnicalEvaluation {
+  id: number;
+  runId: number;
+  jobId: number;
+  candidateId: number;
+  evaluated: boolean;
+  providerName: string;
+  providerType: string;
+  scores?: TechnicalEvaluationScores | null;
+  strengths: string[];
+  redFlags: string[];
+  summary?: string | null;
+  reportUrl?: string | null;
+  /** Stable error code (e.g. `premium_required`, `no_github_username`, `rate_limited`). */
+  error?: string | null;
+  evaluatedAt?: string | null;
+}
+
 export interface JobWorkflowResult {
   run: AgentRun;
   insight?: JobInsight | null;
   evaluations: CandidateEvaluation[];
+  technicalEvaluations: TechnicalEvaluation[];
   shortlist?: Shortlist | null;
   sourcedCandidates: SourcingCandidateResult[];
   logs: AgentLog[];

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Seniority } from "@workspace/api-client-react";
 import { X, Plus, Loader2 } from "lucide-react";
 import { useState } from "react";
@@ -42,6 +43,7 @@ const formSchema = z.object({
   scoringWeights: weightsSchema.refine((w) => sumWeights(w) === 100, {
     message: "Scoring weights must add up to 100%",
   }),
+  technicalEvaluationEnabled: z.boolean().optional(),
 });
 
 export default function CreateJobPage() {
@@ -60,6 +62,7 @@ export default function CreateJobPage() {
       seniority: Seniority.Mid,
       mustHaveSkills: [],
       scoringWeights: { ...DEFAULT_SCORING_WEIGHTS },
+      technicalEvaluationEnabled: false,
     },
   });
 
@@ -213,6 +216,32 @@ export default function CreateJobPage() {
                   </FormItem>
                 )}
               />
+
+              <div className="border-t pt-6">
+                <FormField
+                  control={form.control}
+                  name="technicalEvaluationEnabled"
+                  render={({ field }) => (
+                    <FormItem className="flex items-start justify-between gap-4 mb-6">
+                      <div className="space-y-1">
+                        <FormLabel className="text-base">Technical evaluation</FormLabel>
+                        <p className="text-xs text-muted-foreground">
+                          Run an extra technical scoring step (depth, ownership, consistency, taste, impact)
+                          on every candidate using a connected technical evaluation provider — e.g. CodeMatch.
+                          Each candidate must have a public GitHub username on file.
+                        </p>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={!!field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="job-technical-evaluation-switch"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="border-t pt-6">
                 <FormField

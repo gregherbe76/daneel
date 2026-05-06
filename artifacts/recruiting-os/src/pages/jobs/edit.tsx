@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { X, Plus, Loader2, ArrowLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -43,6 +44,7 @@ const formSchema = z.object({
   scoringWeights: weightsSchema.refine((w) => sumWeights(w) === 100, {
     message: "Scoring weights must add up to 100%",
   }),
+  technicalEvaluationEnabled: z.boolean().optional(),
 });
 
 export default function EditJobPage() {
@@ -67,6 +69,7 @@ export default function EditJobPage() {
       seniority: Seniority.Mid,
       mustHaveSkills: [],
       scoringWeights: { ...DEFAULT_SCORING_WEIGHTS },
+      technicalEvaluationEnabled: false,
     },
   });
 
@@ -79,6 +82,7 @@ export default function EditJobPage() {
         seniority: job.seniority,
         mustHaveSkills: job.mustHaveSkills,
         scoringWeights: job.scoringWeights ?? { ...DEFAULT_SCORING_WEIGHTS },
+        technicalEvaluationEnabled: job.technicalEvaluationEnabled ?? false,
       });
     }
   }, [job, form]);
@@ -257,6 +261,32 @@ export default function EditJobPage() {
                   </FormItem>
                 )}
               />
+
+              <div className="border-t pt-6">
+                <FormField
+                  control={form.control}
+                  name="technicalEvaluationEnabled"
+                  render={({ field }) => (
+                    <FormItem className="flex items-start justify-between gap-4 mb-6">
+                      <div className="space-y-1">
+                        <FormLabel className="text-base">Technical evaluation</FormLabel>
+                        <p className="text-xs text-muted-foreground">
+                          Run an extra technical scoring step (depth, ownership, consistency, taste, impact)
+                          on every candidate using a connected technical evaluation provider — e.g. CodeMatch.
+                          Each candidate must have a public GitHub username on file.
+                        </p>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={!!field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="job-technical-evaluation-switch"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="border-t pt-6">
                 <FormField

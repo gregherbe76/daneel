@@ -36,7 +36,9 @@ import { WebSearchSourcingProvider } from "./web-search";
 import { ApifySourcingProvider } from "./apify";
 import { CouncilProvider } from "./council";
 import { TwinAgentBrowserProvider } from "./twin-agent";
+import { CodeMatchProvider } from "./codematch";
 import type { DecisionProvider } from "./decision-interface";
+import type { EvaluationProvider } from "./evaluation-interface";
 import { logger } from "../../../lib/logger";
 import { decryptProviderSecret } from "../../../lib/provider-secrets";
 
@@ -108,9 +110,86 @@ function buildProvider(row: typeof agentProvidersTable.$inferSelect): AgentProvi
         `Provider "${row.name}" is a Council decision provider — use buildDecisionProvider() / resolveDecisionProvider() instead. ` +
           `Council can only be assigned to the "decision" workflow step.`,
       );
+    case "codematch":
+      throw new Error(
+        `Provider "${row.name}" is a CodeMatch evaluation provider — use buildEvaluationProvider() / resolveEvaluationProvider() instead. ` +
+          `CodeMatch can only be assigned to the "technical_evaluation" workflow step.`,
+      );
     default:
       throw new Error(`Unknown provider type: ${row.type}`);
   }
+}
+
+/**
+ * Construct a technical-evaluation provider instance from a DB row. Kept
+ * separate from `buildProvider` so the type system can enforce that
+ * evaluation providers (CodeMatch today) are only assigned to the
+ * `technical_evaluation` workflow step.
+ */
+function buildEvaluationProvider(
+  row: typeof agentProvidersTable.$inferSelect,
+): EvaluationProvider {
+  const apiKey = decryptApiKeyOrThrow(row.apiKeyEncryptedPlaceholder, row.name);
+  switch (row.type) {
+    case "codematch":
+      return new CodeMatchProvider(
+        row.id,
+        row.name,
+        apiKey,
+        row.config?.codematch ?? null,
+      );
+    default:
+      throw new Error(
+        `Provider type "${row.type}" cannot be assigned to the technical_evaluation step. Only CodeMatch is supported today.`,
+      );
+  }
+}
+
+/**
+ * Resolve the provider for the optional technical_evaluation step. Returns
+ * null when no provider is configured — the engine treats that as "skip the
+ * step entirely". There is no native fallback by design (technical evaluation
+ * requires a real upstream service).
+ */
+export async function resolveEvaluationProvider(): Promise<EvaluationProvider | null> {
+  try {
+    const [setting] = await db
+      .select()
+      .from(workflowProviderSettingsTable)
+      .where(eq(workflowProviderSettingsTable.workflowStep, "technical_evaluation"))
+      .limit(1);
+
+    if (!setting || !setting.enabled) return null;
+
+    const [providerRow] = await db
+      .select()
+      .from(agentProvidersTable)
+      .where(eq(agentProvidersTable.id, setting.providerId))
+      .limit(1);
+
+    if (!providerRow || !providerRow.enabled) {
+      logger.warn(
+        { step: "technical_evaluation", providerId: setting.providerId },
+        "Evaluation provider not found or disabled — skipping technical_evaluation step",
+      );
+      return null;
+    }
+
+    return buildEvaluationProvider(providerRow);
+  } catch (err) {
+    logger.error(
+      { step: "technical_evaluation", err },
+      "Failed to resolve evaluation provider — skipping technical_evaluation step",
+    );
+    return null;
+  }
+}
+
+/** Build an evaluation provider instance from a row, used by ad-hoc routes. */
+export function evaluationProviderFromRow(
+  row: typeof agentProvidersTable.$inferSelect,
+): EvaluationProvider {
+  return buildEvaluationProvider(row);
 }
 
 /**

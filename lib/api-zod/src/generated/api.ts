@@ -62,6 +62,11 @@ export const ListJobsResponseItem = zod.object({
     .describe(
       "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
     ),
+  technicalEvaluationEnabled: zod
+    .boolean()
+    .describe(
+      "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
+    ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
   hasRealSourcingProvider: zod
@@ -118,6 +123,12 @@ export const CreateJobBody = zod.object({
     .describe(
       "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
     ),
+  technicalEvaluationEnabled: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Optional. When true, the `technical_evaluation` workflow step runs (requires a configured evaluation provider). Defaults to false.",
+    ),
 });
 
 /**
@@ -171,6 +182,11 @@ export const GetJobResponse = zod.object({
     })
     .describe(
       "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+    ),
+  technicalEvaluationEnabled: zod
+    .boolean()
+    .describe(
+      "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
     ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -231,6 +247,12 @@ export const UpdateJobBody = zod.object({
     .describe(
       "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
     ),
+  technicalEvaluationEnabled: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Optional. When true, the `technical_evaluation` workflow step runs (requires a configured evaluation provider). Defaults to false.",
+    ),
 });
 
 export const updateJobResponseScoringWeightsAutonomyMin = 0;
@@ -277,6 +299,11 @@ export const UpdateJobResponse = zod.object({
     })
     .describe(
       "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+    ),
+  technicalEvaluationEnabled: zod
+    .boolean()
+    .describe(
+      "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
     ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -361,6 +388,11 @@ export const GetJobApplicationsResponseItem = zod.object({
       })
       .describe(
         "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+      ),
+    technicalEvaluationEnabled: zod
+      .boolean()
+      .describe(
+        "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
@@ -1106,6 +1138,11 @@ export const GetCandidateApplicationsResponseItem = zod.object({
       .describe(
         "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
       ),
+    technicalEvaluationEnabled: zod
+      .boolean()
+      .describe(
+        "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
+      ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
     hasRealSourcingProvider: zod
@@ -1214,6 +1251,11 @@ export const ListApplicationsResponseItem = zod.object({
       })
       .describe(
         "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+      ),
+    technicalEvaluationEnabled: zod
+      .boolean()
+      .describe(
+        "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
@@ -1343,6 +1385,11 @@ export const GetApplicationResponse = zod.object({
       })
       .describe(
         "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+      ),
+    technicalEvaluationEnabled: zod
+      .boolean()
+      .describe(
+        "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
@@ -1616,6 +1663,42 @@ export const GetLatestJobWorkflowResponse = zod.object({
       createdAt: zod.coerce.date(),
     }),
   ),
+  technicalEvaluations: zod.array(
+    zod
+      .object({
+        id: zod.number(),
+        runId: zod.number(),
+        jobId: zod.number(),
+        candidateId: zod.number(),
+        evaluated: zod.boolean(),
+        providerName: zod.string(),
+        providerType: zod.string(),
+        scores: zod
+          .object({
+            technical_depth: zod.number(),
+            ownership: zod.number(),
+            consistency: zod.number(),
+            taste: zod.number(),
+            impact: zod.number(),
+            overall: zod.number(),
+          })
+          .nullish(),
+        strengths: zod.array(zod.string()),
+        redFlags: zod.array(zod.string()),
+        summary: zod.string().nullish(),
+        reportUrl: zod.string().nullish(),
+        error: zod
+          .string()
+          .nullish()
+          .describe(
+            "Stable error code (e.g. `premium_required`, `no_github_username`, `rate_limited`).",
+          ),
+        evaluatedAt: zod.coerce.date().nullish(),
+      })
+      .describe(
+        "One row from `technical_evaluations`. Always returned per\n(run, candidate) pair when the technical_evaluation step ran —\nincluding failure rows (`evaluated: false`) so the UI can explain\nWHY a candidate wasn't scored.\n",
+      ),
+  ),
   shortlist: zod
     .object({
       id: zod.number(),
@@ -1677,6 +1760,7 @@ export const ListProvidersResponseItem = zod.object({
     "apify",
     "council",
     "twin_agent",
+    "codematch",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -1821,6 +1905,19 @@ export const ListProvidersResponseItem = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
         ),
+      codematch: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the CodeMatch backend base URL. Defaults to the hosted production deployment (`https:\/\/assess.codes\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -1846,6 +1943,7 @@ export const CreateProviderBody = zod.object({
     "apify",
     "council",
     "twin_agent",
+    "codematch",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -1984,6 +2082,19 @@ export const CreateProviderBody = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
+      codematch: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the CodeMatch backend base URL. Defaults to the hosted production deployment (`https:\/\/assess.codes\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -2050,6 +2161,7 @@ export const GetProviderResponse = zod.object({
     "apify",
     "council",
     "twin_agent",
+    "codematch",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2194,6 +2306,19 @@ export const GetProviderResponse = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
         ),
+      codematch: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the CodeMatch backend base URL. Defaults to the hosted production deployment (`https:\/\/assess.codes\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -2222,6 +2347,7 @@ export const UpdateProviderBody = zod.object({
     "apify",
     "council",
     "twin_agent",
+    "codematch",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2361,6 +2487,19 @@ export const UpdateProviderBody = zod.object({
         .describe(
           "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
         ),
+      codematch: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the CodeMatch backend base URL. Defaults to the hosted production deployment (`https:\/\/assess.codes\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -2381,6 +2520,7 @@ export const UpdateProviderResponse = zod.object({
     "apify",
     "council",
     "twin_agent",
+    "codematch",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2524,6 +2664,19 @@ export const UpdateProviderResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
+      codematch: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the CodeMatch backend base URL. Defaults to the hosted production deployment (`https:\/\/assess.codes\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -2565,6 +2718,7 @@ export const ToggleProviderResponse = zod.object({
     "apify",
     "council",
     "twin_agent",
+    "codematch",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2708,6 +2862,19 @@ export const ToggleProviderResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
+      codematch: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the CodeMatch backend base URL. Defaults to the hosted production deployment (`https:\/\/assess.codes\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -2751,6 +2918,7 @@ export const ReplaceProviderKeyResponse = zod.object({
     "apify",
     "council",
     "twin_agent",
+    "codematch",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2894,6 +3062,19 @@ export const ReplaceProviderKeyResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
+        ),
+      codematch: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the CodeMatch backend base URL. Defaults to the hosted production deployment (`https:\/\/assess.codes\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -3024,6 +3205,7 @@ export const ListProviderStepSettingsResponseItem = zod.object({
     "sourcing",
     "enrichment",
     "decision",
+    "technical_evaluation",
   ]),
   providerId: zod.number(),
   enabled: zod.boolean(),
@@ -3039,6 +3221,7 @@ export const ListProviderStepSettingsResponseItem = zod.object({
       "apify",
       "council",
       "twin_agent",
+      "codematch",
     ]),
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
@@ -3182,6 +3365,19 @@ export const ListProviderStepSettingsResponseItem = zod.object({
           .optional()
           .describe(
             "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
+          ),
+        codematch: zod
+          .object({
+            baseUrl: zod
+              .string()
+              .nullish()
+              .describe(
+                "Override for the CodeMatch backend base URL. Defaults to the hosted production deployment (`https:\/\/assess.codes\/api\/v1`) when omitted.",
+              ),
+          })
+          .optional()
+          .describe(
+            "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
           ),
       })
       .describe(
@@ -3209,6 +3405,7 @@ export const UpsertProviderStepSettingBody = zod.object({
     "sourcing",
     "enrichment",
     "decision",
+    "technical_evaluation",
   ]),
   providerId: zod.number(),
   enabled: zod.boolean(),
@@ -3224,6 +3421,7 @@ export const UpsertProviderStepSettingResponse = zod.object({
     "sourcing",
     "enrichment",
     "decision",
+    "technical_evaluation",
   ]),
   providerId: zod.number(),
   enabled: zod.boolean(),
@@ -3239,6 +3437,7 @@ export const UpsertProviderStepSettingResponse = zod.object({
       "apify",
       "council",
       "twin_agent",
+      "codematch",
     ]),
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
@@ -3382,6 +3581,19 @@ export const UpsertProviderStepSettingResponse = zod.object({
           .optional()
           .describe(
             "Recruiter-tunable knobs for the Twin Agent Browser sourcing provider.\nThe Twin API key flows through the existing `apiKeyPlaceholder` field\non the provider record (it is sent as `Authorization: Bearer <key>`).\n",
+          ),
+        codematch: zod
+          .object({
+            baseUrl: zod
+              .string()
+              .nullish()
+              .describe(
+                "Override for the CodeMatch backend base URL. Defaults to the hosted production deployment (`https:\/\/assess.codes\/api\/v1`) when omitted.",
+              ),
+          })
+          .optional()
+          .describe(
+            "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
           ),
       })
       .describe(
@@ -4459,6 +4671,11 @@ export const GetJobReportForRunResponse = zod.object({
       .describe(
         "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
       ),
+    technicalEvaluationEnabled: zod
+      .boolean()
+      .describe(
+        "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
+      ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
     hasRealSourcingProvider: zod
@@ -4672,6 +4889,11 @@ export const GetJobReportResponse = zod.object({
       })
       .describe(
         "Per-job scoring weights (integer percentages 0-100, must sum to 100).",
+      ),
+    technicalEvaluationEnabled: zod
+      .boolean()
+      .describe(
+        "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),

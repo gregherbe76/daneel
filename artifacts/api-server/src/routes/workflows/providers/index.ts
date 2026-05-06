@@ -10,6 +10,7 @@ export { GithubSourcingProvider } from "./github";
 export { WebSearchSourcingProvider } from "./web-search";
 export { ApifySourcingProvider } from "./apify";
 export { CouncilProvider } from "./council";
+export { CodeMatchProvider } from "./codematch";
 export type {
   DecisionProvider,
   DeliberateInput,
@@ -18,11 +19,21 @@ export type {
   DeliberationJobInput,
 } from "./decision-interface";
 export { DecisionQuotaExceededError } from "./decision-interface";
+export type {
+  EvaluationProvider,
+  EvaluateInput,
+  EvaluationCandidateInput,
+  EvaluationResult,
+  EvaluationErrorCode,
+  TechnicalScores,
+} from "./evaluation-interface";
 export {
   resolveProvider,
   resolveSourcingProvider,
   resolveEnrichmentProvider,
   resolveDecisionProvider,
+  resolveEvaluationProvider,
   providerFromRow,
   decisionProviderFromRow,
+  evaluationProviderFromRow,
 } from "./registry";

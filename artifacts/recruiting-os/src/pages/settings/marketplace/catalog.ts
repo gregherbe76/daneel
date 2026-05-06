@@ -66,7 +66,8 @@ export type ConnectProviderType =
   | "github"
   | "twin_agent"
   | "scout"
-  | "council";
+  | "council"
+  | "codematch";
 
 /** Twin's brand yellow — used as the marketplace card accent and badge fill. */
 export const TWIN_YELLOW = "#FEDA3D";
@@ -212,6 +213,20 @@ export const CATALOG: CatalogEntry[] = [
     helper:
       "Connecting auto-assigns Council to the Decision workflow step. Convergence, divergence, and orientations show on the candidate Council tab.",
     logoMark: "Co",
+  },
+  {
+    kind: "connect",
+    id: "codematch",
+    name: "CodeMatch",
+    category: "evaluation",
+    oneLiner:
+      "Score candidates on five technical dimensions from their public GitHub footprint — depth, ownership, consistency, taste, impact.",
+    pricing: "Premium — bring your own CodeMatch API key",
+    badges: ["byo-key"],
+    connectType: "codematch",
+    helper:
+      "Connecting auto-assigns CodeMatch to the optional Technical Evaluation step. Each shortlisted candidate must have a public GitHub username on file. Premium-gated per CodeMatch's pricing.",
+    logoMark: "Cm",
   },
   {
     kind: "connect",

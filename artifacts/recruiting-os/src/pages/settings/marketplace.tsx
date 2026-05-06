@@ -70,6 +70,7 @@ type ProviderRecord = {
     twin_agent?: TwinAgentProviderConfig | null;
     apify?: ApifyProviderConfig | null;
     council?: { baseUrl?: string | null } | null;
+    codematch?: { baseUrl?: string | null } | null;
   } | null;
 };
 
@@ -106,7 +107,8 @@ type WorkflowStep =
   | "candidate_matching"
   | "shortlist_generation"
   | "sourcing"
-  | "enrichment";
+  | "enrichment"
+  | "technical_evaluation";
 
 const WORKFLOW_STEP_LABELS: Record<WorkflowStep, string> = {
   job_understanding: "Job Understanding",
@@ -114,6 +116,7 @@ const WORKFLOW_STEP_LABELS: Record<WorkflowStep, string> = {
   shortlist_generation: "Shortlist Generation",
   sourcing: "Sourcing",
   enrichment: "Enrichment",
+  technical_evaluation: "Technical Evaluation",
 };
 
 /**
@@ -133,10 +136,11 @@ const APPLICABLE_STEPS: Record<ConnectProviderType, WorkflowStep[]> = {
   github: ["sourcing"],
   twin_agent: ["sourcing"],
   apify: ["sourcing"],
-  // Scout & Council manage their own step assignment in their connect flow,
-  // so they hide the inline step picker on the marketplace card.
+  // Scout, Council, CodeMatch manage their own step assignment in their
+  // connect flow, so they hide the inline step picker on the marketplace card.
   scout: [],
   council: [],
+  codematch: [],
 };
 
 /** Maps a marketplace connectType to the underlying provider `type` column. */
@@ -147,6 +151,7 @@ function providerTypeFor(connectType: ConnectProviderType): string | null {
   if (connectType === "apify") return "apify";
   if (connectType === "twin_agent") return "twin_agent";
   if (connectType === "council") return "council";
+  if (connectType === "codematch") return "codematch";
   // scout uses twin_webhook + the magic name "A-Player Scout"; handled inline.
   return null;
 }
@@ -207,6 +212,11 @@ function deriveState(entry: ConnectProvider, providers: ProviderRecord[]): ConnS
   }
   if (entry.connectType === "council") {
     const p = providers.find((x) => x.type === "council");
+    if (!p) return "disconnected";
+    return p.enabled ? "connected" : "action_required";
+  }
+  if (entry.connectType === "codematch") {
+    const p = providers.find((x) => x.type === "codematch");
     if (!p) return "disconnected";
     return p.enabled ? "connected" : "action_required";
   }
@@ -382,6 +392,9 @@ function ConnectDialog({
   // Council tuning
   const [councilBaseUrl, setCouncilBaseUrl] = useState("");
 
+  // CodeMatch tuning
+  const [codematchBaseUrl, setCodematchBaseUrl] = useState("");
+
   // GitHub Agent tuning
   const [ghExtraKeywords, setGhExtraKeywords] = useState("");
   const [ghExcludeOrgs, setGhExcludeOrgs] = useState("");
@@ -456,6 +469,9 @@ function ConnectDialog({
     }
     if (entry.connectType === "council") {
       setCouncilBaseUrl(existing?.config?.council?.baseUrl ?? "");
+    }
+    if (entry.connectType === "codematch") {
+      setCodematchBaseUrl(existing?.config?.codematch?.baseUrl ?? "");
     }
   }, [open, entry, existing]);
 
@@ -619,6 +635,52 @@ function ConnectDialog({
           description: stepAssigned
             ? "Wired up to the Decision step. Verdicts appear on the candidate Council tab."
             : "Saved, but couldn't auto-assign the Decision step — wire it up from the Advanced section.",
+        });
+      } else if (entry.connectType === "codematch") {
+        const baseUrl = codematchBaseUrl.trim();
+        const payload = {
+          name: "CodeMatch",
+          type: "codematch" as const,
+          webhookUrl: null,
+          baseUrl: null,
+          apiKeyPlaceholder: apiKey
+            ? apiKey
+            : existing?.apiKeyPlaceholder ?? null,
+          config: baseUrl ? { codematch: { baseUrl } } : null,
+          enabled: true,
+        };
+        let providerId: number;
+        if (existing) {
+          await update.mutateAsync({ id: existing.id, data: payload });
+          providerId = existing.id;
+        } else {
+          const created = (await create.mutateAsync({ data: payload })) as {
+            id: number;
+          };
+          providerId = created.id;
+        }
+        await qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
+        let stepAssigned = false;
+        try {
+          await upsertStep.mutateAsync({
+            data: {
+              workflowStep: "technical_evaluation",
+              providerId,
+              enabled: true,
+            },
+          });
+          await qc.invalidateQueries({
+            queryKey: getListProviderStepSettingsQueryKey(),
+          });
+          stepAssigned = true;
+        } catch {
+          /* non-fatal — admin can wire it from the Advanced section */
+        }
+        toast({
+          title: "CodeMatch connected",
+          description: stepAssigned
+            ? "Wired up to the Technical Evaluation step. Enable it per-job from the job edit page."
+            : "Saved, but couldn't auto-assign the Technical Evaluation step — wire it up from the Advanced section.",
         });
       } else if (entry.connectType === "apify") {
         const apifyConfig: ApifyProviderConfig = {
@@ -913,6 +975,57 @@ function ConnectDialog({
                   <p className="text-xs text-muted-foreground">
                     Leave blank for the hosted production deployment. Override only when self-hosting
                     Council.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {entry.connectType === "codematch" && (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="codematch-key">CodeMatch API key</Label>
+              <Input
+                id="codematch-key"
+                type="password"
+                placeholder={existing?.apiKeyLast4 ? `•••• ${existing.apiKeyLast4}` : "cm_sk_…"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                autoComplete="new-password"
+                data-testid="codematch-key"
+              />
+              <p className="text-xs text-muted-foreground">
+                {existing?.apiKeyLast4
+                  ? "Leave blank to keep the existing key. Paste a new key to rotate."
+                  : "Get your key from assess.codes → Settings → API Keys. Sent as Authorization: Bearer …"}
+              </p>
+            </div>
+
+            <div className="rounded-md bg-muted/40 border border-border p-3 text-xs text-muted-foreground">
+              Connecting auto-assigns CodeMatch to the <strong>Technical Evaluation</strong> step.
+              The step is opt-in per job — toggle it on in the job edit page once CodeMatch is
+              connected. Each candidate must have a public GitHub username on file.
+            </div>
+
+            <AdvancedToggle open={advancedOpen} onToggle={setAdvancedOpen} />
+
+            {advancedOpen && (
+              <div
+                className="space-y-3 rounded-md border border-border p-3"
+                data-testid="codematch-advanced"
+              >
+                <div className="space-y-1.5">
+                  <Label>Base URL override</Label>
+                  <Input
+                    placeholder="https://assess.codes/api/v1"
+                    value={codematchBaseUrl}
+                    onChange={(e) => setCodematchBaseUrl(e.target.value)}
+                    data-testid="codematch-base-url"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave blank for the hosted production deployment. Override only when self-hosting
+                    or pointing at a CodeMatch staging environment.
                   </p>
                 </div>
               </div>

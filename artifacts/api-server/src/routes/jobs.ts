@@ -38,6 +38,9 @@ router.post("/jobs", async (req, res) => {
       seniority: body.seniority,
       mustHaveSkills: body.mustHaveSkills,
       scoringWeights: body.scoringWeights ?? DEFAULT_SCORING_WEIGHTS,
+      ...(typeof body.technicalEvaluationEnabled === "boolean"
+        ? { technicalEvaluationEnabled: body.technicalEvaluationEnabled }
+        : {}),
     })
     .returning();
   const realSourcingAvailable = await hasRealSourcingProvider();
@@ -77,6 +80,9 @@ router.put("/jobs/:id", async (req, res) => {
       // Only overwrite weights when the client explicitly sends them.
       // Omitting the field preserves the job's existing customized weights.
       ...(body.scoringWeights ? { scoringWeights: body.scoringWeights } : {}),
+      ...(typeof body.technicalEvaluationEnabled === "boolean"
+        ? { technicalEvaluationEnabled: body.technicalEvaluationEnabled }
+        : {}),
       updatedAt: new Date(),
     })
     .where(eq(jobsTable.id, id))

@@ -8,6 +8,7 @@ import {
   shortlistsTable,
   candidatesTable,
   activeCandidateFilter,
+  technicalEvaluationsTable,
 } from "@workspace/db";
 import { eq, desc, inArray, and } from "drizzle-orm";
 import { RunWorkflowBody } from "@workspace/api-zod";
@@ -215,13 +216,14 @@ router.get("/workflows/jobs/:jobId/latest", async (req, res) => {
     return;
   }
 
-  const [logs, evaluations, insightRows, shortlistRows, candidates] =
+  const [logs, evaluations, insightRows, shortlistRows, candidates, technicalEvaluations] =
     await Promise.all([
       db.select().from(agentLogsTable).where(eq(agentLogsTable.runId, run.id)).orderBy(agentLogsTable.createdAt),
       db.select().from(aiEvaluationsTable).where(eq(aiEvaluationsTable.runId, run.id)),
       db.select().from(jobInsightsTable).where(eq(jobInsightsTable.runId, run.id)).limit(1),
       db.select().from(shortlistsTable).where(eq(shortlistsTable.runId, run.id)).limit(1),
       db.select().from(candidatesTable).where(activeCandidateFilter),
+      db.select().from(technicalEvaluationsTable).where(eq(technicalEvaluationsTable.runId, run.id)),
     ]);
 
   const candidateMap = new Map(candidates.map(c => [c.id, c]));
@@ -251,10 +253,15 @@ router.get("/workflows/jobs/:jobId/latest", async (req, res) => {
     }
   }
 
+  const technicalEvaluationsForLiveCandidates = technicalEvaluations.filter((te) =>
+    candidateMap.has(te.candidateId),
+  );
+
   res.json({
     run,
     insight: insightRows[0] ?? null,
     evaluations: evaluationsWithCandidates,
+    technicalEvaluations: technicalEvaluationsForLiveCandidates,
     shortlist: shortlistRows[0] ?? null,
     sourcedCandidates,
     logs,

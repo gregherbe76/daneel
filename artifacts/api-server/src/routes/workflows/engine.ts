@@ -9,12 +9,13 @@ import {
   candidatesTable,
   applicationsTable,
   activeCandidateFilter,
+  technicalEvaluationsTable,
 } from "@workspace/db";
 import type { VariantCriteria, DataMode, ScoringWeights } from "@workspace/db";
 import { eq, ne, and, inArray } from "drizzle-orm";
 import { logger } from "../../lib/logger";
 import { validateEmail } from "../../lib/email-validation";
-import { resolveProvider, resolveSourcingProvider, resolveEnrichmentProvider, resolveDecisionProvider } from "./providers";
+import { resolveProvider, resolveSourcingProvider, resolveEnrichmentProvider, resolveDecisionProvider, resolveEvaluationProvider } from "./providers";
 import { DecisionQuotaExceededError } from "./providers/decision-interface";
 import { deliberationsTable } from "@workspace/db";
 import type { JobInsightResult, CandidateMatchResult, ShortlistResult } from "./engine-types";
@@ -709,6 +710,106 @@ async function runShortlist(
   }
 }
 
+// ── STEP 3.5 (optional): Technical Evaluation (CodeMatch et al.) ──────────────
+
+/**
+ * Optional per-candidate technical evaluation step. Runs AFTER candidate
+ * matching and BEFORE shortlist generation, but never modifies the shortlist
+ * scoring — results are stored side-by-side in `technical_evaluations` and
+ * surfaced in the candidate detail UI / report.
+ *
+ * Gated by `jobs.technicalEvaluationEnabled`. When the toggle is on but no
+ * evaluation provider is configured, the step logs a `failed` event with a
+ * recruiter-facing note and returns — the rest of the workflow continues.
+ *
+ * Each candidate is scored independently. Provider failures (premium gate,
+ * rate limit, missing GitHub username, etc.) are persisted as
+ * `evaluated: false` rows so the UI can show WHY a candidate wasn't scored
+ * instead of an empty section.
+ */
+async function runTechnicalEvaluation(
+  runId: number,
+  jobId: number,
+  job: { technicalEvaluationEnabled: boolean },
+  candidates: Array<typeof candidatesTable.$inferSelect>,
+): Promise<void> {
+  if (!job.technicalEvaluationEnabled) return;
+  if (candidates.length === 0) return;
+
+  const provider = await resolveEvaluationProvider();
+  if (!provider) {
+    await logStep(runId, "technical_evaluation", "failed", null, {
+      note: "Connect a technical evaluation provider in the marketplace to use this feature.",
+    });
+    logger.info(
+      { runId, jobId },
+      "technical_evaluation enabled on job but no evaluation provider configured — skipping",
+    );
+    return;
+  }
+
+  await logStep(runId, "technical_evaluation", "running", {
+    candidateCount: candidates.length,
+    provider: provider.name,
+  });
+
+  let evaluatedCount = 0;
+  let skippedCount = 0;
+
+  for (const candidate of candidates) {
+    try {
+      const result = await provider.evaluate({
+        runId,
+        jobId,
+        candidate: {
+          id: candidate.id,
+          name: candidate.name,
+          githubUsername: candidate.githubUsername ?? null,
+          githubUrl: candidate.githubUrl ?? null,
+        },
+      });
+
+      await db.insert(technicalEvaluationsTable).values({
+        runId,
+        jobId,
+        candidateId: candidate.id,
+        evaluated: result.evaluated,
+        providerName: provider.name,
+        providerType: provider.type,
+        scores: result.scores ?? null,
+        strengths: result.strengths,
+        redFlags: result.red_flags,
+        summary: result.summary,
+        reportUrl: result.report_url,
+        error: result.error,
+        evaluatedAt: result.evaluated_at ? new Date(result.evaluated_at) : null,
+      });
+
+      if (result.evaluated) evaluatedCount++;
+      else skippedCount++;
+    } catch (err) {
+      logger.error(
+        { runId, candidateId: candidate.id, err },
+        "Technical evaluation insert failed",
+      );
+      skippedCount++;
+    }
+  }
+
+  await logStep(
+    runId,
+    "technical_evaluation",
+    "completed",
+    { candidateCount: candidates.length, provider: provider.name },
+    {
+      providerName: provider.name,
+      providerType: provider.type,
+      evaluated: evaluatedCount,
+      skipped: skippedCount,
+    },
+  );
+}
+
 // ── STEP 4 (optional): Decision (multi-pole deliberation) ─────────────────────
 
 async function runDecisionStep(
@@ -1017,6 +1118,10 @@ export async function runWorkflowEngine(
       logger.warn({ runId }, "No eligible candidates for matching — skipping matching and shortlist");
     } else {
       await runCandidateMatching(runId, jobId, effectiveJob, insight, matchingCandidates);
+
+      // Step 3.5 (optional): Technical Evaluation — runs side-by-side with the
+      // existing matching scores; never modifies the shortlist ranking.
+      await runTechnicalEvaluation(runId, jobId, effectiveJob, matchingCandidates);
 
       // Step 3: Shortlist (fetch fresh evaluations)
       const evaluations = await db

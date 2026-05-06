@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, pgEnum, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, pgEnum, jsonb, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -38,6 +38,9 @@ export const jobsTable = pgTable("jobs", {
     .$type<ScoringWeights>()
     .notNull()
     .default(DEFAULT_SCORING_WEIGHTS),
+  technicalEvaluationEnabled: boolean("technical_evaluation_enabled")
+    .notNull()
+    .default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

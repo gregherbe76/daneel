@@ -63,6 +63,16 @@ export type TwinAgentProviderConfig = {
   streaming?: boolean | null;
 };
 
+export type CodeMatchProviderConfig = {
+  /**
+   * Override for the CodeMatch backend base URL. Defaults to the hosted
+   * production deployment (`https://assess.codes/api/v1`) when omitted. The
+   * API key flows through the existing `apiKeyEncryptedPlaceholder` column
+   * on the provider row (sent as `Authorization: Bearer <key>`).
+   */
+  baseUrl?: string | null;
+};
+
 export type CouncilProviderConfig = {
   /**
    * Override for the Council backend base URL. Defaults to Council's prod
@@ -78,6 +88,7 @@ export type AgentProviderConfig = {
   apify?: ApifyProviderConfig;
   council?: CouncilProviderConfig;
   twin_agent?: TwinAgentProviderConfig;
+  codematch?: CodeMatchProviderConfig;
 };
 
 export const providerTypeEnum = pgEnum("provider_type", [
@@ -89,6 +100,7 @@ export const providerTypeEnum = pgEnum("provider_type", [
   "apify",
   "council",
   "twin_agent",
+  "codematch",
 ]);
 
 export const workflowStepEnum = pgEnum("workflow_step", [
@@ -99,6 +111,7 @@ export const workflowStepEnum = pgEnum("workflow_step", [
   "sourcing",
   "enrichment",
   "decision",
+  "technical_evaluation",
 ]);
 
 export const agentProvidersTable = pgTable("agent_providers", {

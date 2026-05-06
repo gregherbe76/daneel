@@ -42,6 +42,7 @@ import { EmailStatusHistoryCard } from "@/components/email-status-history-card";
 import { RealSourcingPill } from "@/components/real-sourcing-pill";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CouncilTab } from "@/components/council/council-tab";
+import { TechnicalEvaluationTab } from "@/components/technical-evaluation-tab";
 
 function formatRelativeTime(input: string | Date): string {
   const ts = typeof input === "string" ? new Date(input).getTime() : input.getTime();
@@ -246,6 +247,9 @@ export default function CandidateDetailPage() {
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="technical-evaluation" data-testid="tab-technical-evaluation">
+            Technical Evaluation
+          </TabsTrigger>
           <TabsTrigger value="council">Council</TabsTrigger>
         </TabsList>
 
@@ -375,6 +379,49 @@ export default function CandidateDetailPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="technical-evaluation" className="space-y-4">
+          {(jobs ?? []).length === 0 ? (
+            <Card>
+              <CardContent className="py-6">
+                <p className="text-sm text-muted-foreground italic text-center">
+                  Create a job first — technical evaluations are scoped to a (candidate, job) pair.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                  Evaluation for which role?
+                </label>
+                <Select
+                  value={String(activeJobId)}
+                  onValueChange={(v) => setSelectedJobId(parseInt(v, 10))}
+                >
+                  <SelectTrigger className="max-w-md">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(jobs ?? []).map((j) => (
+                      <SelectItem key={j.id} value={String(j.id)}>
+                        {j.title} · {j.location}
+                        {appJobIds.has(j.id) ? " (applied)" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {activeJobId > 0 && (
+                <TechnicalEvaluationTab
+                  candidateId={candidateId}
+                  jobId={activeJobId}
+                  candidateGithubUsername={candidate.githubUsername ?? null}
+                />
+              )}
+            </>
+          )}
         </TabsContent>
 
         <TabsContent value="council" className="space-y-4">

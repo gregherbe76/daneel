@@ -2158,6 +2158,9 @@ components:
           nullable: true
         scoringWeights:
           $ref: "#/components/schemas/ScoringWeights"
+        technicalEvaluationEnabled:
+          type: boolean
+          description: When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.
         createdAt:
           type: string
           format: date-time
@@ -2181,7 +2184,7 @@ components:
             instead of the historical Mock + off defaults. Populated by
             both GET /jobs and GET /jobs/:id; the value is currently
             global so it is identical across rows in the list response.
-      required: [id, title, description, location, seniority, mustHaveSkills, scoringWeights, createdAt, updatedAt, hasRealSourcingProvider]
+      required: [id, title, description, location, seniority, mustHaveSkills, scoringWeights, technicalEvaluationEnabled, createdAt, updatedAt, hasRealSourcingProvider]
 
     CreateJobBody:
       type: object
@@ -2200,6 +2203,9 @@ components:
             type: string
         scoringWeights:
           $ref: "#/components/schemas/ScoringWeights"
+        technicalEvaluationEnabled:
+          type: boolean
+          description: Optional. When true, the `technical_evaluation` workflow step runs (requires a configured evaluation provider). Defaults to false.
       required: [title, description, location, seniority, mustHaveSkills]
 
     # ── CANDIDATE ──
@@ -2794,11 +2800,11 @@ components:
     # ── PROVIDERS ──
     ProviderType:
       type: string
-      enum: [native_openai, custom_webhook, twin_webhook, github, web_search, apify, council, twin_agent]
+      enum: [native_openai, custom_webhook, twin_webhook, github, web_search, apify, council, twin_agent, codematch]
 
     WorkflowStepName:
       type: string
-      enum: [job_understanding, candidate_matching, shortlist_generation, sourcing_later, sourcing, enrichment, decision]
+      enum: [job_understanding, candidate_matching, shortlist_generation, sourcing_later, sourcing, enrichment, decision, technical_evaluation]
 
     GithubProviderConfig:
       type: object
@@ -2914,6 +2920,19 @@ components:
           nullable: true
           description: When true, open an SSE stream to receive partial candidate cards as Twin's browser agent finds them. Defaults to false (sync JSON response).
 
+    CodeMatchProviderConfig:
+      type: object
+      description: |
+        Recruiter-tunable knobs for the CodeMatch technical-evaluation
+        provider. The CodeMatch API key flows through the existing
+        `apiKeyPlaceholder` field on the provider record (sent as
+        `Authorization: Bearer <key>`).
+      properties:
+        baseUrl:
+          type: string
+          nullable: true
+          description: Override for the CodeMatch backend base URL. Defaults to the hosted production deployment (`https://assess.codes/api/v1`) when omitted.
+
     AgentProviderConfig:
       type: object
       description: Per-provider tuning knobs. Only the section matching the provider type is read.
@@ -2928,6 +2947,8 @@ components:
           $ref: "#/components/schemas/CouncilProviderConfig"
         twin_agent:
           $ref: "#/components/schemas/TwinAgentProviderConfig"
+        codematch:
+          $ref: "#/components/schemas/CodeMatchProviderConfig"
 
     AgentProviderRecord:
       type: object
@@ -4098,6 +4119,73 @@ components:
           nullable: true
       required: [id, name, email, skills]
 
+    TechnicalEvaluationScores:
+      type: object
+      properties:
+        technical_depth:
+          type: integer
+        ownership:
+          type: integer
+        consistency:
+          type: integer
+        taste:
+          type: integer
+        impact:
+          type: integer
+        overall:
+          type: integer
+      required: [technical_depth, ownership, consistency, taste, impact, overall]
+
+    TechnicalEvaluation:
+      type: object
+      description: |
+        One row from `technical_evaluations`. Always returned per
+        (run, candidate) pair when the technical_evaluation step ran —
+        including failure rows (`evaluated: false`) so the UI can explain
+        WHY a candidate wasn't scored.
+      properties:
+        id:
+          type: integer
+        runId:
+          type: integer
+        jobId:
+          type: integer
+        candidateId:
+          type: integer
+        evaluated:
+          type: boolean
+        providerName:
+          type: string
+        providerType:
+          type: string
+        scores:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/TechnicalEvaluationScores"
+        strengths:
+          type: array
+          items:
+            type: string
+        redFlags:
+          type: array
+          items:
+            type: string
+        summary:
+          type: string
+          nullable: true
+        reportUrl:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+          description: Stable error code (e.g. `premium_required`, `no_github_username`, `rate_limited`).
+        evaluatedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [id, runId, jobId, candidateId, evaluated, providerName, providerType, strengths, redFlags]
+
     JobWorkflowResult:
       type: object
       properties:
@@ -4111,6 +4199,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CandidateEvaluation"
+        technicalEvaluations:
+          type: array
+          items:
+            $ref: "#/components/schemas/TechnicalEvaluation"
         shortlist:
           nullable: true
           allOf:
@@ -4123,7 +4215,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AgentLog"
-      required: [run, evaluations, logs, sourcedCandidates]
+      required: [run, evaluations, logs, sourcedCandidates, technicalEvaluations]
 
     # ── REPORTS ──
     ReportRunMeta:
