@@ -118,7 +118,11 @@ Edit `artifacts/api-server/src/routes/reports.ts` to change the structure of Mar
 
 ### Quickstart with Docker (recommended)
 
-Requires **Docker Desktop** or **Docker Engine + Compose v2**.
+Requires **Docker Desktop** or **Docker Engine + Compose v2**. Both Intel/AMD
+(`linux/amd64`) and Apple Silicon (`linux/arm64`) Macs are supported out of
+the box — `docker compose up` automatically pulls the native variant for your
+machine, so M1/M2/M3 users get the same near-instant first boot as Linux/amd64
+users (no QEMU emulation).
 
 ```
 git clone https://github.com/gregherbe76/daneel
