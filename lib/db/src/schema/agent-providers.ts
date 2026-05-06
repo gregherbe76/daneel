@@ -73,6 +73,16 @@ export type CodeMatchProviderConfig = {
   baseUrl?: string | null;
 };
 
+export type ExtendProviderConfig = {
+  /**
+   * Override for the Extend backend base URL. Defaults to the hosted
+   * production deployment (`https://extend.aplayer.ai/api/v1`) when omitted.
+   * The API key flows through the existing `apiKeyEncryptedPlaceholder`
+   * column on the provider row (sent as `Authorization: Bearer <key>`).
+   */
+  baseUrl?: string | null;
+};
+
 export type CouncilProviderConfig = {
   /**
    * Override for the Council backend base URL. Defaults to Council's prod
@@ -89,6 +99,7 @@ export type AgentProviderConfig = {
   council?: CouncilProviderConfig;
   twin_agent?: TwinAgentProviderConfig;
   codematch?: CodeMatchProviderConfig;
+  extend?: ExtendProviderConfig;
 };
 
 export const providerTypeEnum = pgEnum("provider_type", [
@@ -101,6 +112,7 @@ export const providerTypeEnum = pgEnum("provider_type", [
   "council",
   "twin_agent",
   "codematch",
+  "extend",
 ]);
 
 export const workflowStepEnum = pgEnum("workflow_step", [

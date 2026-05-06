@@ -106,6 +106,13 @@ export interface Job {
   scoringWeights: ScoringWeights;
   /** When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking. */
   technicalEvaluationEnabled: boolean;
+  /** Optional list of LinkedIn profile URLs that act as "example
+A-player" seeds for pattern-matching sourcing providers
+(currently Extend). 1-10 URLs. Ignored by sourcing providers
+that don't take a seed profile (GitHub, Web Search, Apify,
+Twin, native).
+ */
+  exampleProfileUrls?: string[] | null;
   createdAt: string;
   updatedAt: string;
   /** True when the sourcing workflow step is configured with an
@@ -135,6 +142,8 @@ export interface CreateJobBody {
   scoringWeights?: ScoringWeights;
   /** Optional. When true, the `technical_evaluation` workflow step runs (requires a configured evaluation provider). Defaults to false. */
   technicalEvaluationEnabled?: boolean;
+  /** Optional. 1-10 LinkedIn profile URLs used as seeds by pattern-matching sourcing providers (currently Extend). Ignored by other sourcing providers. */
+  exampleProfileUrls?: string[] | null;
 }
 
 /**
@@ -501,6 +510,7 @@ export const ProviderType = {
   council: "council",
   twin_agent: "twin_agent",
   codematch: "codematch",
+  extend: "extend",
 } as const;
 
 export type WorkflowStepName =
@@ -607,6 +617,18 @@ export interface CodeMatchProviderConfig {
 }
 
 /**
+ * Recruiter-tunable knobs for the Extend pattern-matching sourcing
+provider. The Extend API key flows through the existing
+`apiKeyPlaceholder` field on the provider record (sent as
+`Authorization: Bearer <key>`).
+
+ */
+export interface ExtendProviderConfig {
+  /** Override for the Extend backend base URL. Defaults to the hosted production deployment (`https://extend.aplayer.ai/api/v1`) when omitted. */
+  baseUrl?: string | null;
+}
+
+/**
  * Per-provider tuning knobs. Only the section matching the provider type is read.
  */
 export interface AgentProviderConfig {
@@ -616,6 +638,7 @@ export interface AgentProviderConfig {
   council?: CouncilProviderConfig;
   twin_agent?: TwinAgentProviderConfig;
   codematch?: CodeMatchProviderConfig;
+  extend?: ExtendProviderConfig;
 }
 
 export interface AgentProviderRecord {

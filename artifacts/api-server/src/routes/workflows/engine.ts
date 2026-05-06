@@ -1028,7 +1028,7 @@ export async function runWorkflowEngine(
         if (!isTwin) {
           logger.warn({ runId }, "Real mode: no real provider assigned to sourcing — skipping sourcing step");
           await logStep(runId, "sourcing", "failed", null, {
-            note: "Skipped: real data mode requires a real sourcing provider (Twin webhook, GitHub Agent, Web Search, or Apify). Assign one in Settings → Providers.",
+            note: "Skipped: real data mode requires a real sourcing provider (Twin webhook, GitHub Agent, Web Search, Apify, Twin Agent, or Extend). Assign one in Settings → Providers.",
           });
         } else {
           // Real mode with a real provider → tag with provider-specific source
@@ -1041,6 +1041,8 @@ export async function runWorkflowEngine(
               ? "Apify"
               : sourcingProvider.type === "twin_agent"
               ? "Twin Agent Browser"
+              : sourcingProvider.type === "extend"
+              ? "Extend"
               : SOURCE_TWIN;
           try {
             await runSourcing(runId, jobId, effectiveJob, insight, realSourceTag, sourcingProvider);

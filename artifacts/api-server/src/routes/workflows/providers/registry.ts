@@ -37,6 +37,7 @@ import { ApifySourcingProvider } from "./apify";
 import { CouncilProvider } from "./council";
 import { TwinAgentBrowserProvider } from "./twin-agent";
 import { CodeMatchProvider } from "./codematch";
+import { ExtendSourcingProvider } from "./extend";
 import type { DecisionProvider } from "./decision-interface";
 import type { EvaluationProvider } from "./evaluation-interface";
 import { logger } from "../../../lib/logger";
@@ -105,6 +106,8 @@ function buildProvider(row: typeof agentProvidersTable.$inferSelect): AgentProvi
       );
     case "twin_agent":
       return new TwinAgentBrowserProvider(row.id, row.name, apiKey, row.config?.twin_agent ?? null);
+    case "extend":
+      return new ExtendSourcingProvider(row.id, row.name, apiKey, row.config?.extend ?? null);
     case "council":
       throw new Error(
         `Provider "${row.name}" is a Council decision provider — use buildDecisionProvider() / resolveDecisionProvider() instead. ` +
@@ -267,6 +270,7 @@ const REAL_SOURCING_TYPES = new Set([
   "web_search",
   "apify",
   "twin_agent",
+  "extend",
 ]);
 
 /**

@@ -1,0 +1,393 @@
+GO POUR ÉTAPE 2 — Sous-tâche 3.2
+
+Diagnostic Étape 1 validé. Décisions arbitrées :
+
+D1 — Probe validateConnection : utilise GET https://extend.aplayer.ai/api/v1/me 
+     (endpoint léger, pas de quota consommé)
+
+D2 — isTwin → étendre la condition (pas de rename) :
+     const isTwin = sourcingProvider.type === "twin_agent" 
+       || sourcingProvider.type === "extend"
+       || ... (autres types existants)
+     Ajouter commentaire TODO :
+     // TODO: rename isTwin → isRealProvider (covers twin_agent, 
+     // extend, and other real providers — historical naming)
+
+D3 — UI exampleProfileUrls : Option C (collapsé sous toggle 
+     "Advanced sourcing inputs"). Pattern :
+     <details>
+       <summary>Advanced sourcing inputs</summary>
+       <ExampleProfileUrlsField 
+         helper="Used by Extend (pattern-matching) if assigned to 
+                 the sourcing step in Settings → Workflow Step 
+                 Assignments. Ignored otherwise."
+       />
+     </details>
+     Toggle fermé par défaut. Champ multi-input (1-10 URLs LinkedIn).
+
+D4 — Refinement loop : SKIP pour cette sous-tâche. On expose 
+     uniquement POST /v1/find-similar + polling dans Daneel. 
+     Documenter : "For pattern refinement, use Extend directly 
+     at extend.aplayer.ai"
+
+============================================================
+Implémentation en 6 sections séquentielles. STOP intermédiaire 2 
+entre Section C et Section D.
+============================================================
+
+SECTION A — Migration BDD + extension enum
+
+A.1. Drizzle migration :
+     - Ajouter "extend" au providerTypeEnum dans 
+       lib/db/src/schema/agent-providers.ts
+     - Ajouter colonne jobs.exampleProfileUrls : 
+       text[] (nullable, default null)
+
+A.2. Mettre à jour les types TypeScript correspondants.
+
+A.3. Tester la migration :
+     pnpm --filter @workspace/db run push
+     psql $DATABASE_URL -c "\d jobs"  # voir exampleProfileUrls
+     psql $DATABASE_URL -c "SELECT enum_range(NULL::provider_type);"
+     # doit inclure "extend"
+
+A.4. Mettre à jour AgentProviderConfig dans agent-providers.ts :
+     extend?: { baseUrl?: string | null }
+
+Commit local : "feat(db): add extend provider type and 
+jobs.example_profile_urls column"
+
+============================================================
+SECTION B — Extend SourcingProvider (TypeScript)
+============================================================
+
+B.1. Nouveau fichier : 
+     artifacts/api-server/src/routes/workflows/providers/extend.ts
+
+B.2. Implémente AgentProvider interface (signature découverte 
+     dans diagnostic Étape 1) :
+     
+     class ExtendSourcingProvider implements AgentProvider {
+       readonly id: number;
+       readonly name: string;
+       readonly type = "extend";
+       
+       constructor(
+         id: number, 
+         name: string, 
+         apiKey: string,        // ex_xxx, déjà déchiffrée
+         config: { baseUrl?: string | null } | null
+       )
+       
+       async run(input: AgentProviderRunInput): Promise<SourcingRunResult>
+       
+       async validateConnection(): Promise<{ ok: boolean; error?: string }>
+     }
+
+B.3. Méthode validateConnection() :
+     - GET {baseUrl}/v1/me avec Bearer apiKey
+     - Timeout 8s
+     - Mapping :
+       * 200 → { ok: true } (clé valide, peu importe le tier)
+       * 401 → { ok: false, error: "Invalid API key" }
+       * 5xx → { ok: false, error: "Extend API unreachable" }
+       * timeout → { ok: false, error: "Extend API timeout" }
+
+B.4. Méthode run() — orchestration async polling :
+
+     1. Récupérer profile_urls depuis input.payload.job.exampleProfileUrls
+        - Si vide ou null : retourner 
+          { candidates: [], stats: { error: "no_profile_urls" } }
+        - Si > 10 : tronquer à 10 (l'API Extend rejette > 10)
+
+     2. Préparer le body Extend :
+        {
+          profile_urls: array,
+          job_context: input.payload.job.description ?? undefined,
+          search_location: input.payload.job.location ?? undefined,
+          max_results: 20,
+          min_results: 3,
+          scoring_criteria: input.payload.job.mustHaveSkills ?? undefined
+        }
+
+     3. POST {baseUrl}/v1/find-similar avec Bearer apiKey
+        - Timeout 8s sur ce POST (juste pour recevoir 202)
+        - Si pas 202 : map error et retourner result avec error
+
+     4. Récupérer analysis_id depuis la réponse 202
+
+     5. Polling loop :
+        - Délai initial 30s (pipeline ~60-150s en moyenne)
+        - Puis poll GET /v1/find-similar/:id toutes les 10s
+        - Timeout total côté Daneel : 12 minutes (Extend a un 
+          watchdog 10 min côté serveur, on prend une marge)
+        - Si status === "running" : continue polling
+        - Si status === "completed" : extract candidates et break
+        - Si status === "failed" : retourner avec error
+        - Si timeout 12 min : retourner avec error: "extend_timeout"
+
+     6. Mapper Extend candidates → Daneel SourcingCandidate[] :
+        Pour chaque candidate Extend :
+        {
+          name: extend.name,
+          headline: "",  // Extend ne fournit pas
+          location: input.payload.job.location ?? "",  // copie du job
+          currentCompany: "",  // Extend ne fournit pas
+          email: null,
+          linkedinUrl: extend.linkedinUrl,  // camelCase Extend OK
+          githubUrl: "",
+          username: null,
+          confidence: extend.score / 10,  // Extend score 0-10 → 
+                                          // Daneel confidence 0-1
+          emailSource: null,
+          skills: [],  // Extend ne fournit pas par candidat
+          summary: extend.scoreReason ?? "",  // bullets concaténés
+          evidence: extend.linkedinUrl,  // pour anti-fabrication
+          potentialRisks: "",
+          source: "Extend pattern-match"
+        }
+
+     7. Retourner :
+        {
+          candidates: mapped[],
+          stats: {
+            extend_analysis_id: analysisId,
+            extend_pattern_title: pattern.title,
+            extend_total_found: total_found,
+            extend_below_minimum: below_minimum,
+            extend_polling_duration_ms: duration
+          }
+        }
+
+B.5. Headers Bearer apiKey + User-Agent: "Daneel/1.0 (Extend 
+     provider)" sur tous les appels.
+
+B.6. Logger via SimpleLogger injecté (pattern existant), pas 
+     req.log direct.
+
+Commit local : "feat(workflow): add Extend as sourcing provider 
+with async polling"
+
+============================================================
+SECTION C — Registry + engine integration
+============================================================
+
+C.1. Dans providers/registry.ts :
+     - Ajouter case "extend" dans buildProvider :
+       case "extend":
+         return new ExtendSourcingProvider(
+           row.id, 
+           row.name, 
+           decryptApiKeyOrThrow(row.apiKeyEncryptedPlaceholder, row.name),
+           row.config?.extend ?? null
+         );
+
+C.2. Dans engine.ts (resolveSourcingProvider et runWorkflowEngine) :
+     - Étendre la condition isTwin pour inclure "extend"
+     - Ajouter dans le mapping realSourceTag :
+       : sourcingProvider.type === "extend"   ? "Extend"
+
+C.3. Test rapide de la registry :
+     - Créer une entrée fictive en BDD : type="extend", 
+       apiKeyEncryptedPlaceholder=<dummy>, config={extend:{}}
+     - Appeler resolveSourcingProvider, vérifier qu'il instancie 
+       bien ExtendSourcingProvider sans crash
+     - Supprimer l'entrée fictive après test
+
+Commit local : "feat(workflow): register extend in provider 
+registry and engine resolution"
+
+============================================================
+STOP INTERMÉDIAIRE 2
+============================================================
+
+Affiche dans le chat :
+
+1. Confirmation migration BDD réussie (output \d jobs + 
+   enum_range provider_type)
+
+2. Confirmation provider compile sans erreur TypeScript :
+   pnpm --filter api-server run typecheck (ou équivalent)
+
+3. Confirmation registry instantiate l'Extend provider sans 
+   crash (test rapide Section C.3)
+
+4. Liste des fichiers modifiés/créés
+
+ATTENDS MA CONFIRMATION EXPLICITE AVANT SECTION D.
+
+============================================================
+SECTION D — Marketplace UI : carte Extend
+============================================================
+
+D.1. Catalog (catalog.ts) — ajouter entrée Extend :
+
+     {
+       kind: "connect",
+       id: "extend",
+       name: "Extend",
+       category: "sourcing",
+       oneLiner: "Pattern-match candidates from example LinkedIn profiles",
+       pricing: "Premium — $29/mo at extend.aplayer.ai",
+       badges: ["byo-key"],
+       connectType: "extend",
+       helper: "Connecting auto-assigns Extend to the sourcing 
+                step. Configure example profile URLs per job in 
+                'Advanced sourcing inputs'.",
+       logoMark: "Ex"
+     }
+
+     Étendre le union ConnectProviderType :
+     export type ConnectProviderType =
+       | "custom_webhook" | "serpapi" | "apify" | "github"
+       | "twin_agent" | "scout" | "council" | "codematch"
+       | "extend";
+
+D.2. Marketplace.tsx — sub-dialog Extend (suivre le pattern 
+     CodeMatch lignes 985-1030) :
+
+     - Champ API Key (password input, helper "ex_xxx...")
+     - Lien "Don't have a key yet? Get an Extend API key" → ouvre 
+       https://extend.aplayer.ai/account dans nouveau tab 
+       (target="_blank" rel="noopener")
+     - Section "Advanced" pour baseUrl override (optionnel, 
+       default https://extend.aplayer.ai/api/v1)
+     - Bouton "Save & Test" : 
+       * POST /api/agent-providers avec type="extend", 
+         apiKeyEncryptedPlaceholder, config.extend.baseUrl
+       * Backend appelle validateConnection()
+       * Si ok: true → toast "Connected" + auto-assign à sourcing step
+       * Si ok: false → toast rouge avec error exact
+
+D.3. Pattern Save & Test : suivre Phase 4.2 CodeMatch exactement 
+     (mapping connectType → providerType, lookup provider 
+     existant pour pré-remplir, etc.)
+
+Commit local : "feat(marketplace): add Extend connect card and 
+dialog"
+
+============================================================
+SECTION E — Page job : champ exampleProfileUrls (toggle 
+discret)
+============================================================
+
+E.1. Dans la page job edit (jobs/edit.tsx ou jobs/new.tsx), 
+     ajouter sous les autres champs :
+
+     <details className="mt-4">
+       <summary className="cursor-pointer text-sm text-muted-foreground">
+         Advanced sourcing inputs
+       </summary>
+       <div className="mt-2 space-y-2">
+         <Label>Example profile URLs</Label>
+         <p className="text-xs text-muted-foreground">
+           Used by Extend (pattern-matching) if assigned to the 
+           sourcing step in Settings → Workflow Step Assignments. 
+           Ignored by other sourcing providers.
+         </p>
+         <ProfileUrlsMultiInput 
+           value={form.exampleProfileUrls ?? []}
+           onChange={(urls) => form.setExampleProfileUrls(urls)}
+           min={1}
+           max={10}
+           placeholder="https://www.linkedin.com/in/example"
+         />
+       </div>
+     </details>
+
+E.2. ProfileUrlsMultiInput component (nouveau si pas existant) :
+     - Liste de inputs URL
+     - Bouton "+ Add another" (jusqu'à max=10)
+     - Bouton X par ligne pour supprimer
+     - Validation client : chaque URL doit matcher 
+       /^https?:\/\/(www\.)?linkedin\.com\/in\//
+
+E.3. Backend : update jobs handler pour accepter exampleProfileUrls 
+     dans le body, sauvegarder en BDD.
+
+E.4. Si l'utilisateur sélectionne Extend comme sourcing provider 
+     mais exampleProfileUrls vide : workflow run échoue 
+     proprement avec message "Extend requires example profile 
+     URLs. Configure them in 'Advanced sourcing inputs' on the 
+     job page."
+
+Commit local : "feat(jobs): add example profile URLs field for 
+Extend sourcing"
+
+============================================================
+SECTION F — Tests + documentation
+============================================================
+
+F.1. Tests unitaires pour extend-provider.ts (au moins 6 tests, 
+     pattern Phase 4.2 CodeMatch) :
+     1. validateConnection() avec mock 200 → returns ok: true
+     2. validateConnection() avec mock 401 → returns ok: false, 
+        error: "Invalid API key"
+     3. validateConnection() avec mock timeout → returns ok: false, 
+        error: "Extend API timeout"
+     4. run() avec exampleProfileUrls vide → returns 
+        candidates: [], stats avec error
+     5. run() avec mock 202 puis polling → returns mapped 
+        candidates correctement
+     6. run() avec mock pipeline failed → returns avec error
+     7. run() avec timeout 12 min → returns avec error: "extend_timeout"
+
+F.2. Documentation /docs/providers/extend.md :
+     - What it does (1 paragraphe : pattern-match from example 
+       LinkedIn profiles)
+     - How to connect (étapes : créer compte sur extend.aplayer.ai, 
+       upgrader Pro, configurer LinkedIn cookie, générer API key, 
+       coller dans Daneel marketplace)
+     - Pricing : "$29/mo at extend.aplayer.ai/account"
+     - Workflow integration : exampleProfileUrls per job + comment 
+       le step sourcing tourne avec Extend
+     - Error states : tous les error codes possibles 
+       (no_profile_urls, auth_failed, premium_required, 
+       linkedin_cookie_required, timeout, server_error)
+     - Limitations : 
+       * 1-10 profils max par job
+       * Pipeline 2-5 min en moyenne
+       * Refinement loop NON disponible dans Daneel — utiliser 
+         Extend standalone pour cela
+
+F.3. Mettre à jour docs/PROVIDER_CONTRACT.md (s'il existe) avec 
+     la ligne Extend dans le tableau des providers commerciaux.
+
+Commit local : "feat(docs): add Extend provider documentation 
+and tests"
+
+============================================================
+CONTRAINTES STRICTES
+============================================================
+
+- Aucune modification du workflow engine existant autre que 
+  l'enregistrement du nouveau provider extend dans la registry 
+  + extension de la condition isTwin
+- Aucune modification des autres providers (Scout, Council, 
+  CodeMatch, Twin, GitHub, etc.)
+- Aucune modification de VISION.md, NAMING.md, README.md
+- Pas de hardcode de l'API URL ou de la clé Extend
+- Le push GitHub sera fait par moi (l'utilisateur), pas par toi
+- Si une migration de DB est risquée (perte de données possible), 
+  ARRÊTE et signale
+- Si une nouvelle dépendance npm est nécessaire, ARRÊTE et 
+  demande-moi avant d'ajouter
+- Refinement loop NON implémenté dans cette sous-tâche
+
+============================================================
+DELIVERABLE FINAL
+============================================================
+
+Après les 6 sections :
+
+1. 6 commits locaux distincts (un par section) avec messages 
+   exacts
+2. Liste complète des fichiers modifiés/créés
+3. Output des tests unitaires (devrait inclure les nouveaux 
+   tests Section F + les tests existants qui passent toujours)
+4. Description visuelle de la nouvelle carte Extend dans le 
+   marketplace + nouveau toggle "Advanced sourcing inputs" dans 
+   la page job
+
+STOP final. Attends ma confirmation explicite avant tout push 
+GitHub.

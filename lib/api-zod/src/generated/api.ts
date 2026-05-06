@@ -67,6 +67,12 @@ export const ListJobsResponseItem = zod.object({
     .describe(
       "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
     ),
+  exampleProfileUrls: zod
+    .array(zod.string())
+    .nullish()
+    .describe(
+      'Optional list of LinkedIn profile URLs that act as \"example\nA-player\" seeds for pattern-matching sourcing providers\n(currently Extend). 1-10 URLs. Ignored by sourcing providers\nthat don\'t take a seed profile (GitHub, Web Search, Apify,\nTwin, native).\n',
+    ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
   hasRealSourcingProvider: zod
@@ -129,6 +135,12 @@ export const CreateJobBody = zod.object({
     .describe(
       "Optional. When true, the `technical_evaluation` workflow step runs (requires a configured evaluation provider). Defaults to false.",
     ),
+  exampleProfileUrls: zod
+    .array(zod.string())
+    .nullish()
+    .describe(
+      "Optional. 1-10 LinkedIn profile URLs used as seeds by pattern-matching sourcing providers (currently Extend). Ignored by other sourcing providers.",
+    ),
 });
 
 /**
@@ -187,6 +199,12 @@ export const GetJobResponse = zod.object({
     .boolean()
     .describe(
       "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
+    ),
+  exampleProfileUrls: zod
+    .array(zod.string())
+    .nullish()
+    .describe(
+      'Optional list of LinkedIn profile URLs that act as \"example\nA-player\" seeds for pattern-matching sourcing providers\n(currently Extend). 1-10 URLs. Ignored by sourcing providers\nthat don\'t take a seed profile (GitHub, Web Search, Apify,\nTwin, native).\n',
     ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -253,6 +271,12 @@ export const UpdateJobBody = zod.object({
     .describe(
       "Optional. When true, the `technical_evaluation` workflow step runs (requires a configured evaluation provider). Defaults to false.",
     ),
+  exampleProfileUrls: zod
+    .array(zod.string())
+    .nullish()
+    .describe(
+      "Optional. 1-10 LinkedIn profile URLs used as seeds by pattern-matching sourcing providers (currently Extend). Ignored by other sourcing providers.",
+    ),
 });
 
 export const updateJobResponseScoringWeightsAutonomyMin = 0;
@@ -304,6 +328,12 @@ export const UpdateJobResponse = zod.object({
     .boolean()
     .describe(
       "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
+    ),
+  exampleProfileUrls: zod
+    .array(zod.string())
+    .nullish()
+    .describe(
+      'Optional list of LinkedIn profile URLs that act as \"example\nA-player\" seeds for pattern-matching sourcing providers\n(currently Extend). 1-10 URLs. Ignored by sourcing providers\nthat don\'t take a seed profile (GitHub, Web Search, Apify,\nTwin, native).\n',
     ),
   createdAt: zod.coerce.date(),
   updatedAt: zod.coerce.date(),
@@ -393,6 +423,12 @@ export const GetJobApplicationsResponseItem = zod.object({
       .boolean()
       .describe(
         "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
+      ),
+    exampleProfileUrls: zod
+      .array(zod.string())
+      .nullish()
+      .describe(
+        'Optional list of LinkedIn profile URLs that act as \"example\nA-player\" seeds for pattern-matching sourcing providers\n(currently Extend). 1-10 URLs. Ignored by sourcing providers\nthat don\'t take a seed profile (GitHub, Web Search, Apify,\nTwin, native).\n',
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
@@ -1143,6 +1179,12 @@ export const GetCandidateApplicationsResponseItem = zod.object({
       .describe(
         "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
       ),
+    exampleProfileUrls: zod
+      .array(zod.string())
+      .nullish()
+      .describe(
+        'Optional list of LinkedIn profile URLs that act as \"example\nA-player\" seeds for pattern-matching sourcing providers\n(currently Extend). 1-10 URLs. Ignored by sourcing providers\nthat don\'t take a seed profile (GitHub, Web Search, Apify,\nTwin, native).\n',
+      ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
     hasRealSourcingProvider: zod
@@ -1256,6 +1298,12 @@ export const ListApplicationsResponseItem = zod.object({
       .boolean()
       .describe(
         "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
+      ),
+    exampleProfileUrls: zod
+      .array(zod.string())
+      .nullish()
+      .describe(
+        'Optional list of LinkedIn profile URLs that act as \"example\nA-player\" seeds for pattern-matching sourcing providers\n(currently Extend). 1-10 URLs. Ignored by sourcing providers\nthat don\'t take a seed profile (GitHub, Web Search, Apify,\nTwin, native).\n',
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
@@ -1390,6 +1438,12 @@ export const GetApplicationResponse = zod.object({
       .boolean()
       .describe(
         "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
+      ),
+    exampleProfileUrls: zod
+      .array(zod.string())
+      .nullish()
+      .describe(
+        'Optional list of LinkedIn profile URLs that act as \"example\nA-player\" seeds for pattern-matching sourcing providers\n(currently Extend). 1-10 URLs. Ignored by sourcing providers\nthat don\'t take a seed profile (GitHub, Web Search, Apify,\nTwin, native).\n',
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
@@ -1791,6 +1845,7 @@ export const ListProvidersResponseItem = zod.object({
     "council",
     "twin_agent",
     "codematch",
+    "extend",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -1948,6 +2003,19 @@ export const ListProvidersResponseItem = zod.object({
         .describe(
           "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
         ),
+      extend: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Extend pattern-matching sourcing\nprovider. The Extend API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -1974,6 +2042,7 @@ export const CreateProviderBody = zod.object({
     "council",
     "twin_agent",
     "codematch",
+    "extend",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2125,6 +2194,19 @@ export const CreateProviderBody = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
+        ),
+      extend: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Extend pattern-matching sourcing\nprovider. The Extend API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -2192,6 +2274,7 @@ export const GetProviderResponse = zod.object({
     "council",
     "twin_agent",
     "codematch",
+    "extend",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2349,6 +2432,19 @@ export const GetProviderResponse = zod.object({
         .describe(
           "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
         ),
+      extend: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Extend pattern-matching sourcing\nprovider. The Extend API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -2378,6 +2474,7 @@ export const UpdateProviderBody = zod.object({
     "council",
     "twin_agent",
     "codematch",
+    "extend",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2530,6 +2627,19 @@ export const UpdateProviderBody = zod.object({
         .describe(
           "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
         ),
+      extend: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Extend pattern-matching sourcing\nprovider. The Extend API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
+        ),
     })
     .describe(
       "Per-provider tuning knobs. Only the section matching the provider type is read.",
@@ -2551,6 +2661,7 @@ export const UpdateProviderResponse = zod.object({
     "council",
     "twin_agent",
     "codematch",
+    "extend",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2707,6 +2818,19 @@ export const UpdateProviderResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
+        ),
+      extend: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Extend pattern-matching sourcing\nprovider. The Extend API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -2749,6 +2873,7 @@ export const ToggleProviderResponse = zod.object({
     "council",
     "twin_agent",
     "codematch",
+    "extend",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -2905,6 +3030,19 @@ export const ToggleProviderResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
+        ),
+      extend: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Extend pattern-matching sourcing\nprovider. The Extend API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -2949,6 +3087,7 @@ export const ReplaceProviderKeyResponse = zod.object({
     "council",
     "twin_agent",
     "codematch",
+    "extend",
   ]),
   baseUrl: zod.string().nullish(),
   webhookUrl: zod.string().nullish(),
@@ -3105,6 +3244,19 @@ export const ReplaceProviderKeyResponse = zod.object({
         .optional()
         .describe(
           "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
+        ),
+      extend: zod
+        .object({
+          baseUrl: zod
+            .string()
+            .nullish()
+            .describe(
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+            ),
+        })
+        .optional()
+        .describe(
+          "Recruiter-tunable knobs for the Extend pattern-matching sourcing\nprovider. The Extend API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
         ),
     })
     .describe(
@@ -3252,6 +3404,7 @@ export const ListProviderStepSettingsResponseItem = zod.object({
       "council",
       "twin_agent",
       "codematch",
+      "extend",
     ]),
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
@@ -3408,6 +3561,19 @@ export const ListProviderStepSettingsResponseItem = zod.object({
           .optional()
           .describe(
             "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
+          ),
+        extend: zod
+          .object({
+            baseUrl: zod
+              .string()
+              .nullish()
+              .describe(
+                "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+              ),
+          })
+          .optional()
+          .describe(
+            "Recruiter-tunable knobs for the Extend pattern-matching sourcing\nprovider. The Extend API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
           ),
       })
       .describe(
@@ -3468,6 +3634,7 @@ export const UpsertProviderStepSettingResponse = zod.object({
       "council",
       "twin_agent",
       "codematch",
+      "extend",
     ]),
     baseUrl: zod.string().nullish(),
     webhookUrl: zod.string().nullish(),
@@ -3624,6 +3791,19 @@ export const UpsertProviderStepSettingResponse = zod.object({
           .optional()
           .describe(
             "Recruiter-tunable knobs for the CodeMatch technical-evaluation\nprovider. The CodeMatch API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
+          ),
+        extend: zod
+          .object({
+            baseUrl: zod
+              .string()
+              .nullish()
+              .describe(
+                "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+              ),
+          })
+          .optional()
+          .describe(
+            "Recruiter-tunable knobs for the Extend pattern-matching sourcing\nprovider. The Extend API key flows through the existing\n`apiKeyPlaceholder` field on the provider record (sent as\n`Authorization: Bearer <key>`).\n",
           ),
       })
       .describe(
@@ -4706,6 +4886,12 @@ export const GetJobReportForRunResponse = zod.object({
       .describe(
         "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
       ),
+    exampleProfileUrls: zod
+      .array(zod.string())
+      .nullish()
+      .describe(
+        'Optional list of LinkedIn profile URLs that act as \"example\nA-player\" seeds for pattern-matching sourcing providers\n(currently Extend). 1-10 URLs. Ignored by sourcing providers\nthat don\'t take a seed profile (GitHub, Web Search, Apify,\nTwin, native).\n',
+      ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),
     hasRealSourcingProvider: zod
@@ -4924,6 +5110,12 @@ export const GetJobReportResponse = zod.object({
       .boolean()
       .describe(
         "When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.",
+      ),
+    exampleProfileUrls: zod
+      .array(zod.string())
+      .nullish()
+      .describe(
+        'Optional list of LinkedIn profile URLs that act as \"example\nA-player\" seeds for pattern-matching sourcing providers\n(currently Extend). 1-10 URLs. Ignored by sourcing providers\nthat don\'t take a seed profile (GitHub, Web Search, Apify,\nTwin, native).\n',
       ),
     createdAt: zod.coerce.date(),
     updatedAt: zod.coerce.date(),

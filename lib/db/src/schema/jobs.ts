@@ -41,6 +41,13 @@ export const jobsTable = pgTable("jobs", {
   technicalEvaluationEnabled: boolean("technical_evaluation_enabled")
     .notNull()
     .default(false),
+  /**
+   * Optional list of LinkedIn profile URLs that act as "example A-player"
+   * seeds for pattern-matching sourcing providers (currently Extend).
+   * 1-10 URLs validated client-side. Ignored by sourcing providers that
+   * don't take a seed profile (GitHub, Web Search, Apify, Twin, native).
+   */
+  exampleProfileUrls: text("example_profile_urls").array(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

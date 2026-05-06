@@ -2161,6 +2161,17 @@ components:
         technicalEvaluationEnabled:
           type: boolean
           description: When true, runs the optional `technical_evaluation` workflow step (per-candidate scoring via the configured evaluation provider, e.g. CodeMatch). Defaults to false. Side-by-side with the matching score — never modifies the shortlist ranking.
+        exampleProfileUrls:
+          type: array
+          nullable: true
+          items:
+            type: string
+          description: |
+            Optional list of LinkedIn profile URLs that act as "example
+            A-player" seeds for pattern-matching sourcing providers
+            (currently Extend). 1-10 URLs. Ignored by sourcing providers
+            that don't take a seed profile (GitHub, Web Search, Apify,
+            Twin, native).
         createdAt:
           type: string
           format: date-time
@@ -2206,6 +2217,12 @@ components:
         technicalEvaluationEnabled:
           type: boolean
           description: Optional. When true, the `technical_evaluation` workflow step runs (requires a configured evaluation provider). Defaults to false.
+        exampleProfileUrls:
+          type: array
+          nullable: true
+          items:
+            type: string
+          description: Optional. 1-10 LinkedIn profile URLs used as seeds by pattern-matching sourcing providers (currently Extend). Ignored by other sourcing providers.
       required: [title, description, location, seniority, mustHaveSkills]
 
     # ── CANDIDATE ──
@@ -2800,7 +2817,7 @@ components:
     # ── PROVIDERS ──
     ProviderType:
       type: string
-      enum: [native_openai, custom_webhook, twin_webhook, github, web_search, apify, council, twin_agent, codematch]
+      enum: [native_openai, custom_webhook, twin_webhook, github, web_search, apify, council, twin_agent, codematch, extend]
 
     WorkflowStepName:
       type: string
@@ -2933,6 +2950,19 @@ components:
           nullable: true
           description: Override for the CodeMatch backend base URL. Defaults to the hosted production deployment (`https://assess.codes/api/v1`) when omitted.
 
+    ExtendProviderConfig:
+      type: object
+      description: |
+        Recruiter-tunable knobs for the Extend pattern-matching sourcing
+        provider. The Extend API key flows through the existing
+        `apiKeyPlaceholder` field on the provider record (sent as
+        `Authorization: Bearer <key>`).
+      properties:
+        baseUrl:
+          type: string
+          nullable: true
+          description: Override for the Extend backend base URL. Defaults to the hosted production deployment (`https://extend.aplayer.ai/api/v1`) when omitted.
+
     AgentProviderConfig:
       type: object
       description: Per-provider tuning knobs. Only the section matching the provider type is read.
@@ -2949,6 +2979,8 @@ components:
           $ref: "#/components/schemas/TwinAgentProviderConfig"
         codematch:
           $ref: "#/components/schemas/CodeMatchProviderConfig"
+        extend:
+          $ref: "#/components/schemas/ExtendProviderConfig"
 
     AgentProviderRecord:
       type: object
