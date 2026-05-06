@@ -271,6 +271,53 @@ export function decryptProviderSecret(stored: string): string {
   );
 }
 
+/**
+ * Lazy v1 → v2 migration helper. Returns a freshly-encrypted v2 ciphertext
+ * for the given v1 row, or `null` when no upgrade is needed (already v2,
+ * legacy plaintext, no key id configured, or the auto-upgrade flag is off).
+ *
+ * Opt-in via `PROVIDER_KEY_AUTO_UPGRADE=1` (or `true`) so deployments that
+ * have not configured `PROVIDER_KEY_ID` yet — or that don't want background
+ * re-encrypts at all — keep the old behaviour. When enabled, callers are
+ * expected to fire-and-forget the resulting ciphertext back into the row
+ * (see `routes/providers.ts`).
+ *
+ * The returned ciphertext is freshly encrypted under the current primary
+ * key with a new random IV (AES-GCM, non-deterministic), so the row's
+ * plaintext is unchanged — only the wire format (and the embedded key id)
+ * gets refreshed.
+ */
+export function maybeUpgradeProviderSecretToV2(
+  stored: string | null | undefined,
+): string | null {
+  if (!stored) return null;
+  if (!stored.startsWith(VERSION_PREFIX_V1)) return null;
+  const flag = process.env["PROVIDER_KEY_AUTO_UPGRADE"];
+  if (flag !== "1" && flag !== "true") return null;
+  const { primary } = resolveKeyring();
+  if (primary.id === null) return null;
+  let plaintext: string;
+  try {
+    plaintext = decryptProviderSecret(stored);
+  } catch {
+    return null;
+  }
+  const iv = randomBytes(IV_LEN);
+  const cipher = createCipheriv(ALGO, primary.key, iv);
+  const ciphertext = Buffer.concat([
+    cipher.update(plaintext, "utf8"),
+    cipher.final(),
+  ]);
+  const tag = cipher.getAuthTag();
+  return [
+    "enc:v2",
+    primary.id,
+    iv.toString("base64"),
+    tag.toString("base64"),
+    ciphertext.toString("base64"),
+  ].join(":");
+}
+
 /** Convenience wrappers for nullable column reads/writes. */
 export function maybeEncryptProviderSecret(
   v: string | null | undefined,

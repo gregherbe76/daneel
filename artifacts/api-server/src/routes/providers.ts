@@ -14,7 +14,32 @@ import {
   encryptProviderSecret,
   lastFourOfProviderSecret,
   maybeEncryptProviderSecret,
+  maybeUpgradeProviderSecretToV2,
 } from "../lib/provider-secrets";
+
+/**
+ * Lazy v1 → v2 upgrade. When `PROVIDER_KEY_AUTO_UPGRADE=1` and
+ * `PROVIDER_KEY_ID` is set, any v1 row we just decrypted gets re-encrypted
+ * to the tagged v2 wire format and written back. Fire-and-forget so reads
+ * stay fast; failures are logged but never bubble up to the caller.
+ */
+function scheduleProviderSecretUpgrade(row: {
+  id: number;
+  apiKeyEncryptedPlaceholder?: string | null;
+}): void {
+  const upgraded = maybeUpgradeProviderSecretToV2(row.apiKeyEncryptedPlaceholder);
+  if (!upgraded) return;
+  void db
+    .update(agentProvidersTable)
+    .set({ apiKeyEncryptedPlaceholder: upgraded })
+    .where(eq(agentProvidersTable.id, row.id))
+    .catch((err) => {
+      logger.warn(
+        { providerId: row.id, err },
+        "Lazy v1 → v2 provider-secret upgrade failed",
+      );
+    });
+}
 
 /**
  * Strip the encrypted credential out of a provider row before sending it to
@@ -45,6 +70,7 @@ router.get("/providers", async (_req, res) => {
     .select()
     .from(agentProvidersTable)
     .orderBy(agentProvidersTable.createdAt);
+  for (const p of providers) scheduleProviderSecretUpgrade(p);
   res.json(providers.map(serializeRowForApi));
 });
 
@@ -71,6 +97,8 @@ router.get("/providers/steps", async (_req, res) => {
   const settings = await db.select().from(workflowProviderSettingsTable);
   const providers = await db.select().from(agentProvidersTable);
   const providerMap = new Map(providers.map((p) => [p.id, p]));
+
+  for (const p of providers) scheduleProviderSecretUpgrade(p);
 
   const result = settings.map((s) => {
     const provider = providerMap.get(s.providerId);
@@ -182,6 +210,7 @@ router.get("/providers/:id", async (req, res) => {
     res.status(404).json({ error: "Provider not found" });
     return;
   }
+  scheduleProviderSecretUpgrade(provider);
   res.json(serializeRowForApi(provider));
 });
 

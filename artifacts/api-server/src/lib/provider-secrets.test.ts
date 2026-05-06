@@ -6,18 +6,21 @@ import {
   isEncryptedProviderSecret,
   maybeDecryptProviderSecret,
   maybeEncryptProviderSecret,
+  maybeUpgradeProviderSecretToV2,
 } from "./provider-secrets";
 
 const originalSecret = process.env["PROVIDER_KEY_SECRET"];
 const originalOldSecret = process.env["PROVIDER_KEY_SECRET_OLD"];
 const originalKeyId = process.env["PROVIDER_KEY_ID"];
 const originalOldKeyId = process.env["PROVIDER_KEY_ID_OLD"];
+const originalAutoUpgrade = process.env["PROVIDER_KEY_AUTO_UPGRADE"];
 
 beforeEach(() => {
   process.env["PROVIDER_KEY_SECRET"] = "test-secret-please-change";
   delete process.env["PROVIDER_KEY_SECRET_OLD"];
   delete process.env["PROVIDER_KEY_ID"];
   delete process.env["PROVIDER_KEY_ID_OLD"];
+  delete process.env["PROVIDER_KEY_AUTO_UPGRADE"];
   _resetProviderSecretKeyForTest();
 });
 
@@ -34,6 +37,7 @@ afterEach(() => {
   restoreEnv("PROVIDER_KEY_SECRET_OLD", originalOldSecret);
   restoreEnv("PROVIDER_KEY_ID", originalKeyId);
   restoreEnv("PROVIDER_KEY_ID_OLD", originalOldKeyId);
+  restoreEnv("PROVIDER_KEY_AUTO_UPGRADE", originalAutoUpgrade);
   _resetProviderSecretKeyForTest();
 });
 
@@ -130,6 +134,61 @@ describe("provider-secrets", () => {
     process.env["PROVIDER_KEY_SECRET_OLD"] = "wrong-old";
     _resetProviderSecretKeyForTest();
     expect(() => decryptProviderSecret(ct)).toThrow(/any configured key/);
+  });
+
+  describe("maybeUpgradeProviderSecretToV2", () => {
+    it("returns null when the auto-upgrade flag is off (default)", () => {
+      process.env["PROVIDER_KEY_ID"] = "2026-05";
+      _resetProviderSecretKeyForTest();
+      // Encrypt a v1 row first (no key id at write time).
+      delete process.env["PROVIDER_KEY_ID"];
+      _resetProviderSecretKeyForTest();
+      const v1 = encryptProviderSecret("legacy-row");
+      expect(v1.startsWith("enc:v1:")).toBe(true);
+
+      // Now turn on a key id but leave auto-upgrade off.
+      process.env["PROVIDER_KEY_ID"] = "2026-05";
+      _resetProviderSecretKeyForTest();
+      expect(maybeUpgradeProviderSecretToV2(v1)).toBeNull();
+    });
+
+    it("returns null when PROVIDER_KEY_ID is not configured", () => {
+      const v1 = encryptProviderSecret("still-v1");
+      expect(v1.startsWith("enc:v1:")).toBe(true);
+      process.env["PROVIDER_KEY_AUTO_UPGRADE"] = "1";
+      _resetProviderSecretKeyForTest();
+      expect(maybeUpgradeProviderSecretToV2(v1)).toBeNull();
+    });
+
+    it("returns a v2 ciphertext when both flag and key id are set", () => {
+      // Step 1: write a v1 row under no key id.
+      const v1 = encryptProviderSecret("upgrade-me");
+      expect(v1.startsWith("enc:v1:")).toBe(true);
+
+      // Step 2: configure key id + auto-upgrade.
+      process.env["PROVIDER_KEY_ID"] = "2026-05";
+      process.env["PROVIDER_KEY_AUTO_UPGRADE"] = "1";
+      _resetProviderSecretKeyForTest();
+
+      const v2 = maybeUpgradeProviderSecretToV2(v1);
+      expect(v2).not.toBeNull();
+      expect(v2!.startsWith("enc:v2:2026-05:")).toBe(true);
+      expect(v2!.split(":")).toHaveLength(6);
+      expect(decryptProviderSecret(v2!)).toBe("upgrade-me");
+    });
+
+    it("is a no-op for already-v2 rows, plaintext, and empty values", () => {
+      process.env["PROVIDER_KEY_ID"] = "2026-05";
+      process.env["PROVIDER_KEY_AUTO_UPGRADE"] = "1";
+      _resetProviderSecretKeyForTest();
+      const v2 = encryptProviderSecret("fresh");
+      expect(v2.startsWith("enc:v2:")).toBe(true);
+      expect(maybeUpgradeProviderSecretToV2(v2)).toBeNull();
+      expect(maybeUpgradeProviderSecretToV2("legacy-plaintext")).toBeNull();
+      expect(maybeUpgradeProviderSecretToV2(null)).toBeNull();
+      expect(maybeUpgradeProviderSecretToV2(undefined)).toBeNull();
+      expect(maybeUpgradeProviderSecretToV2("")).toBeNull();
+    });
   });
 
   it("maybeEncryptProviderSecret handles null/empty", () => {
