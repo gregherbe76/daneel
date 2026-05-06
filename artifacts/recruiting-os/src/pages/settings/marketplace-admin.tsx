@@ -66,7 +66,6 @@ import {
   Sparkles,
   ExternalLink,
 } from "lucide-react";
-import { SettingsTabs } from "@/components/settings-tabs";
 import { track as trackTelemetry } from "@/lib/telemetry";
 import { GithubQueryPreview } from "./github-query-preview";
 
@@ -1181,9 +1180,15 @@ export function ScoutMarketplaceCard({ providers }: { providers: Provider[] }) {
   );
 }
 
-// ── main page ─────────────────────────────────────────────────────────────────
+// ── main section ──────────────────────────────────────────────────────────────
+//
+// Rendered as the "Advanced (admin)" disclosure inside the Provider
+// Marketplace. This section exposes the raw provider CRUD form, the Scout
+// OAuth card, and the full workflow step assignments table — including the
+// Council-only `decision` step — that the marketplace catalog cards alone
+// don't surface.
 
-export default function AgentProvidersPage() {
+export function AdvancedProvidersSection() {
   const { data: providers = [], isLoading: loadingProviders } = useListProviders();
   const { data: stepSettings = [], isLoading: loadingSteps } = useListProviderStepSettings();
   const qc = useQueryClient();
@@ -1224,23 +1229,13 @@ export default function AgentProvidersPage() {
   );
 
   return (
-    <>
-    <SettingsTabs />
-    <div className="p-8 max-w-4xl mx-auto">
-      {/* Page header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">Agent Providers</h1>
-        <p className="text-muted-foreground mt-1">
-          Configure which AI provider runs each step of the workflow. The native OpenAI provider is always the default fallback.
-        </p>
-      </div>
-
+    <div className="space-y-10">
       {/* Marketplace section */}
-      <section className="mb-10">
+      <section>
         <div className="mb-4">
-          <h2 className="text-base font-semibold text-foreground">Marketplace</h2>
+          <h2 className="text-base font-semibold text-foreground">A-Player Scout</h2>
           <p className="text-sm text-muted-foreground">
-            One-click integrations with A-Player products. No copy-pasting API keys.
+            One-click OAuth integration with A-Player Scout. No copy-pasting API keys.
           </p>
         </div>
         <ScoutMarketplaceCard providers={providers as Provider[]} />
@@ -1357,6 +1352,5 @@ export default function AgentProvidersPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
-    </>
   );
 }

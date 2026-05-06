@@ -52,8 +52,8 @@ vi.mock("@/components/settings-tabs", () => ({
   SettingsTabs: () => null,
 }));
 
-// Import the page under test AFTER mocks so they apply.
-import AgentProvidersPage from "./providers";
+// Import the section under test AFTER mocks so they apply.
+import { AdvancedProvidersSection as AgentProvidersPage } from "./marketplace-admin";
 
 function makeProvider(overrides: Partial<Record<string, unknown>> = {}) {
   return {

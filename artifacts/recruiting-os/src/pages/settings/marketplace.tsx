@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { SettingsTabs } from "@/components/settings-tabs";
+import { AdvancedProvidersSection } from "./marketplace-admin";
 import {
   CATALOG,
   CATEGORIES,
@@ -1268,6 +1269,16 @@ export default function MarketplacePage() {
             </div>
           )}
         </div>
+
+        <details className="mt-10 group" data-testid="advanced-admin-section">
+          <summary className="cursor-pointer list-none flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors py-2">
+            <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
+            Advanced (admin) — Scout OAuth, raw provider CRUD, Council & step assignments
+          </summary>
+          <div className="mt-4 rounded-lg border border-border bg-muted/20 p-6">
+            <AdvancedProvidersSection />
+          </div>
+        </details>
 
         <ComingSoonDialog
           entry={stubOpen}

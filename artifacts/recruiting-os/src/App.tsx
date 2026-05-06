@@ -20,7 +20,6 @@ import JobDetailPage from "./pages/jobs/detail";
 import JobReportPage from "./pages/jobs/report";
 import CandidatesPage from "./pages/candidates/index";
 import CandidateDetailPage from "./pages/candidates/detail";
-import AgentProvidersPage from "./pages/settings/providers";
 import MarketplacePage from "./pages/settings/marketplace";
 import EmailRevalidationSettingsPage from "./pages/settings/email-revalidation";
 import BulkJobsSettingsPage from "./pages/settings/bulk-jobs";
@@ -67,7 +66,6 @@ function AppRoutes() {
           <Route key={from} path={from} component={() => <Redirect to={to} />} />
         ))}
         <Route path="/settings/marketplace" component={MarketplacePage} />
-        <Route path="/settings/providers/legacy" component={AgentProvidersPage} />
         <Route path="/settings/email-revalidation" component={EmailRevalidationSettingsPage} />
         <Route path="/settings/bulk-jobs" component={BulkJobsSettingsPage} />
         <Route path="/settings/branding" component={BrandingSettingsPage} />
