@@ -21,12 +21,28 @@ All four products below are commercial offerings from the project
 maintainer (Greg Herbé / A-Player). They are optional — Daneel runs
 end-to-end without any of them.
 
-| Canonical name      | Role                                                           | Domain (planned)        |
-| ------------------- | -------------------------------------------------------------- | ----------------------- |
-| **A-Player Scout**  | Sourcing from a job description (JD-driven candidate sourcing) | `aplayerscout.com`      |
-| **Extend**          | Sourcing by extending a small set of example "look-alike" profiles | `extend.hr`         |
-| **CodeMatch**       | GitHub-based technical evaluation of engineering candidates    | `codematch.dev`         |
-| **Council**         | Multi-LLM deliberation for final hiring decisions              | `council.hr`            |
+| Canonical name      | Role                                                               | Domain (planned)   |
+| ------------------- | ------------------------------------------------------------------ | ------------------ |
+| **A-Player Scout**  | Sourcing from a job description (JD-driven candidate sourcing)     | `aplayerscout.com` |
+| **Extend**          | Sourcing by extending a small set of example "look-alike" profiles | `extend.hr`        |
+| **CodeMatch**       | GitHub-based technical evaluation of engineering candidates        | `codematch.dev`    |
+| **Council**         | Multi-LLM deliberation for final hiring decisions                  | `council.hr`       |
+
+## Third-party connectors (BYOK)
+
+These are technical integrations, **not** commercial products of the
+project maintainer. They are listed here so contributors and users can
+identify the provider files and understand which connectors are
+bring-your-own-key.
+
+| Connector              | Provider file                                                                                                                    | Note                                            |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| **OpenAI**             | `artifacts/api-server/src/routes/workflows/providers/native-openai.ts` (+ `native-openai-sourcing.ts`, `native-openai-enrichment.ts`) | BYOK                                            |
+| **GitHub public search** | `artifacts/api-server/src/routes/workflows/providers/github.ts`                                                                | Optional `GITHUB_TOKEN` for rate-limit headroom |
+| **SerpAPI**            | `artifacts/api-server/src/routes/workflows/providers/web-search.ts`                                                              | BYOK                                            |
+| **Apify**              | `artifacts/api-server/src/routes/workflows/providers/apify.ts`                                                                   | BYOK                                            |
+| **Twin Agent Browser** | `artifacts/api-server/src/routes/workflows/providers/twin-agent.ts`                                                              | BYOK — connect your Twin account and templates  |
+| **Custom Webhook**     | `artifacts/api-server/src/routes/workflows/providers/custom-webhook.ts`                                                          | Bring any external HTTP endpoint                |
 
 ## Important naming notes
 
@@ -39,6 +55,13 @@ as **A-Player Scout**. The canonical, user-facing name is
 **A-Player Scout**. Internal type names (`twin_webhook`, `twinContext`,
 `TwinWebhookProvider`) may stay as-is for engine stability — only
 user-visible strings need to migrate.
+
+The provider file `twin-webhook.ts` implements **A-Player Scout**
+(legacy filename, kept for backwards compatibility). The provider file
+`twin-agent.ts` implements the **Twin Agent Browser** BYOK connector,
+which is a separate technical integration (not a commercial product).
+These two providers have distinct technical targets and must not be
+conflated.
 
 ### Dropped names — do not reintroduce
 
@@ -61,3 +84,6 @@ not one of the four commercial provider products.
 - When listing the four together, mark each with an asterisk (`*`)
   and disclose commercial status in the same paragraph (see
   `VISION.md` → "Commercial Disclosure").
+- **Twin Agent Browser** is a BYOK third-party connector, not one of
+  the four commercial products. List it under "Third-party connectors
+  (BYOK)", never alongside Scout / Extend / CodeMatch / Council.

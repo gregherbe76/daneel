@@ -40,30 +40,48 @@ end-to-end without paying for anything beyond their own LLM keys.
   runtime to plug their own sourcing, scoring, or deliberation models
   into without rebuilding the orchestration layer.
 
-## The Five-Tool Funnel
+## The Commercial Providers
 
-Daneel is the engine. On top of it, five commercial provider products
+Daneel is the engine. On top of it, four commercial provider products
 plug in via the standard provider interface to cover the full hiring
 funnel:
 
 1. **A-Player Scout*** — sourcing from a job description.
 2. **Extend*** — sourcing by extending a small set of example
    "look-alike" profiles.
-3. **Twin Agent Browser*** — sourcing by letting an agent explore the
-   open web in a real browser, no JD or example list required.
-4. **CodeMatch*** — GitHub-based technical evaluation of engineers.
-5. **Council*** — multi-LLM deliberation for final hiring decisions.
+3. **CodeMatch*** — GitHub-based technical evaluation of engineers.
+4. **Council*** — multi-LLM deliberation for final hiring decisions.
 
 Each tool is an optional drop-in. Daneel itself never requires any of
 them to function.
 
+## Third-party connectors (BYOK)
+
+Daneel ships with several free or BYOK third-party providers. These are
+technical connectors — not commercial offerings of the project maintainer.
+
+- **OpenAI** (BYOK) — native LLM provider for job understanding,
+  candidate matching, shortlist generation, and enrichment.
+- **GitHub public search** — sourcing via the public GitHub REST API
+  (optional `GITHUB_TOKEN` for higher rate limits).
+- **SerpAPI** (BYOK) — web-search-driven sourcing.
+- **Apify** (BYOK) — scraper-driven sourcing through third-party Apify
+  actors (LinkedIn, Bing, Google, etc.).
+- **Twin Agent Browser** (BYOK) — connect your Twin account and
+  templates to source candidates via an agentic browser.
+- **Custom Webhook** — bring any external HTTP endpoint as a provider.
+
 ## Commercial Disclosure
 
-The five tools marked with an asterisk above (**A-Player Scout**,
-**Extend**, **Twin Agent Browser**, **CodeMatch**, **Council**) are commercial offerings from
+The four tools marked with an asterisk above (**A-Player Scout**,
+**Extend**, **CodeMatch**, **Council**) are commercial offerings from
 the project maintainer, **Greg Herbé / A-Player**. They are paid,
 hosted services that integrate with Daneel through the same public
 provider interface that any third-party developer can use.
+
+Daneel also integrates with third-party services (OpenAI, Twin, Apify,
+SerpAPI, etc.) via BYOK providers. These integrations are technical and
+do not imply any commercial relationship with those vendors.
 
 The Daneel engine itself is, and will remain, fully functional with
 free and bring-your-own-key providers (native OpenAI, custom webhooks,

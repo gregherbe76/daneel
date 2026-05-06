@@ -1,0 +1,56 @@
+Décision finale après clarification :
+
+Twin Agent Browser N'EST PAS un produit commercial A-Player ni Twin. 
+C'est un provider tiers BYOK (Bring Your Own Account/Key), au même 
+niveau technique que les providers OpenAI, Apify ou SerpAPI : 
+l'utilisateur apporte son compte Twin et ses propres templates d'agents.
+
+Il existe donc 4 produits commerciaux A-Player, pas 5.
+
+VISION.md est INCORRECT (il liste Twin Agent Browser parmi les 5 commercial 
+offerings) et doit être corrigé.
+
+Procède en 2 modifications dans un seul commit :
+
+1. Modifier VISION.md :
+
+   - Section "The Five-Tool Funnel" → renommer "The Provider Marketplace" 
+     ou "The Commercial Providers" 
+   - Lister 4 produits commerciaux uniquement (Scout, Extend, CodeMatch, 
+     Council), tous maintenus par Greg Herbé / A-Player
+   - Retirer Twin Agent Browser de cette liste
+   
+   - Ajouter une nouvelle sous-section "Third-party connectors (BYOK)" 
+     qui liste : OpenAI (BYOK), Anthropic (BYOK si présent), GitHub 
+     public, SerpAPI, Apify (BYOK), Twin Agent Browser (BYOK — connect 
+     your Twin account and templates), Custom Webhook
+   - Phrase d'introduction de la sous-section : "Daneel ships with 
+     several free or BYOK third-party providers. These are technical 
+     connectors — not commercial offerings of the project maintainer."
+   
+   - Section "Commercial Disclosure" : ajuster pour ne mentionner que 
+     les 4 produits A-Player. Phrase explicite : "Daneel also integrates 
+     with third-party services (OpenAI, Twin, Apify, SerpAPI, etc.) 
+     via BYOK providers. These integrations are technical and do not 
+     imply any commercial relationship with those vendors."
+
+2. Modifier NAMING.md :
+
+   - Liste 4 produits commerciaux (Scout, Extend, CodeMatch, Council). 
+     Pas de Twin Agent Browser dans cette liste.
+   - Garder la note "Twin Scout → A-Player Scout" et la clarifier : 
+     "The provider file twin-webhook.ts implements A-Player Scout 
+     (legacy filename, kept for backwards compatibility). The provider 
+     file twin-agent.ts implements the Twin Agent Browser BYOK 
+     connector, which is a separate technical integration (not a 
+     commercial product)."
+   - Ajouter une section "Third-party connectors (BYOK)" qui liste les 
+     providers techniques tiers, incluant Twin Agent Browser. Format : 
+     nom du provider, fichier source, note "BYOK".
+
+Commit unique :
+"docs: clarify Twin Agent Browser as BYOK connector, not commercial 
+product (4 commercial providers, not 5)"
+
+STOP après commit. Attends validation avant de toucher au README ou 
+autre chose.
