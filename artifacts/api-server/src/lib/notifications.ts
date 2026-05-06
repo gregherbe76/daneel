@@ -440,21 +440,80 @@ export interface DigestRow {
   changedAt: Date;
 }
 
-function buildDigestSubject(rows: DigestRow[], windowHours: number): string {
-  return `[HiringAI] ${rows.length} new email regression${rows.length === 1 ? "" : "s"} in the last ${windowHours}h`;
+/**
+ * Hard cap on the number of regression rows included in a single digest
+ * email. Anything beyond this is summarised in the body and rolled into the
+ * next digest by leaving the cursor parked at the last included row's
+ * `changedAt`. This protects SendGrid request size limits and keeps the
+ * email skimmable when the scheduler has been offline for a long time.
+ */
+export const MAX_DIGEST_ROWS = 100;
+
+/**
+ * If the actual window covered by the digest exceeds the configured cadence
+ * by this multiplier, a "backlog" header is added so recipients can tell a
+ * normal daily digest apart from one that just caught up after downtime.
+ */
+const BACKLOG_WINDOW_RATIO = 1.5;
+
+function formatWindowHours(windowMs: number): string {
+  const hours = windowMs / (60 * 60 * 1000);
+  if (hours >= 24) {
+    const days = hours / 24;
+    const rounded = days >= 10 ? Math.round(days) : Math.round(days * 10) / 10;
+    return `${rounded}d`;
+  }
+  if (hours >= 1) {
+    const rounded = hours >= 10 ? Math.round(hours) : Math.round(hours * 10) / 10;
+    return `${rounded}h`;
+  }
+  const minutes = Math.max(1, Math.round(windowMs / (60 * 1000)));
+  return `${minutes}m`;
 }
 
-function buildDigestBody(rows: DigestRow[], windowHours: number): string {
-  const header = [
-    `${rows.length} email validation regression${rows.length === 1 ? " was" : "s were"} recorded in the last ${windowHours}h.`,
-    "",
+interface DigestWindow {
+  windowMs: number;
+  cadenceMs: number;
+  totalCount: number;
+  truncatedCount: number;
+}
+
+function buildDigestSubject(includedRows: DigestRow[], window: DigestWindow): string {
+  const label = formatWindowHours(window.windowMs);
+  const isBacklog = window.windowMs > window.cadenceMs * BACKLOG_WINDOW_RATIO;
+  const prefix = isBacklog ? "[HiringAI][backlog]" : "[HiringAI]";
+  const count = window.totalCount;
+  return `${prefix} ${count} new email regression${count === 1 ? "" : "s"} in the last ${label}`;
+}
+
+function buildDigestBody(includedRows: DigestRow[], window: DigestWindow): string {
+  const label = formatWindowHours(window.windowMs);
+  const header: string[] = [
+    `${window.totalCount} email validation regression${window.totalCount === 1 ? " was" : "s were"} recorded in the last ${label}.`,
   ];
-  const lines = rows.map((r) => {
+  if (window.windowMs > window.cadenceMs * BACKLOG_WINDOW_RATIO) {
+    const cadenceLabel = formatWindowHours(window.cadenceMs);
+    header.push(
+      `Heads up: this digest covers a wider window than your usual ${cadenceLabel} cadence — likely because the scheduler was catching up on a backlog.`,
+    );
+  }
+  header.push("");
+
+  const lines = includedRows.map((r) => {
     const reason = r.newReason ? ` — ${r.newReason}` : "";
     const email = r.candidateEmail ?? "(no email)";
     return `• ${r.candidateName} (#${r.candidateId}, ${email}): ${r.previousStatus} → ${r.newStatus}${reason}`;
   });
-  return [...header, ...lines, "", "— HiringAI"].join("\n");
+
+  const footer: string[] = [""];
+  if (window.truncatedCount > 0) {
+    footer.push(
+      `… and ${window.truncatedCount} more not shown here. They will be included in the next digest.`,
+      "",
+    );
+  }
+  footer.push("— HiringAI");
+  return [...header, ...lines, ...footer].join("\n");
 }
 
 /**
@@ -600,7 +659,14 @@ export async function loadDigestRows(
 export interface DigestRunResult {
   attempted: boolean;
   recipientCount: number;
+  /** Number of regression rows actually included in the email body. */
   regressionCount: number;
+  /**
+   * Number of additional rows that matched the window but were dropped by
+   * the per-digest cap. These are picked up by the next digest because the
+   * cursor is parked at the last included row's `changedAt`.
+   */
+  truncatedCount?: number;
   reason?: string;
 }
 
@@ -637,6 +703,9 @@ export async function runDigestSweep(
     };
   }
 
+  const cadenceMs = settings.digestCadenceHours * 60 * 60 * 1000;
+  const lowerBound =
+    settings.digestLastSentAt ?? new Date(now.getTime() - cadenceMs);
   const rows = await loadDigestRows(
     settings.digestLastSentAt,
     settings.digestCadenceHours,
@@ -657,15 +726,53 @@ export async function runDigestSweep(
     };
   }
 
+  // Cap the per-email batch so a long backlog doesn't produce an oversized
+  // SendGrid request or an unreadable email. Remaining rows stay un-stamped
+  // and the cursor parks at the last included row's `changedAt`, so the next
+  // digest picks up exactly where this one stopped.
+  //
+  // Tie-handling: `loadDigestRows` filters with `gt(changedAt, cursor)` —
+  // strictly greater than. If we naively cut at MAX_DIGEST_ROWS and the row
+  // immediately after shares its `changedAt` with the last included row,
+  // those tied rows would be permanently skipped because the next sweep's
+  // `gt(cursor)` filter would exclude them. To avoid silent data loss we
+  // extend the included batch through any timestamp ties at the boundary.
+  // In the worst case this slightly exceeds the cap, but only by however many
+  // regressions happened to share a single millisecond — a bounded overshoot
+  // we accept in exchange for never dropping a notification.
+  let cutoff = MAX_DIGEST_ROWS;
+  if (rows.length > MAX_DIGEST_ROWS) {
+    const tieTime = rows[MAX_DIGEST_ROWS - 1]!.changedAt.getTime();
+    while (
+      cutoff < rows.length &&
+      rows[cutoff]!.changedAt.getTime() === tieTime
+    ) {
+      cutoff++;
+    }
+  }
+  const includedRows = rows.slice(0, cutoff);
+  const truncatedCount = rows.length - includedRows.length;
+  const cursorAdvanceTo =
+    truncatedCount > 0
+      ? includedRows[includedRows.length - 1]!.changedAt
+      : now;
+  const windowMs = cursorAdvanceTo.getTime() - lowerBound.getTime();
+  const window: DigestWindow = {
+    windowMs: Math.max(windowMs, 0),
+    cadenceMs,
+    totalCount: rows.length,
+    truncatedCount,
+  };
+
   await sendEmailRaw(
     digestRecipients,
-    buildDigestSubject(rows, settings.digestCadenceHours),
-    buildDigestBody(rows, settings.digestCadenceHours),
+    buildDigestSubject(includedRows, window),
+    buildDigestBody(includedRows, window),
   );
 
-  // Stamp notification_sent_at on every row included in this digest so the UI
-  // "notified externally" state is consistent with what was actually emailed.
-  const ids = rows
+  // Stamp notification_sent_at on every row that was actually included in
+  // this digest so the UI "notified externally" state matches the email.
+  const ids = includedRows
     .filter((r) => r.id !== undefined)
     .map((r) => r.id);
   if (ids.length > 0) {
@@ -677,14 +784,16 @@ export async function runDigestSweep(
 
   await db
     .update(notificationSettingsTable)
-    .set({ digestLastSentAt: now })
+    .set({ digestLastSentAt: cursorAdvanceTo })
     .where(eq(notificationSettingsTable.id, SINGLETON_ID));
 
   logger.info(
     {
       recipientCount: digestRecipients.length,
-      regressionCount: rows.length,
+      regressionCount: includedRows.length,
+      truncatedCount,
       cadenceHours: settings.digestCadenceHours,
+      windowMs: window.windowMs,
     },
     "Email regression digest sent",
   );
@@ -692,7 +801,8 @@ export async function runDigestSweep(
   return {
     attempted: true,
     recipientCount: digestRecipients.length,
-    regressionCount: rows.length,
+    regressionCount: includedRows.length,
+    truncatedCount,
   };
 }
 

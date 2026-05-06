@@ -569,6 +569,7 @@ describe("runDigestSweep", () => {
       attempted: true,
       recipientCount: 2,
       regressionCount: 3,
+      truncatedCount: 0,
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -591,6 +592,203 @@ describe("runDigestSweep", () => {
     expect(dbState.changeStamps[0]!.ids).toEqual([11, 12, 13]);
     expect(dbState.changeStamps[0]!.sentAt).toEqual(now);
     expect(dbState.cursorUpdates).toEqual([now]);
+  });
+
+  it("caps the digest at MAX_DIGEST_ROWS, parks the cursor, and notes the remainder", async () => {
+    process.env["SENDGRID_API_KEY"] = "sg-test-key";
+    setSettings([{ email: "digest@example.com", mode: "digest" }], {
+      emailEnabled: true,
+      digestCadenceHours: 24,
+      digestLastSentAt: new Date("2026-04-29T12:00:00Z"),
+    });
+    // 150 backlog rows, ascending by changedAt — the digest should include
+    // the first 100 and leave 50 for the next sweep.
+    const start = new Date("2026-04-29T13:00:00Z").getTime();
+    dbState.digestRows = Array.from({ length: 150 }, (_, i) => ({
+      id: 1000 + i,
+      candidateId: i + 1,
+      candidateName: `Cand ${i + 1}`,
+      candidateEmail: `cand${i + 1}@example.com`,
+      previousStatus: "valid",
+      newStatus: "invalid",
+      newReason: "bounced",
+      // Spread evenly over the backlog window so the 100th row's `changedAt`
+      // is well before `now`.
+      changedAt: new Date(start + i * 60 * 1000),
+    }));
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 202 });
+
+    const now = new Date("2026-05-06T12:00:00Z");
+    const result = await runDigestSweep(now);
+
+    expect(result.attempted).toBe(true);
+    expect(result.regressionCount).toBe(100);
+    expect(result.truncatedCount).toBe(50);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const init = fetchMock.mock.calls[0]![1];
+    const body = JSON.parse((init as { body: string }).body);
+    expect(body.subject).toContain("150 new email regressions");
+    expect(body.content[0].value).toContain(
+      "… and 50 more not shown here. They will be included in the next digest.",
+    );
+    // Last row in the body is the 100th candidate, not the 150th.
+    expect(body.content[0].value).toContain("Cand 100");
+    expect(body.content[0].value).not.toContain("Cand 101");
+
+    // Stamp only the included 100 ids.
+    expect(dbState.changeStamps).toHaveLength(1);
+    expect(dbState.changeStamps[0]!.ids).toHaveLength(100);
+    expect(dbState.changeStamps[0]!.ids[0]).toBe(1000);
+    expect(dbState.changeStamps[0]!.ids[99]).toBe(1099);
+
+    // Cursor parks at the last included row's `changedAt`, NOT `now`, so the
+    // remaining 50 rows are picked up by the next digest.
+    expect(dbState.cursorUpdates).toHaveLength(1);
+    const expectedCursor = new Date(start + 99 * 60 * 1000);
+    expect(dbState.cursorUpdates[0]!.getTime()).toBe(expectedCursor.getTime());
+    expect(dbState.cursorUpdates[0]!.getTime()).toBeLessThan(now.getTime());
+  });
+
+  it("extends the cap through timestamp ties so no regression is silently skipped", async () => {
+    process.env["SENDGRID_API_KEY"] = "sg-test-key";
+    setSettings([{ email: "digest@example.com", mode: "digest" }], {
+      emailEnabled: true,
+      digestCadenceHours: 24,
+      digestLastSentAt: new Date("2026-04-29T12:00:00Z"),
+    });
+    // 105 rows where rows 99..103 all share the SAME changedAt. A naive
+    // slice(0, 100) would park the cursor at that shared timestamp and the
+    // next sweep's `gt(cursor)` filter would silently drop rows 101..103.
+    // The fix should extend the batch through the tie boundary.
+    const tieTime = new Date("2026-04-30T08:00:00Z");
+    const rows: DigestRowFixture[] = [];
+    for (let i = 0; i < 99; i++) {
+      rows.push({
+        id: 2000 + i,
+        candidateId: i + 1,
+        candidateName: `Cand ${i + 1}`,
+        candidateEmail: `cand${i + 1}@example.com`,
+        previousStatus: "valid",
+        newStatus: "invalid",
+        newReason: null,
+        changedAt: new Date(Date.UTC(2026, 3, 29, 13, i, 0)),
+      });
+    }
+    // 5 tied rows at index 99..103 (positions 100..104).
+    for (let i = 0; i < 5; i++) {
+      rows.push({
+        id: 2099 + i,
+        candidateId: 100 + i,
+        candidateName: `Tie ${i}`,
+        candidateEmail: `tie${i}@example.com`,
+        previousStatus: "valid",
+        newStatus: "invalid",
+        newReason: null,
+        changedAt: tieTime,
+      });
+    }
+    // One row strictly after the tie burst.
+    rows.push({
+      id: 2999,
+      candidateId: 999,
+      candidateName: "After",
+      candidateEmail: "after@example.com",
+      previousStatus: "valid",
+      newStatus: "invalid",
+      newReason: null,
+      changedAt: new Date(tieTime.getTime() + 60 * 1000),
+    });
+    dbState.digestRows = rows;
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 202 });
+
+    const now = new Date("2026-05-06T12:00:00Z");
+    const result = await runDigestSweep(now);
+
+    // Cap was 100, but ties pushed the included batch to 104 so no row
+    // sharing the boundary timestamp gets dropped. One remaining row
+    // (the "After" row) is left for the next digest.
+    expect(result.attempted).toBe(true);
+    expect(result.regressionCount).toBe(104);
+    expect(result.truncatedCount).toBe(1);
+    expect(dbState.changeStamps[0]!.ids).toHaveLength(104);
+    // Cursor parks at the tied timestamp — safe because the only remaining
+    // row has changedAt strictly greater than it.
+    expect(dbState.cursorUpdates).toHaveLength(1);
+    expect(dbState.cursorUpdates[0]!.getTime()).toBe(tieTime.getTime());
+  });
+
+  it("adds a backlog header when the actual window is much wider than the cadence", async () => {
+    process.env["SENDGRID_API_KEY"] = "sg-test-key";
+    // Cadence is 24h but the last digest went out 7 days ago — backlog mode.
+    setSettings([{ email: "digest@example.com", mode: "digest" }], {
+      emailEnabled: true,
+      digestCadenceHours: 24,
+      digestLastSentAt: new Date("2026-04-29T12:00:00Z"),
+    });
+    dbState.digestRows = [
+      {
+        id: 1,
+        candidateId: 1,
+        candidateName: "Alice",
+        candidateEmail: "alice@example.com",
+        previousStatus: "valid",
+        newStatus: "invalid",
+        newReason: "bounced",
+        changedAt: new Date("2026-05-05T00:00:00Z"),
+      },
+    ];
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 202 });
+
+    const now = new Date("2026-05-06T12:00:00Z");
+    const result = await runDigestSweep(now);
+
+    expect(result.attempted).toBe(true);
+    expect(result.truncatedCount).toBe(0);
+
+    const init = fetchMock.mock.calls[0]![1];
+    const body = JSON.parse((init as { body: string }).body);
+    expect(body.subject).toContain("[backlog]");
+    expect(body.subject).toContain("7d");
+    expect(body.content[0].value).toContain(
+      "this digest covers a wider window than your usual",
+    );
+    expect(body.content[0].value).toContain("1d cadence");
+    // No truncation footer when nothing was dropped.
+    expect(body.content[0].value).not.toContain("more not shown here");
+    // Normal advance to `now` because we weren't truncated.
+    expect(dbState.cursorUpdates).toEqual([now]);
+  });
+
+  it("uses a normal subject (no backlog tag) when the window matches cadence", async () => {
+    process.env["SENDGRID_API_KEY"] = "sg-test-key";
+    setSettings([{ email: "digest@example.com", mode: "digest" }], {
+      emailEnabled: true,
+      digestCadenceHours: 24,
+      digestLastSentAt: new Date("2026-05-05T12:00:00Z"),
+    });
+    dbState.digestRows = [
+      {
+        id: 1,
+        candidateId: 1,
+        candidateName: "Alice",
+        candidateEmail: "alice@example.com",
+        previousStatus: "valid",
+        newStatus: "invalid",
+        newReason: null,
+        changedAt: new Date("2026-05-06T06:00:00Z"),
+      },
+    ];
+    fetchMock.mockResolvedValueOnce({ ok: true, status: 202 });
+
+    const now = new Date("2026-05-06T12:00:00Z");
+    await runDigestSweep(now);
+
+    const init = fetchMock.mock.calls[0]![1];
+    const body = JSON.parse((init as { body: string }).body);
+    expect(body.subject).not.toContain("[backlog]");
+    expect(body.subject).toContain("[HiringAI]");
+    expect(body.content[0].value).not.toContain("Heads up");
   });
 });
 
