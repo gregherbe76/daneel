@@ -132,9 +132,18 @@ Reports are clearly labelled. Mock and real data are never silently mixed.
 | Change the scoring rubric | [examples/custom-scoring-rubric.md](examples/custom-scoring-rubric.md) |
 | Connect an external system via webhook | [examples/twin-provider.md](examples/twin-provider.md) |
 | Add a new workflow step | [examples/custom-workflow.md](examples/custom-workflow.md) |
-| White-label with a different brand | See `lib/branding/templates/` |
+| White-label the UI | Add a template under `lib/branding/src/templates/` and set `APP_TEMPLATE` (server) or `VITE_APP_TEMPLATE` (frontend). Daneel ships with two templates: `daneel` (default) and `hiringai` (alternative example). |
 
 Full extension guide: [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md).
+
+### White-label templates
+
+Daneel ships with a pluggable branding system. Switch between templates via the `APP_TEMPLATE` (server) and `VITE_APP_TEMPLATE` (frontend) environment variables. Two templates are included out of the box:
+
+- `daneel` — the default open-source branding
+- `hiringai` — an example alternative template, showing how agencies or partners can re-skin the UI without touching the engine
+
+Add your own template under `lib/branding/src/templates/<your-brand>/` following the same structure.
 
 ---
 
