@@ -47,6 +47,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { track as trackTelemetry } from "@/lib/telemetry";
+import { GithubQueryPreview } from "./github-query-preview";
 
 type ProviderRecord = {
   id: number;
@@ -761,6 +762,18 @@ function ConnectDialog({
                     data-testid="gh-active-within"
                   />
                 </div>
+
+                <GithubQueryPreview
+                  config={{
+                    extraKeywords: ghExtraKeywords.trim() || null,
+                    excludeOrgs: ghExcludeOrgs.trim() || null,
+                    minFollowers: parsePositiveInt(ghMinFollowers),
+                    minRepos: parsePositiveInt(ghMinRepos),
+                    requireBio: ghRequireBio ? true : null,
+                    activeWithinMonths: parsePositiveInt(ghActiveWithinMonths),
+                  }}
+                  editProviderId={existing?.id ?? null}
+                />
               </div>
             )}
           </div>
