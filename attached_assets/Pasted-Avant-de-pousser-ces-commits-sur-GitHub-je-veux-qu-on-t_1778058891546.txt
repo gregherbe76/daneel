@@ -1,0 +1,55 @@
+Avant de pousser ces commits sur GitHub, je veux qu'on teste l'intégration end-to-end en local. C'est non-négociable parce que les tests unitaires de l'agent ne valident pas l'expérience utilisateur réelle.
+Étape 1 — Lancer Daneel en local
+Dans Replit (projet Daneel), lance l'app en mode dev. Vérifie que ça tourne sans erreur au démarrage.
+Étape 2 — Configurer CodeMatch comme provider
+
+Ouvre Daneel dans le navigateur (probablement http://localhost:5173)
+Va dans Settings → Marketplace
+Tu devrais voir une nouvelle carte CodeMatch dans la section Commercial Providers ⭐
+Clique Connect
+Dans le modal, colle ta clé daneel-internal que tu as générée sur CodeMatch
+Clique Save & Test
+Le test doit appeler CodeMatch en arrière-plan avec torvalds (ou similaire) et confirmer que la clé marche
+Si Save & Test passe → CodeMatch est connecté
+
+→ Si Save & Test échoue : copie l'erreur exacte ici, on debug
+→ Si la carte CodeMatch n'apparaît pas du tout : signale-le
+Étape 3 — Créer un job de test avec technical_evaluation activé
+
+Crée un nouveau job (ou utilise un existant)
+Dans la config du job, active la checkbox "Enable technical evaluation"
+Vérifie que la checkbox n'affiche pas le warning "Connect a provider" (puisque CodeMatch est connecté)
+Sauvegarde le job
+
+Étape 4 — Ajouter un candidat avec un GitHub username
+
+Ajoute manuellement un candidat avec un GitHub username réel et connu
+Suggestions pour avoir des données intéressantes : torvalds, sindresorhus, gaearon, tj — des dévs avec beaucoup de contributions
+Vérifie que le candidat est créé
+
+Étape 5 — Lancer le workflow
+
+Lance le workflow sur ce job
+Observe la timeline d'exécution
+Tu dois voir le step technical_evaluation apparaître après candidate_matching
+Le step doit appeler CodeMatch en background
+
+Étape 6 — Vérifier le résultat sur la page candidat
+
+Une fois le workflow fini, ouvre la page détail du candidat
+Tu dois voir la nouvelle section "Technical Evaluation" avec :
+
+Overall score en grand
+5 dimensions en bars (CSS si recharts pas dispo)
+Strengths en liste verte
+Red flags en liste rouge
+Summary
+"Powered by CodeMatch" en bas
+Bouton PDF si report_url non null
+
+
+
+Étape 7 — Vérifier la persistance
+
+Refresh la page → les données doivent persister (signe que la table technical_evaluations fonctionne)
+Optionnel : vérifie en BDD que la table existe et contient un row : psql $DATABASE_URL -c "SELECT * FROM technical_evaluations LIMIT 5;"
