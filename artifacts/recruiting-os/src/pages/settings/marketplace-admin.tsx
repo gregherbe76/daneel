@@ -65,13 +65,14 @@ import {
   Scale,
   Sparkles,
   ExternalLink,
+  Bot,
 } from "lucide-react";
 import { track as trackTelemetry } from "@/lib/telemetry";
 import { GithubQueryPreview } from "./github-query-preview";
 
 // ── types ────────────────────────────────────────────────────────────────────
 
-type ProviderType = "native_openai" | "custom_webhook" | "twin_webhook" | "github" | "web_search" | "council";
+type ProviderType = "native_openai" | "custom_webhook" | "twin_webhook" | "github" | "web_search" | "apify" | "council";
 type WorkflowStep =
   | "job_understanding"
   | "candidate_matching"
@@ -99,6 +100,7 @@ interface Provider {
   config?: {
     github?: GithubProviderConfig | null;
     web_search?: WebSearchProviderConfig | null;
+    apify?: ApifyProviderConfig | null;
     council?: CouncilProviderConfig | null;
   } | null;
   enabled: boolean;
@@ -122,6 +124,7 @@ const PROVIDER_TYPE_LABELS: Record<ProviderType, string> = {
   twin_webhook: "Twin Webhook",
   github: "GitHub Agent",
   web_search: "Web Search",
+  apify: "Apify Scrapers",
   council: "Council",
 };
 
@@ -131,8 +134,21 @@ const PROVIDER_TYPE_ICONS: Record<ProviderType, React.ComponentType<{ className?
   twin_webhook: Zap,
   github: Github,
   web_search: Globe,
+  apify: Bot,
   council: Scale,
 };
+
+/**
+ * Apify ships a default actor when no override is configured. Mirrors
+ * `DEFAULT_ACTOR_ID` in `artifacts/api-server/src/routes/workflows/providers/apify.ts`
+ * so the Step Assignments row reflects what the engine will actually run.
+ */
+const APIFY_DEFAULT_ACTOR_ID = "apify/google-search-scraper";
+
+function apifyActorLabel(provider: Provider): string {
+  const id = provider.config?.apify?.actorId?.trim();
+  return id && id.length > 0 ? id : `${APIFY_DEFAULT_ACTOR_ID} (default)`;
+}
 
 // ── form schema ──────────────────────────────────────────────────────────────
 
@@ -174,6 +190,14 @@ interface WebSearchProviderConfig {
 
 interface CouncilProviderConfig {
   baseUrl?: string | null;
+}
+
+interface ApifyProviderConfig {
+  actorId?: string | null;
+  extraKeywords?: string | null;
+  targetSites?: string[] | null;
+  excludeSites?: string[] | null;
+  resultsPerPage?: number | null;
 }
 
 /** Split a comma/space/newline-separated free-text field into a clean array. */
@@ -347,6 +371,10 @@ function StepAssignmentRow({
   const [saving, setSaving] = useState(false);
 
   const currentProviderId = currentSetting?.providerId;
+  const currentProvider =
+    currentProviderId != null
+      ? providers.find((p) => p.id === currentProviderId) ?? null
+      : null;
   // For the decision step, only council-typed providers are valid. For every
   // other step, council providers are excluded so they can't be misassigned.
   const enabledProviders = providers.filter((p) => {
@@ -402,11 +430,25 @@ function StepAssignmentRow({
                 <SelectItem key={p.id} value={p.id.toString()}>
                   <span className="flex items-center gap-2">
                     {PROVIDER_TYPE_LABELS[p.type]} — {p.name}
+                    {p.type === "apify" && (
+                      <span className="text-xs text-muted-foreground">
+                        · {apifyActorLabel(p)}
+                      </span>
+                    )}
                   </span>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+        )}
+        {currentProvider?.type === "apify" && currentSetting?.enabled && (
+          <p
+            className="text-[11px] text-muted-foreground mt-1 truncate"
+            data-testid={`step-assignment-apify-actor-${step.key}`}
+            title={apifyActorLabel(currentProvider)}
+          >
+            Actor: <code className="text-[11px]">{apifyActorLabel(currentProvider)}</code>
+          </p>
         )}
       </div>
       {saving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />}

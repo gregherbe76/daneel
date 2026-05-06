@@ -1131,6 +1131,24 @@ function ProviderCard({
         <p className="text-xs text-amber-600 -mt-2">{entry.helper}</p>
       )}
 
+      {entry.kind === "connect" &&
+        entry.connectType === "apify" &&
+        dbProvider &&
+        state === "connected" && (
+          <p
+            className="text-[11px] text-muted-foreground -mt-2 truncate"
+            data-testid={`apify-card-actor-${entry.id}`}
+            title={dbProvider.config?.apify?.actorId ?? "apify/google-search-scraper"}
+          >
+            Actor:{" "}
+            <code className="text-[11px]">
+              {dbProvider.config?.apify?.actorId?.trim()
+                ? dbProvider.config.apify.actorId
+                : "apify/google-search-scraper (default)"}
+            </code>
+          </p>
+        )}
+
       <div className="flex items-center justify-between gap-2">
         <span
           className="text-[10px] uppercase font-semibold tracking-wide"
