@@ -36,7 +36,7 @@ vi.mock("@workspace/api-client-react", async (importOriginal) => {
   };
 });
 
-import { ScoutMarketplaceCard } from "./providers";
+import { ScoutMarketplaceCard } from "./marketplace/connect-cards";
 
 function renderCard() {
   const qc = new QueryClient({

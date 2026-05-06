@@ -532,10 +532,10 @@ describe("MarketplacePage – Advanced (admin) disclosure", () => {
       }),
     ).toBeInTheDocument();
 
-    // The Advanced section's own A-Player Scout subsection heading
+    // The Advanced section's own A-Player integrations subsection heading
     // (separate from the marketplace Scout card above the disclosure).
     expect(
-      within(details).getByRole("heading", { name: /a-player scout/i }),
+      within(details).getByRole("heading", { name: /a-player integrations/i }),
     ).toBeInTheDocument();
   });
 });
