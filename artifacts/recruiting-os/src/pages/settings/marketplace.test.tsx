@@ -495,6 +495,51 @@ describe("MarketplacePage – inline workflow step assignment", () => {
   });
 });
 
+describe("MarketplacePage – Advanced (admin) disclosure", () => {
+  it("starts closed and toggles open when its summary is clicked", async () => {
+    renderPage();
+
+    const details = screen.getByTestId(
+      "advanced-admin-section",
+    ) as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+
+    const summary = details.querySelector("summary");
+    expect(summary).not.toBeNull();
+    await userEvent.click(summary as HTMLElement);
+
+    expect(details.open).toBe(true);
+  });
+
+  it("mounts the lifted admin sections inside the disclosure", async () => {
+    renderPage();
+
+    const details = screen.getByTestId(
+      "advanced-admin-section",
+    ) as HTMLDetailsElement;
+    const summary = details.querySelector("summary");
+    await userEvent.click(summary as HTMLElement);
+
+    // The lifted Configured Providers section ships an "Add Provider" button.
+    expect(
+      within(details).getByRole("button", { name: /add provider/i }),
+    ).toBeInTheDocument();
+
+    // The lifted Workflow Step Assignments section heading.
+    expect(
+      within(details).getByRole("heading", {
+        name: /workflow step assignments/i,
+      }),
+    ).toBeInTheDocument();
+
+    // The Advanced section's own A-Player Scout subsection heading
+    // (separate from the marketplace Scout card above the disclosure).
+    expect(
+      within(details).getByRole("heading", { name: /a-player scout/i }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("App routing – legacy settings paths redirect to the marketplace", () => {
   // Behavioral runtime check driven off the EXACT redirect array exported
   // from App.tsx. If a redirect is dropped, retargeted, or its source path
