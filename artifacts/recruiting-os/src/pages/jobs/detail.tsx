@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useKickoffDefaults } from "./use-kickoff-defaults";
 import { KickoffWorkflowToggles } from "./kickoff-workflow-toggles";
 import {
@@ -406,10 +406,18 @@ export default function JobDetailPage() {
     () => parseEmailSourceParam(search),
     [search],
   );
+  // Keep the latest search string in a ref so back-to-back updateUrl calls
+  // within the same render compose correctly. Without this, both calls would
+  // read the same stale `search` from the closure and the second navigate()
+  // would clobber the first (e.g. clearing both `email` and `emailSource` in
+  // a single tick).
+  const searchRef = useRef(search);
+  searchRef.current = search;
   const updateUrl = (mutate: (params: URLSearchParams) => void) => {
-    const parsed = new URLSearchParams(search);
+    const parsed = new URLSearchParams(searchRef.current);
     mutate(parsed);
     const qs = parsed.toString();
+    searchRef.current = qs;
     navigate(`/jobs/${jobId}${qs ? `?${qs}` : ""}`, { replace: true });
   };
   const setEmailFilter = (value: EmailStatusFilterValue) => {

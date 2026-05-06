@@ -1,7 +1,7 @@
 import { getListCandidatesQueryKey, useListCandidates } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -70,10 +70,18 @@ export default function CandidatesPage() {
     return isEmailStatusFilterValue(v) ? v : "all";
   }, [search]);
 
+  // Keep the latest search string in a ref so back-to-back updateUrl calls
+  // within the same render compose correctly. Without this, both calls would
+  // read the same stale `search` from the closure and the second navigate()
+  // would clobber the first — see clearAllFilters where we drop two params
+  // in a single tick.
+  const searchRef = useRef(search);
+  searchRef.current = search;
   const updateUrl = (mutate: (params: URLSearchParams) => void) => {
-    const parsed = new URLSearchParams(search);
+    const parsed = new URLSearchParams(searchRef.current);
     mutate(parsed);
     const qs = parsed.toString();
+    searchRef.current = qs;
     navigate(`/candidates${qs ? `?${qs}` : ""}`, { replace: true });
   };
 

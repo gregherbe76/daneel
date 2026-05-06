@@ -174,4 +174,32 @@ describe("CandidatesPage — remembered email source filter", () => {
       });
     },
   );
+
+  it(
+    "the inline 'Clear all' shortcut drops both the emailSource and email " +
+      "URL params in a single tick (no stale survivor)",
+    async () => {
+      // Land with both filters active so the inline "Clear all" shortcut
+      // renders (it only appears when at least one filter is set).
+      const { loc } = await renderCandidatesAt(
+        "/candidates?emailSource=profile&email=valid",
+      );
+
+      await waitFor(() => {
+        const params = new URLSearchParams(currentSearch(loc));
+        expect(params.get("emailSource")).toBe("profile");
+        expect(params.get("email")).toBe("valid");
+      });
+
+      // The inline shortcut sits next to the "Showing N of M candidates" copy.
+      const clearAll = await screen.findByRole("button", { name: /^clear all$/i });
+      await userEvent.click(clearAll);
+
+      await waitFor(() => {
+        const params = new URLSearchParams(currentSearch(loc));
+        expect(params.get("emailSource")).toBeNull();
+        expect(params.get("email")).toBeNull();
+      });
+    },
+  );
 });
