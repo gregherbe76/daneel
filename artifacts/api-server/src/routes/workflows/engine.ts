@@ -666,7 +666,7 @@ async function runCandidateMatching(
 
 // ── STEP 3: Shortlist ─────────────────────────────────────────────────────────
 
-async function runShortlist(
+export async function runShortlist(
   runId: number,
   jobId: number,
   job: { title: string; description: string },
