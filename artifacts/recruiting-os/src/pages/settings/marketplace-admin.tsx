@@ -13,6 +13,8 @@ import {
   useUpsertProviderStepSetting,
   useIssueScoutConnectState,
   useDisconnectScout,
+  useIssueEnrichConnectState,
+  useDisconnectEnrich,
   getListProvidersQueryKey,
   getListProviderStepSettingsQueryKey,
 } from "@workspace/api-client-react";
@@ -1246,6 +1248,307 @@ export function ScoutMarketplaceCard({ providers }: { providers: Provider[] }) {
   );
 }
 
+// ── marketplace: A-Player Enrich card ────────────────────────────────────────
+//
+// A peer to ScoutMarketplaceCard so the marketplace section now showcases the
+// "list of integrations + the steps they power" pattern with more than one
+// real card. Same redirect-flavored OAuth-style flow, different powered step
+// (`enrichment`) and different BroadcastChannel/localStorage/postMessage
+// channel names so the two cards don't react to each other's connect events.
+
+const ENRICH_PROVIDER_NAME = "A-Player Enrich";
+
+/**
+ * Workflow steps the Enrich integration is currently capable of powering.
+ * Server-side mirror lives at
+ * `artifacts/api-server/src/routes/integrations-enrich.ts:ENRICH_POWERED_STEPS`.
+ */
+const ENRICH_POWERED_STEPS: WorkflowStep[] = ["enrichment"];
+
+function EnrichMarketplaceCard({ providers }: { providers: Provider[] }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [waiting, setWaiting] = useState(false);
+  const [autoAssign, setAutoAssign] = useState(true);
+  const issueState = useIssueEnrichConnectState();
+  const disconnect = useDisconnectEnrich();
+  const testConn = useTestProviderConnection();
+  const [livePing, setLivePing] = useState<{ ok: boolean | null; checking: boolean }>(
+    { ok: null, checking: false },
+  );
+
+  const enrichProvider = providers.find(
+    (p) => p.name === ENRICH_PROVIDER_NAME && p.type === "twin_webhook",
+  );
+  const connected = !!enrichProvider && enrichProvider.enabled;
+
+  useEffect(() => {
+    if (!enrichProvider) {
+      setLivePing({ ok: null, checking: false });
+      return;
+    }
+    let cancelled = false;
+    setLivePing({ ok: null, checking: true });
+    testConn
+      .mutateAsync({ id: enrichProvider.id })
+      .then((res) => {
+        if (cancelled) return;
+        setLivePing({ ok: (res as { ok: boolean }).ok, checking: false });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLivePing({ ok: false, checking: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enrichProvider?.id]);
+
+  useEffect(() => {
+    if (!waiting) return;
+    function onSuccess(payload: {
+      ok: boolean;
+      error?: string | null;
+      assignedSteps?: string[];
+    }) {
+      setWaiting(false);
+      qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
+      qc.invalidateQueries({ queryKey: getListProviderStepSettingsQueryKey() });
+      if (payload.ok) {
+        const steps = (payload.assignedSteps ?? []).filter(
+          (s): s is WorkflowStep => ENRICH_POWERED_STEPS.includes(s as WorkflowStep),
+        );
+        const description =
+          steps.length > 0
+            ? `Wired up: ${steps.map(stepLabel).join(", ")}.`
+            : "No workflow steps were auto-assigned. Wire Enrich up from Workflow Step Assignments below.";
+        toast({
+          title: "Connected to A-Player Enrich",
+          description,
+        });
+      } else {
+        toast({
+          title: "Enrich connection failed",
+          description: payload.error ?? "Unknown error",
+          variant: "destructive",
+        });
+      }
+    }
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel("daneel:enrich-connect");
+      bc.onmessage = (ev) => onSuccess(ev.data);
+    } catch {
+      bc = null;
+    }
+    function onStorage(e: StorageEvent) {
+      if (e.key !== "daneel.enrichConnect" || !e.newValue) return;
+      try {
+        onSuccess(JSON.parse(e.newValue));
+      } catch {
+        /* ignore */
+      }
+    }
+    function onMessage(e: MessageEvent) {
+      const data = e.data as
+        | {
+            source?: string;
+            ok?: boolean;
+            error?: string | null;
+            assignedSteps?: string[];
+          }
+        | undefined;
+      if (!data || data.source !== "daneel-enrich-connect") return;
+      onSuccess({
+        ok: !!data.ok,
+        error: data.error ?? null,
+        assignedSteps: data.assignedSteps ?? [],
+      });
+    }
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("message", onMessage);
+    return () => {
+      bc?.close();
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("message", onMessage);
+    };
+  }, [waiting, qc, toast]);
+
+  async function handleConnect() {
+    try {
+      const res = (await issueState.mutateAsync({
+        data: { autoAssignSteps: autoAssign },
+      })) as {
+        connectUrl: string;
+        state: string;
+      };
+      setWaiting(true);
+      const popup = window.open(res.connectUrl, "_blank", "noopener,noreferrer");
+      if (!popup) {
+        window.location.href = res.connectUrl;
+      }
+    } catch (err) {
+      setWaiting(false);
+      toast({
+        title: "Could not start Enrich connection",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleDisconnect() {
+    if (!enrichProvider) return;
+    try {
+      await disconnect.mutateAsync();
+      qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
+      qc.invalidateQueries({ queryKey: getListProviderStepSettingsQueryKey() });
+      toast({ title: "Disconnected from A-Player Enrich" });
+    } catch {
+      toast({ title: "Failed to disconnect", variant: "destructive" });
+    } finally {
+      setDeleteOpen(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="border border-border rounded-lg p-5 bg-card flex items-start gap-4">
+        <div className="h-10 w-10 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+          <Sparkles className="h-5 w-5 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-foreground">A-Player Enrich</span>
+            {connected ? (
+              <Badge variant="outline" className="text-xs gap-1 border-green-500/40 text-green-700">
+                <CheckCircle className="h-3 w-3" />
+                Connected
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-xs text-muted-foreground">
+                Not connected
+              </Badge>
+            )}
+            {connected && livePing.ok === true && (
+              <span className="text-xs text-green-700 flex items-center gap-1">
+                <Wifi className="h-3 w-3" /> Live
+              </span>
+            )}
+            {connected && livePing.ok === false && !livePing.checking && (
+              <span className="text-xs text-destructive flex items-center gap-1">
+                <WifiOff className="h-3 w-3" /> Offline
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Profile enrichment for thin candidate records. Connect once and
+            Enrich becomes your enrichment step — no API key paste required.
+          </p>
+          <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-muted-foreground">
+              {connected ? "Powers" : "Will power"}:
+            </span>
+            {ENRICH_POWERED_STEPS.map((step) => (
+              <Badge key={step} variant="secondary" className="text-xs">
+                {stepLabel(step)}
+              </Badge>
+            ))}
+          </div>
+          {!connected && (
+            <label className="mt-3 flex items-start gap-2 text-xs cursor-pointer select-none">
+              <Switch
+                checked={autoAssign}
+                onCheckedChange={setAutoAssign}
+                disabled={issueState.isPending || waiting}
+                aria-label="Auto-assign workflow steps when connecting"
+              />
+              <span className="text-muted-foreground leading-tight">
+                Auto-assign these workflow steps on connect.{" "}
+                <span className="text-foreground/70">
+                  Steps already wired to another provider stay untouched.
+                </span>
+              </span>
+            </label>
+          )}
+          {waiting && (
+            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Waiting for Enrich… Complete the sign-in in the new tab.
+            </p>
+          )}
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            {connected ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleConnect}
+                  disabled={issueState.isPending || waiting}
+                  className="gap-1.5"
+                >
+                  {(issueState.isPending || waiting) ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  )}
+                  Reconnect
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDeleteOpen(true)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  Disconnect
+                </Button>
+              </>
+            ) : (
+              <Button
+                onClick={handleConnect}
+                disabled={issueState.isPending || waiting}
+                size="sm"
+                className="gap-1.5"
+              >
+                {(issueState.isPending || waiting) ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ExternalLink className="h-3.5 w-3.5" />
+                )}
+                Connect Enrich
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect A-Player Enrich?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the saved Enrich credentials and unlinks Enrich
+              from any workflow steps it was assigned to. You can reconnect
+              at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDisconnect}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Disconnect
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
 // ── main section ──────────────────────────────────────────────────────────────
 //
 // Rendered as the "Advanced (admin)" disclosure inside the Provider
@@ -1304,7 +1607,10 @@ export function AdvancedProvidersSection() {
             One-click OAuth integration with A-Player Scout. No copy-pasting API keys.
           </p>
         </div>
-        <ScoutMarketplaceCard providers={providers as Provider[]} />
+        <div className="space-y-3">
+          <ScoutMarketplaceCard providers={providers as Provider[]} />
+          <EnrichMarketplaceCard providers={providers as Provider[]} />
+        </div>
       </section>
 
       {/* Providers section */}

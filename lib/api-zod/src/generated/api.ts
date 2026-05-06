@@ -3343,6 +3343,62 @@ export const DisconnectScoutResponse = zod.object({
 });
 
 /**
+ * Same shape and lifecycle as the Scout state endpoint. Returns a one- time CSRF `state` token plus the absolute Enrich Connect URL the frontend should open in a new tab. The optional request body lets the recruiter opt out of auto-wiring Enrich into the workflow steps it can power; defaults to opting in.
+
+ * @summary Mint a single-use CSRF state for the Enrich Connect redirect flow
+ */
+export const IssueEnrichConnectStateBody = zod
+  .object({
+    autoAssignSteps: zod
+      .boolean()
+      .optional()
+      .describe(
+        "When true (default), the callback handler will wire Scout into any workflow steps it can power that do not yet have a provider assigned. When false, the recruiter must wire Scout up manually from the Workflow Step Assignments table.\n",
+      ),
+  })
+  .describe(
+    "Optional preferences captured at state-issuance time and surfaced back to the callback handler when Scout redirects the recruiter back.\n",
+  );
+
+export const IssueEnrichConnectStateResponse = zod
+  .object({
+    state: zod
+      .string()
+      .describe(
+        "Single-use CSRF token. Sent to Scout in the redirect URL and validated by the callback.",
+      ),
+    connectUrl: zod
+      .string()
+      .describe("Absolute URL on Scout the frontend should open in a new tab."),
+    callbackUrl: zod
+      .string()
+      .describe(
+        "Absolute URL Scout should redirect back to with `?token=…&state=…`.",
+      ),
+  })
+  .describe("Response from the Scout Connect state-issuance endpoint.");
+
+/**
+ * Receives the redirect from Enrich with `?token=…&state=…`, validates the state, exchanges the token server-side for `{apiKey, baseUrl}`, upserts the "A-Player Enrich" `twin_webhook` provider, and (only if no enrichment provider was assigned yet) wires it as the enrichment step provider. Always responds with HTML — the page pings the originating tab via `BroadcastChannel` and `localStorage` then auto-closes on success.
+
+ * @summary Enrich Connect redirect callback
+ */
+export const EnrichConnectCallbackQueryParams = zod.object({
+  token: zod.coerce.string().optional(),
+  state: zod.coerce.string().optional(),
+  error: zod.coerce.string().optional(),
+});
+
+/**
+ * Clears any `workflow_provider_settings` rows that reference the "A-Player Enrich" provider, then deletes the provider row itself.
+
+ * @summary Atomically unlink and delete the Enrich provider
+ */
+export const DisconnectEnrichResponse = zod.object({
+  removed: zod.boolean(),
+});
+
+/**
  * @summary Get the current email re-validation scheduler settings
  */
 export const getEmailRevalidationSettingsResponseThresholdDaysMax = 365;

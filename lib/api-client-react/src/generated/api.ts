@@ -43,6 +43,7 @@ import type {
   DeliberationRecord,
   DigestPreview,
   DigestRunResult,
+  DisconnectEnrich200,
   DisconnectScout200,
   EmailRevalidationAlertStatus,
   EmailRevalidationRun,
@@ -50,6 +51,7 @@ import type {
   EmailStatusChange,
   EmptyCandidateTrashResult,
   EnqueueBulkCandidateJobBody,
+  EnrichConnectCallbackParams,
   GetTelemetryDashboardParams,
   HealthStatus,
   HiringReport,
@@ -4628,6 +4630,286 @@ export const useDisconnectScout = <
   TContext
 > => {
   return useMutation(getDisconnectScoutMutationOptions(options));
+};
+
+/**
+ * Same shape and lifecycle as the Scout state endpoint. Returns a one- time CSRF `state` token plus the absolute Enrich Connect URL the frontend should open in a new tab. The optional request body lets the recruiter opt out of auto-wiring Enrich into the workflow steps it can power; defaults to opting in.
+
+ * @summary Mint a single-use CSRF state for the Enrich Connect redirect flow
+ */
+export const getIssueEnrichConnectStateUrl = () => {
+  return `/api/integrations/enrich/state`;
+};
+
+export const issueEnrichConnectState = async (
+  issueScoutConnectStateBody?: IssueScoutConnectStateBody,
+  options?: RequestInit,
+): Promise<ScoutConnectStateResponse> => {
+  return customFetch<ScoutConnectStateResponse>(
+    getIssueEnrichConnectStateUrl(),
+    {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(issueScoutConnectStateBody),
+    },
+  );
+};
+
+export const getIssueEnrichConnectStateMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof issueEnrichConnectState>>,
+    TError,
+    { data: BodyType<IssueScoutConnectStateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof issueEnrichConnectState>>,
+  TError,
+  { data: BodyType<IssueScoutConnectStateBody> },
+  TContext
+> => {
+  const mutationKey = ["issueEnrichConnectState"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof issueEnrichConnectState>>,
+    { data: BodyType<IssueScoutConnectStateBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return issueEnrichConnectState(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type IssueEnrichConnectStateMutationResult = NonNullable<
+  Awaited<ReturnType<typeof issueEnrichConnectState>>
+>;
+export type IssueEnrichConnectStateMutationBody =
+  BodyType<IssueScoutConnectStateBody>;
+export type IssueEnrichConnectStateMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Mint a single-use CSRF state for the Enrich Connect redirect flow
+ */
+export const useIssueEnrichConnectState = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof issueEnrichConnectState>>,
+    TError,
+    { data: BodyType<IssueScoutConnectStateBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof issueEnrichConnectState>>,
+  TError,
+  { data: BodyType<IssueScoutConnectStateBody> },
+  TContext
+> => {
+  return useMutation(getIssueEnrichConnectStateMutationOptions(options));
+};
+
+/**
+ * Receives the redirect from Enrich with `?token=…&state=…`, validates the state, exchanges the token server-side for `{apiKey, baseUrl}`, upserts the "A-Player Enrich" `twin_webhook` provider, and (only if no enrichment provider was assigned yet) wires it as the enrichment step provider. Always responds with HTML — the page pings the originating tab via `BroadcastChannel` and `localStorage` then auto-closes on success.
+
+ * @summary Enrich Connect redirect callback
+ */
+export const getEnrichConnectCallbackUrl = (
+  params?: EnrichConnectCallbackParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/integrations/enrich/callback?${stringifiedParams}`
+    : `/api/integrations/enrich/callback`;
+};
+
+export const enrichConnectCallback = async (
+  params?: EnrichConnectCallbackParams,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getEnrichConnectCallbackUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getEnrichConnectCallbackQueryKey = (
+  params?: EnrichConnectCallbackParams,
+) => {
+  return [
+    `/api/integrations/enrich/callback`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getEnrichConnectCallbackQueryOptions = <
+  TData = Awaited<ReturnType<typeof enrichConnectCallback>>,
+  TError = ErrorType<string>,
+>(
+  params?: EnrichConnectCallbackParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof enrichConnectCallback>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getEnrichConnectCallbackQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof enrichConnectCallback>>
+  > = ({ signal }) =>
+    enrichConnectCallback(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof enrichConnectCallback>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type EnrichConnectCallbackQueryResult = NonNullable<
+  Awaited<ReturnType<typeof enrichConnectCallback>>
+>;
+export type EnrichConnectCallbackQueryError = ErrorType<string>;
+
+/**
+ * @summary Enrich Connect redirect callback
+ */
+
+export function useEnrichConnectCallback<
+  TData = Awaited<ReturnType<typeof enrichConnectCallback>>,
+  TError = ErrorType<string>,
+>(
+  params?: EnrichConnectCallbackParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof enrichConnectCallback>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getEnrichConnectCallbackQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Clears any `workflow_provider_settings` rows that reference the "A-Player Enrich" provider, then deletes the provider row itself.
+
+ * @summary Atomically unlink and delete the Enrich provider
+ */
+export const getDisconnectEnrichUrl = () => {
+  return `/api/integrations/enrich/connection`;
+};
+
+export const disconnectEnrich = async (
+  options?: RequestInit,
+): Promise<DisconnectEnrich200> => {
+  return customFetch<DisconnectEnrich200>(getDisconnectEnrichUrl(), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDisconnectEnrichMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof disconnectEnrich>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof disconnectEnrich>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["disconnectEnrich"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof disconnectEnrich>>,
+    void
+  > = () => {
+    return disconnectEnrich(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DisconnectEnrichMutationResult = NonNullable<
+  Awaited<ReturnType<typeof disconnectEnrich>>
+>;
+
+export type DisconnectEnrichMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Atomically unlink and delete the Enrich provider
+ */
+export const useDisconnectEnrich = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof disconnectEnrich>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof disconnectEnrich>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getDisconnectEnrichMutationOptions(options));
 };
 
 /**

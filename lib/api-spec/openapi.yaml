@@ -1147,6 +1147,94 @@ paths:
                   removed: { type: boolean }
                 required: [removed]
 
+  # ── A-PLAYER ENRICH CONNECT (parallel marketplace integration to Scout) ────
+  /integrations/enrich/state:
+    post:
+      operationId: issueEnrichConnectState
+      tags: [providers]
+      summary: Mint a single-use CSRF state for the Enrich Connect redirect flow
+      description: >
+        Same shape and lifecycle as the Scout state endpoint. Returns a one-
+        time CSRF `state` token plus the absolute Enrich Connect URL the
+        frontend should open in a new tab. The optional request body lets
+        the recruiter opt out of auto-wiring Enrich into the workflow steps
+        it can power; defaults to opting in.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueScoutConnectStateBody"
+      responses:
+        "200":
+          description: State minted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScoutConnectStateResponse"
+
+  /integrations/enrich/callback:
+    get:
+      operationId: enrichConnectCallback
+      tags: [providers]
+      summary: Enrich Connect redirect callback
+      description: >
+        Receives the redirect from Enrich with `?token=…&state=…`, validates
+        the state, exchanges the token server-side for `{apiKey, baseUrl}`,
+        upserts the "A-Player Enrich" `twin_webhook` provider, and (only if
+        no enrichment provider was assigned yet) wires it as the enrichment
+        step provider. Always responds with HTML — the page pings the
+        originating tab via `BroadcastChannel` and `localStorage` then
+        auto-closes on success.
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema: { type: string }
+        - name: state
+          in: query
+          required: false
+          schema: { type: string }
+        - name: error
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: Connection established
+          content:
+            text/html:
+              schema: { type: string }
+        "400":
+          description: Invalid / missing / expired / replayed state, or token missing
+          content:
+            text/html:
+              schema: { type: string }
+        "502":
+          description: Enrich exchange endpoint failed or returned a malformed response
+          content:
+            text/html:
+              schema: { type: string }
+
+  /integrations/enrich/connection:
+    delete:
+      operationId: disconnectEnrich
+      tags: [providers]
+      summary: Atomically unlink and delete the Enrich provider
+      description: >
+        Clears any `workflow_provider_settings` rows that reference the
+        "A-Player Enrich" provider, then deletes the provider row itself.
+      responses:
+        "200":
+          description: Disconnect result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  removed: { type: boolean }
+                required: [removed]
+
   /settings/email-revalidation:
     get:
       operationId: getEmailRevalidationSettings

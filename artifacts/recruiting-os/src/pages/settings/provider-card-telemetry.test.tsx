@@ -41,6 +41,8 @@ vi.mock("@workspace/api-client-react", () => {
     useListJobs: () => ({ data: [], isLoading: false }),
     useIssueScoutConnectState: noopMutation,
     useDisconnectScout: noopMutation,
+    useIssueEnrichConnectState: noopMutation,
+    useDisconnectEnrich: noopMutation,
     getListProvidersQueryKey: () => ["providers"],
     getListProviderStepSettingsQueryKey: () => ["provider-step-settings"],
   };

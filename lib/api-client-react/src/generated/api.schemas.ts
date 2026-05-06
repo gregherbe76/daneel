@@ -1469,6 +1469,16 @@ export type DisconnectScout200 = {
   removed: boolean;
 };
 
+export type EnrichConnectCallbackParams = {
+  token?: string;
+  state?: string;
+  error?: string;
+};
+
+export type DisconnectEnrich200 = {
+  removed: boolean;
+};
+
 export type ListCandidateNotesParams = {
   jobId?: number;
 };
