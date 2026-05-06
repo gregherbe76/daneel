@@ -945,6 +945,80 @@ export default function JobDetailPage() {
                 ) : (
                   <div className="space-y-8">
 
+                    {/* ── Step timeline strip ──
+                        Lists every step the latest run executed with its
+                        status + the provider that produced the result.
+                        Engine denormalizes providerName onto each step's
+                        completed log output (see engine.ts logStep calls)
+                        so we don't have to re-resolve provider settings.
+                        Covers enrichment + decision too — those steps don't
+                        get their own dedicated section card below. */}
+                    {(() => {
+                      type StepLog = { step: string; status: string; output?: unknown };
+                      const logs = (workflowData.logs ?? []) as StepLog[];
+                      if (logs.length === 0) return null;
+                      const STEP_ORDER = [
+                        "job_understanding",
+                        "sourcing",
+                        "enrichment",
+                        "candidate_matching",
+                        "shortlist",
+                        "decision",
+                      ];
+                      const STEP_LABELS: Record<string, string> = {
+                        job_understanding: "Job Understanding",
+                        sourcing: "Sourcing",
+                        enrichment: "Enrichment",
+                        candidate_matching: "Candidate Matching",
+                        shortlist: "Shortlist",
+                        decision: "Decision (Council)",
+                      };
+                      // Pick the most recent log per step so a "running" log
+                      // doesn't shadow a later "completed" / "failed" log.
+                      const latestByStep = new Map<string, StepLog>();
+                      for (const l of logs) latestByStep.set(l.step, l);
+                      const rendered = STEP_ORDER
+                        .map((s) => latestByStep.get(s))
+                        .filter((l): l is StepLog => !!l);
+                      if (rendered.length === 0) return null;
+                      return (
+                        <div className="rounded-md border border-border bg-muted/20 p-3">
+                          <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                            Run Timeline
+                          </h3>
+                          <div className="flex flex-wrap gap-2">
+                            {rendered.map((l) => {
+                              const providerName =
+                                (l.output as { providerName?: string } | null)?.providerName ?? null;
+                              const tone =
+                                l.status === "completed"
+                                  ? "border-purple-200 bg-purple-500/10 text-purple-700"
+                                  : l.status === "failed"
+                                    ? "border-destructive/30 bg-destructive/5 text-destructive"
+                                    : "border-border bg-background text-muted-foreground";
+                              return (
+                                <div
+                                  key={l.step}
+                                  data-testid={`workflow-step-${l.step}`}
+                                  className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${tone}`}
+                                >
+                                  <span className="font-medium">{STEP_LABELS[l.step] ?? l.step}</span>
+                                  {providerName && (
+                                    <span
+                                      data-testid={`workflow-step-${l.step}-provider`}
+                                      className="font-normal opacity-80"
+                                    >
+                                      via {providerName}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Sourcing step status */}
                     {workflowData.run.runSourcing && (() => {
                       const sourcingLog = workflowData.logs?.find((l: { step: string; status: string; output?: unknown }) => l.step === "sourcing");
@@ -1283,9 +1357,28 @@ export default function JobDetailPage() {
                     <CompareRuns runs={jobRuns ?? []} jobId={jobId} />
 
                     {/* Job Understanding */}
-                    {workflowData.insight && (
+                    {workflowData.insight && (() => {
+                      // Engine writes providerName onto every completed
+                      // step's log output so the timeline can label "via X"
+                      // without re-resolving provider settings.
+                      const log = workflowData.logs?.find(
+                        (l: { step: string; status: string; output?: unknown }) =>
+                          l.step === "job_understanding" && l.status === "completed",
+                      );
+                      const providerName = (log?.output as { providerName?: string } | null)?.providerName ?? null;
+                      return (
                       <div>
-                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Job Understanding</h3>
+                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <span>Job Understanding</span>
+                          {providerName && (
+                            <span
+                              className="text-[11px] font-normal normal-case tracking-normal text-muted-foreground"
+                              data-testid="job-understanding-provider-name"
+                            >
+                              via {providerName}
+                            </span>
+                          )}
+                        </h3>
                         <div className="grid md:grid-cols-2 gap-6">
                           <Card>
                             <CardHeader className="pb-2">
@@ -1309,12 +1402,29 @@ export default function JobDetailPage() {
                           </Card>
                         </div>
                       </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Top Candidates */}
-                    {workflowData.shortlist?.summaries && workflowData.shortlist.summaries.length > 0 && (
+                    {workflowData.shortlist?.summaries && workflowData.shortlist.summaries.length > 0 && (() => {
+                      const log = workflowData.logs?.find(
+                        (l: { step: string; status: string; output?: unknown }) =>
+                          l.step === "shortlist" && l.status === "completed",
+                      );
+                      const providerName = (log?.output as { providerName?: string } | null)?.providerName ?? null;
+                      return (
                       <div>
-                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4">Top Candidates</h3>
+                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <span>Top Candidates</span>
+                          {providerName && (
+                            <span
+                              className="text-[11px] font-normal normal-case tracking-normal text-muted-foreground"
+                              data-testid="shortlist-provider-name"
+                            >
+                              via {providerName}
+                            </span>
+                          )}
+                        </h3>
                         <div className="grid md:grid-cols-3 gap-4">
                           {workflowData.shortlist.summaries.map((summary: { candidateId: number; candidateName: string; whyRelevant: string; keyRisks?: string }) => {
                             const evalData = workflowData.evaluations.find((e: { candidateId: number }) => e.candidateId === summary.candidateId);
@@ -1394,14 +1504,31 @@ export default function JobDetailPage() {
                           })}
                         </div>
                       </div>
-                    )}
+                      );
+                    })()}
 
                     {/* All Evaluations Collapsible */}
-                    {workflowData.evaluations && workflowData.evaluations.length > 0 && (
+                    {workflowData.evaluations && workflowData.evaluations.length > 0 && (() => {
+                      const log = workflowData.logs?.find(
+                        (l: { step: string; status: string; output?: unknown }) =>
+                          l.step === "candidate_matching" && l.status === "completed",
+                      );
+                      const providerName = (log?.output as { providerName?: string } | null)?.providerName ?? null;
+                      return (
                       <Collapsible open={isAllEvalsOpen} onOpenChange={setIsAllEvalsOpen} className="border border-border rounded-md">
                         <CollapsibleTrigger asChild>
                           <Button variant="ghost" className="w-full justify-between p-4 h-auto font-medium hover:bg-muted/50">
-                            All Evaluations ({workflowData.evaluations.length})
+                            <span className="flex items-center gap-2">
+                              <span>All Evaluations ({workflowData.evaluations.length})</span>
+                              {providerName && (
+                                <span
+                                  className="text-[11px] font-normal text-muted-foreground"
+                                  data-testid="candidate-matching-provider-name"
+                                >
+                                  via {providerName}
+                                </span>
+                              )}
+                            </span>
                             {isAllEvalsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </Button>
                         </CollapsibleTrigger>
@@ -1478,7 +1605,8 @@ export default function JobDetailPage() {
                           </div>
                         </CollapsibleContent>
                       </Collapsible>
-                    )}
+                      );
+                    })()}
 
                   </div>
                 )}

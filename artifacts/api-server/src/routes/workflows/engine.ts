@@ -274,6 +274,8 @@ async function runEnrichment(
   if (candidates.length === 0) {
     logger.info({ runId }, "No candidates need enrichment — all profiles are already complete");
     await logStep(runId, "enrichment", "completed", { note: "All candidates already have complete profiles" }, {
+      providerName: provider.name,
+      providerType: provider.type,
       enriched: 0,
     });
     return;
@@ -344,6 +346,8 @@ async function runEnrichment(
   );
 
   await logStep(runId, "enrichment", "completed", { candidateCount: candidates.length, provider: provider.name }, {
+    providerName: provider.name,
+    providerType: provider.type,
     enriched: enrichedCount,
     partial: partialCount,
     failed: failedCount,
@@ -373,10 +377,19 @@ async function runJobUnderstanding(
       payload: { job },
     })) as JobInsightResult;
 
-    await logStep(runId, "job_understanding", "completed", { jobTitle: job.title, provider: provider.name }, result);
+    await logStep(runId, "job_understanding", "completed", { jobTitle: job.title, provider: provider.name }, {
+      ...result,
+      // Denormalize provider identity onto the log output so the run-detail
+      // timeline can show "via {provider}" beside the step badge without
+      // having to re-resolve provider settings or join agent_provider rows.
+      providerName: provider.name,
+      providerType: provider.type,
+    });
     return result;
   } catch (err) {
     await logStep(runId, "job_understanding", "failed", { jobTitle: job.title, provider: provider.name }, {
+      providerName: provider.name,
+      providerType: provider.type,
       error: err instanceof Error ? err.message : String(err),
     });
     throw err;
@@ -626,6 +639,8 @@ async function runCandidateMatching(
     );
 
     await logStep(runId, "candidate_matching", "completed", { candidateCount: candidates.length, provider: provider.name }, {
+      providerName: provider.name,
+      providerType: provider.type,
       scores: results.map((r) => ({ name: r.candidateName, fitScore: r.fitScore ?? r.score, rec: r.recommendation })),
       enrichmentPreScreen: {
         lowConfidenceCount: lowConfCandidates.length,
@@ -634,6 +649,8 @@ async function runCandidateMatching(
     });
   } catch (err) {
     await logStep(runId, "candidate_matching", "failed", { candidateCount: candidates.length, provider: provider.name }, {
+      providerName: provider.name,
+      providerType: provider.type,
       error: err instanceof Error ? err.message : String(err),
     });
     throw err;
@@ -677,9 +694,15 @@ async function runShortlist(
       summaries,
     });
 
-    await logStep(runId, "shortlist", "completed", { top5Count: top5.length, provider: provider.name }, { summaries });
+    await logStep(runId, "shortlist", "completed", { top5Count: top5.length, provider: provider.name }, {
+      providerName: provider.name,
+      providerType: provider.type,
+      summaries,
+    });
   } catch (err) {
     await logStep(runId, "shortlist", "failed", {}, {
+      providerName: provider.name,
+      providerType: provider.type,
       error: err instanceof Error ? err.message : String(err),
     });
     throw err;
@@ -781,7 +804,13 @@ async function runDecisionStep(
     "decision",
     "completed",
     { candidateCount: top5.length, provider: provider.name },
-    { succeeded, failed, quotaHit },
+    {
+      providerName: provider.name,
+      providerType: provider.type,
+      succeeded,
+      failed,
+      quotaHit,
+    },
   );
 }
 
@@ -913,12 +942,16 @@ export async function runWorkflowEngine(
               try {
                 await runInlineEnrichmentForCandidates(runId, effectiveJob, targetCandidates, enrichmentProvider);
                 await logStep(runId, "enrichment", "completed", { candidateCount: targetCandidates.length, provider: enrichmentProvider.name }, {
+                  providerName: enrichmentProvider.name,
+                  providerType: enrichmentProvider.type,
                   enriched: targetCandidates.length,
                   note: "Targeted enrichment completed",
                 });
               } catch (err) {
                 logger.error({ runId, err }, "Targeted enrichment failed — continuing with original candidate data");
                 await logStep(runId, "enrichment", "failed", null, {
+                  providerName: enrichmentProvider.name,
+                  providerType: enrichmentProvider.type,
                   error: err instanceof Error ? err.message : String(err),
                   note: "Targeted enrichment failed — continuing with existing candidate data",
                 });
