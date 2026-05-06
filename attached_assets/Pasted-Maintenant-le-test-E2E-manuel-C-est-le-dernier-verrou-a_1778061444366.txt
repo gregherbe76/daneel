@@ -1,0 +1,37 @@
+Maintenant — le test E2E manuel
+C'est le dernier verrou avant push GitHub. Ne saute pas cette étape. L'agent a fait du code review architect mais pas de test bout-en-bout sur ton instance. Toi seul peux valider que l'expérience utilisateur est cohérente.
+Voici ton plan de test pratique :
+Setup (5 min)
+
+Lance Daneel en local (docker compose up ou pnpm dev selon ton flow)
+Vérifie que CodeMatch est encore connecté dans la marketplace (Settings → Marketplace, carte CodeMatch en état "Connected")
+Si déconnecté pour une raison, reconnecte avec ta clé daneel-internal
+
+Test A — Job avec mix de candidats (15 min)
+
+Crée un nouveau job (titre quelconque, description courte)
+Active la checkbox "Enable technical evaluation" dans la config job
+Sauvegarde
+Ajoute manuellement 5 candidats avec ces profils :
+
+Nom testgithub_usernameProfil attenduAlice StrongtorvaldsBon matching + bon CodeMatch → devrait dominerBob AveragetjBon matching + bon CodeMatch (tj est très productif)Charlie Tech-onlysindresorhusMatching moyen + très bon CodeMatch → boost devrait le faire remonterDora No-GitHub(vide)Bon matching mais pas de CodeMatch → pas de boostEva No-GitHub(vide)Matching faible et pas de CodeMatch
+
+Lance le workflow
+Attends qu'il finisse (peut prendre 5-15 min selon les CodeMatch fresh evaluations vs cachées)
+
+Test B — Vérifications visuelles sur la shortlist (10 min)
+Ouvre la page Top Candidates (job detail) et vérifie :
+→ Badges : Alice, Bob, Charlie ont le badge "⚡ Tech evaluated". Dora et Eva ne l'ont pas.
+→ Tooltip : hover sur le score d'Alice → affiche Matching: X / Tech bonus: +Y (CodeMatch Z) / Final: W
+→ Tooltip de Dora : hover sur son score → soit pas de tooltip, soit un tooltip qui dit juste son score sans bonus (selon implémentation)
+→ Ranking cohérent : Charlie devrait être devant Eva (matching moyen + boost > matching faible sans boost). Alice devrait être en haut.
+→ Cap à 100 : si quelqu'un a matching=90 + CodeMatch=100 (bonus +20) → Final affiche 100 avec mention "(capped)"
+Test C — Backward compat (5 min)
+→ Va sur un ancien job qui n'avait pas technical_evaluation activé (de tes runs précédents)
+→ Ouvre sa shortlist
+→ Vérifie : aucun badge, aucun tooltip étendu, score affiché normalement, comportement identique à avant Phase 4.3
+Test D — Council reste isolé (5 min, si tu peux)
+Si tu as Council activé sur le job de Test A :
+→ Ouvre la délibération Council
+→ Vérifie dans les logs ou la délibération que Council a reçu les candidats classés par decisionScore brut, pas par finalScore boosté
+→ C'est un test de cohérence interne, pas user-facing — vérifie via les logs serveur ou la BDD si l'agent expose pas ça dans l'UI
