@@ -21,6 +21,7 @@ import {
   sendTestNotification,
   runDigestSweep,
   previewDigest,
+  getDigestStatus,
 } from "../lib/notifications";
 
 const router: IRouter = Router();
@@ -171,6 +172,14 @@ router.post(
       "Manual digest sweep finished",
     );
     res.json(result);
+  },
+);
+
+router.get(
+  "/settings/notifications/digest-status",
+  async (_req, res): Promise<void> => {
+    const status = await getDigestStatus();
+    res.json(status);
   },
 );
 

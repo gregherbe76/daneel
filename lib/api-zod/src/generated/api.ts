@@ -3848,6 +3848,49 @@ export const RunNotificationDigestResponse = zod
   .describe("Outcome of a manual or scheduled digest sweep.");
 
 /**
+ * @summary Snapshot of last/next digest tick and queued regression count
+ */
+export const GetNotificationDigestStatusResponse = zod
+  .object({
+    cadenceHours: zod
+      .number()
+      .describe("The configured digest cadence in hours."),
+    lastSentAt: zod.coerce
+      .date()
+      .nullish()
+      .describe(
+        "Timestamp of the most recent successful digest dispatch, or null if a digest has never been sent.",
+      ),
+    nextTickAt: zod.coerce
+      .date()
+      .nullable()
+      .describe(
+        "Projected wall-clock time of the next scheduler tick (lastSentAt + cadenceHours, or now + cadenceHours if no digest has been sent yet). Null when the scheduler is paused because email is disabled, no digest recipients are configured, or delivery isn't configured.",
+      ),
+    schedulerEnabled: zod
+      .boolean()
+      .describe(
+        "True when the next tick will actually attempt to send. False when the scheduler is alive but slow-polling because the gating preconditions aren't met.",
+      ),
+    overdue: zod
+      .boolean()
+      .describe(
+        "True when nextTickAt is in the past — the scheduler is catching up on a missed window.",
+      ),
+    digestRecipientCount: zod
+      .number()
+      .describe("Number of recipients in `digest` mode."),
+    queuedRegressionCount: zod
+      .number()
+      .describe(
+        "Number of regression rows that would be included in the next digest.",
+      ),
+  })
+  .describe(
+    "Snapshot of the digest scheduler used by Settings → Notifications.",
+  );
+
+/**
  * @summary Preview the regression rows that the next digest would include
  */
 export const PreviewNotificationDigestResponse = zod

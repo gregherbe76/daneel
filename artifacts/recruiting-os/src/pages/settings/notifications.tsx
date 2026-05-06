@@ -5,8 +5,10 @@ import {
   useSendTestNotification,
   useRunNotificationDigest,
   usePreviewNotificationDigest,
+  useGetNotificationDigestStatus,
   getGetNotificationSettingsQueryKey,
   getPreviewNotificationDigestQueryKey,
+  getGetNotificationDigestStatusQueryKey,
 } from "@workspace/api-client-react";
 import type {
   TestNotificationChannelResult,
@@ -73,6 +75,7 @@ export default function NotificationsSettingsPage() {
   const updateMutation = useUpdateNotificationSettings();
   const testMutation = useSendTestNotification();
   const digestPreviewQuery = usePreviewNotificationDigest();
+  const digestStatusQuery = useGetNotificationDigestStatus();
   const runDigestMutation = useRunNotificationDigest();
 
   const [emailEnabled, setEmailEnabled] = useState(false);
@@ -160,6 +163,9 @@ export default function NotificationsSettingsPage() {
         queryClient.invalidateQueries({
           queryKey: getPreviewNotificationDigestQueryKey(),
         }),
+        queryClient.invalidateQueries({
+          queryKey: getGetNotificationDigestStatusQueryKey(),
+        }),
       ]);
       setDirty(false);
       toast({
@@ -244,6 +250,9 @@ export default function NotificationsSettingsPage() {
         queryClient.invalidateQueries({
           queryKey: getPreviewNotificationDigestQueryKey(),
         }),
+        queryClient.invalidateQueries({
+          queryKey: getGetNotificationDigestStatusQueryKey(),
+        }),
       ]);
       if (res.attempted) {
         toast({
@@ -315,9 +324,15 @@ export default function NotificationsSettingsPage() {
   const updatedAt = settingsQuery.data?.updatedAt
     ? new Date(settingsQuery.data.updatedAt).toLocaleString()
     : "—";
-  const digestLastSentAt = settingsQuery.data?.digestLastSentAt
-    ? new Date(settingsQuery.data.digestLastSentAt).toLocaleString()
-    : "Never";
+  const digestStatus = digestStatusQuery.data;
+  const digestLastSentAt = digestStatus?.lastSentAt
+    ? new Date(digestStatus.lastSentAt).toLocaleString()
+    : settingsQuery.data?.digestLastSentAt
+      ? new Date(settingsQuery.data.digestLastSentAt).toLocaleString()
+      : "Never";
+  const digestNextTickAt = digestStatus?.nextTickAt
+    ? new Date(digestStatus.nextTickAt).toLocaleString()
+    : null;
   const emailDeliveryConfigured =
     settingsQuery.data?.emailDeliveryConfigured ?? false;
 
@@ -448,9 +463,64 @@ export default function NotificationsSettingsPage() {
                   Defaults to every 24 hours.
                 </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Last digest sent: {digestLastSentAt}
-              </p>
+              <div
+                className="text-xs space-y-1 sm:text-right"
+                data-testid="digest-status-panel"
+              >
+                <p className="text-muted-foreground">
+                  Last digest sent:{" "}
+                  <span
+                    className="text-foreground font-medium"
+                    data-testid="digest-status-last-sent"
+                  >
+                    {digestLastSentAt}
+                  </span>
+                </p>
+                {digestStatus ? (
+                  digestStatus.schedulerEnabled && digestNextTickAt ? (
+                    <p
+                      className={
+                        digestStatus.overdue
+                          ? "text-amber-700"
+                          : "text-muted-foreground"
+                      }
+                    >
+                      Next digest:{" "}
+                      <span
+                        className="font-medium"
+                        data-testid="digest-status-next-tick"
+                      >
+                        {digestNextTickAt}
+                      </span>
+                      {digestStatus.overdue ? " (overdue)" : ""}
+                    </p>
+                  ) : (
+                    <p
+                      className="text-muted-foreground"
+                      data-testid="digest-status-paused"
+                    >
+                      Next digest: paused —{" "}
+                      {!settingsQuery.data?.emailEnabled
+                        ? "email is turned off"
+                        : !emailDeliveryConfigured
+                          ? "delivery isn't configured"
+                          : "no digest-mode recipients"}
+                    </p>
+                  )
+                ) : digestStatusQuery.isLoading ? (
+                  <p className="text-muted-foreground">Loading next-tick…</p>
+                ) : null}
+                {digestStatus ? (
+                  <p
+                    className="text-muted-foreground"
+                    data-testid="digest-status-queued"
+                  >
+                    {digestStatus.queuedRegressionCount} regression
+                    {digestStatus.queuedRegressionCount === 1 ? "" : "s"}{" "}
+                    queued for next digest
+                  </p>
+                ) : null}
+              </div>
             </div>
 
             <div

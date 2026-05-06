@@ -43,6 +43,7 @@ import type {
   DeliberationRecord,
   DigestPreview,
   DigestRunResult,
+  DigestStatus,
   DisconnectEnrich200,
   DisconnectScout200,
   EmailRevalidationAlertStatus,
@@ -5813,6 +5814,83 @@ export const useRunNotificationDigest = <
 > => {
   return useMutation(getRunNotificationDigestMutationOptions(options));
 };
+
+/**
+ * @summary Snapshot of last/next digest tick and queued regression count
+ */
+export const getGetNotificationDigestStatusUrl = () => {
+  return `/api/settings/notifications/digest-status`;
+};
+
+export const getNotificationDigestStatus = async (
+  options?: RequestInit,
+): Promise<DigestStatus> => {
+  return customFetch<DigestStatus>(getGetNotificationDigestStatusUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetNotificationDigestStatusQueryKey = () => {
+  return [`/api/settings/notifications/digest-status`] as const;
+};
+
+export const getGetNotificationDigestStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof getNotificationDigestStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getNotificationDigestStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetNotificationDigestStatusQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getNotificationDigestStatus>>
+  > = ({ signal }) =>
+    getNotificationDigestStatus({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getNotificationDigestStatus>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetNotificationDigestStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getNotificationDigestStatus>>
+>;
+export type GetNotificationDigestStatusQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Snapshot of last/next digest tick and queued regression count
+ */
+
+export function useGetNotificationDigestStatus<
+  TData = Awaited<ReturnType<typeof getNotificationDigestStatus>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getNotificationDigestStatus>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetNotificationDigestStatusQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
 
 /**
  * @summary Preview the regression rows that the next digest would include

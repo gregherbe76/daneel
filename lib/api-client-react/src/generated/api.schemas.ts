@@ -1006,6 +1006,26 @@ export interface DigestRunResult {
 }
 
 /**
+ * Snapshot of the digest scheduler used by Settings → Notifications.
+ */
+export interface DigestStatus {
+  /** The configured digest cadence in hours. */
+  cadenceHours: number;
+  /** Timestamp of the most recent successful digest dispatch, or null if a digest has never been sent. */
+  lastSentAt?: string | null;
+  /** Projected wall-clock time of the next scheduler tick (lastSentAt + cadenceHours, or now + cadenceHours if no digest has been sent yet). Null when the scheduler is paused because email is disabled, no digest recipients are configured, or delivery isn't configured. */
+  nextTickAt: string | null;
+  /** True when the next tick will actually attempt to send. False when the scheduler is alive but slow-polling because the gating preconditions aren't met. */
+  schedulerEnabled: boolean;
+  /** True when nextTickAt is in the past — the scheduler is catching up on a missed window. */
+  overdue: boolean;
+  /** Number of recipients in `digest` mode. */
+  digestRecipientCount: number;
+  /** Number of regression rows that would be included in the next digest. */
+  queuedRegressionCount: number;
+}
+
+/**
  * A single regression row that would be included in the next digest.
  */
 export interface DigestPreviewRow {

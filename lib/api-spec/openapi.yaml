@@ -1392,6 +1392,19 @@ paths:
               schema:
                 $ref: "#/components/schemas/DigestRunResult"
 
+  /settings/notifications/digest-status:
+    get:
+      operationId: getNotificationDigestStatus
+      tags: [settings]
+      summary: Snapshot of last/next digest tick and queued regression count
+      responses:
+        "200":
+          description: Digest scheduler status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DigestStatus"
+
   /settings/notifications/digest/preview:
     get:
       operationId: previewNotificationDigest
@@ -3396,6 +3409,37 @@ components:
           nullable: true
           description: When attempted=false, a short machine-readable reason such as `email_disabled`, `no_digest_recipients`, `delivery_not_configured`, or `no_new_regressions`.
       required: [attempted, recipientCount, regressionCount]
+
+    DigestStatus:
+      type: object
+      description: Snapshot of the digest scheduler used by Settings → Notifications.
+      properties:
+        cadenceHours:
+          type: integer
+          description: The configured digest cadence in hours.
+        lastSentAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp of the most recent successful digest dispatch, or null if a digest has never been sent.
+        nextTickAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Projected wall-clock time of the next scheduler tick (lastSentAt + cadenceHours, or now + cadenceHours if no digest has been sent yet). Null when the scheduler is paused because email is disabled, no digest recipients are configured, or delivery isn't configured.
+        schedulerEnabled:
+          type: boolean
+          description: True when the next tick will actually attempt to send. False when the scheduler is alive but slow-polling because the gating preconditions aren't met.
+        overdue:
+          type: boolean
+          description: True when nextTickAt is in the past — the scheduler is catching up on a missed window.
+        digestRecipientCount:
+          type: integer
+          description: Number of recipients in `digest` mode.
+        queuedRegressionCount:
+          type: integer
+          description: Number of regression rows that would be included in the next digest.
+      required: [cadenceHours, nextTickAt, schedulerEnabled, overdue, digestRecipientCount, queuedRegressionCount]
 
     DigestPreviewRow:
       type: object

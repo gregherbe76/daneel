@@ -494,6 +494,82 @@ export async function previewDigest(): Promise<DigestPreviewSummary> {
   };
 }
 
+export interface DigestStatus {
+  cadenceHours: number;
+  lastSentAt: Date | null;
+  /**
+   * Projected wall-clock time of the next scheduler tick. Computed from
+   * `lastSentAt + cadenceHours`. Null while the scheduler is gated off
+   * (email disabled, no digest recipients, or delivery not configured) —
+   * in that case the scheduler is slow-polling and won't fire until the
+   * gate opens, so showing a concrete time would be misleading.
+   *
+   * When `lastSentAt` is null but the scheduler is enabled, the value is
+   * `now + cadenceHours` to mirror the first-tick behaviour in
+   * `startDigestScheduler`.
+   */
+  nextTickAt: Date | null;
+  /**
+   * True when the next tick would actually attempt a send (matches the
+   * `enabled` predicate in `startDigestScheduler`). When false, the
+   * scheduler is alive but slow-polling for settings changes.
+   */
+  schedulerEnabled: boolean;
+  /** True when next tick is in the past — scheduler is overdue / catching up. */
+  overdue: boolean;
+  digestRecipientCount: number;
+  queuedRegressionCount: number;
+}
+
+/**
+ * Snapshot used by the Settings → Notifications "next digest" indicator.
+ *
+ * Returns enough information for the UI to render:
+ *   • when the last digest went out
+ *   • when the scheduler will fire next (or "paused" if disabled)
+ *   • how many regressions are queued for the next digest
+ *
+ * The cadence math here mirrors `startDigestScheduler` so the UI never
+ * disagrees with the actual scheduler behaviour.
+ */
+export async function getDigestStatus(
+  now: Date = new Date(),
+): Promise<DigestStatus> {
+  const settings = await getNotificationSettings();
+  const digestRecipientCount = settings.emailRecipients.filter(
+    (r) => r.mode === "digest",
+  ).length;
+  const schedulerEnabled =
+    settings.emailEnabled &&
+    settings.emailDeliveryConfigured &&
+    digestRecipientCount > 0;
+
+  const cadenceMs = settings.digestCadenceHours * 60 * 60 * 1000;
+  let nextTickAt: Date | null = null;
+  if (schedulerEnabled) {
+    nextTickAt = settings.digestLastSentAt
+      ? new Date(settings.digestLastSentAt.getTime() + cadenceMs)
+      : new Date(now.getTime() + cadenceMs);
+  }
+  const overdue =
+    nextTickAt !== null && nextTickAt.getTime() < now.getTime();
+
+  const rows = await loadDigestRows(
+    settings.digestLastSentAt,
+    settings.digestCadenceHours,
+  );
+
+  return {
+    cadenceHours: settings.digestCadenceHours,
+    lastSentAt: settings.digestLastSentAt,
+    nextTickAt,
+    schedulerEnabled,
+    overdue,
+    digestRecipientCount,
+    queuedRegressionCount: rows.length,
+  };
+}
+
 export async function loadDigestRows(
   since: Date | null,
   cadenceHours: number,

@@ -174,6 +174,7 @@ const {
   dispatchRegressionNotification,
   runDigestSweep,
   loadDigestRows,
+  getDigestStatus,
   startDigestScheduler,
   stopDigestScheduler,
 } = await import("./notifications");
@@ -372,6 +373,88 @@ describe("loadDigestRows", () => {
     expect(lastGtSince).toBeInstanceOf(Date);
     const expected = new Date(fixedNow.getTime() - 6 * 60 * 60 * 1000);
     expect((lastGtSince as Date).getTime()).toBe(expected.getTime());
+  });
+});
+
+describe("getDigestStatus", () => {
+  it("computes nextTickAt as lastSentAt + cadence when scheduler is enabled", async () => {
+    process.env["SENDGRID_API_KEY"] = "sg-test-key";
+    const lastSent = new Date("2026-05-05T00:00:00Z");
+    setSettings([{ email: "digest@example.com", mode: "digest" }], {
+      emailEnabled: true,
+      digestCadenceHours: 6,
+      digestLastSentAt: lastSent,
+    });
+    dbState.digestRows = [
+      {
+        id: 1,
+        candidateId: 7,
+        candidateName: "X",
+        candidateEmail: null,
+        previousStatus: "valid",
+        newStatus: "invalid",
+        newReason: null,
+        changedAt: new Date("2026-05-05T01:00:00Z"),
+      },
+    ];
+
+    const now = new Date("2026-05-05T03:00:00Z");
+    const status = await getDigestStatus(now);
+
+    expect(status.schedulerEnabled).toBe(true);
+    expect(status.lastSentAt?.toISOString()).toBe(lastSent.toISOString());
+    expect(status.nextTickAt?.toISOString()).toBe(
+      new Date(lastSent.getTime() + 6 * 60 * 60 * 1000).toISOString(),
+    );
+    expect(status.overdue).toBe(false);
+    expect(status.queuedRegressionCount).toBe(1);
+    expect(status.digestRecipientCount).toBe(1);
+  });
+
+  it("flags overdue when nextTickAt is in the past", async () => {
+    process.env["SENDGRID_API_KEY"] = "sg-test-key";
+    const lastSent = new Date("2026-05-01T00:00:00Z");
+    setSettings([{ email: "digest@example.com", mode: "digest" }], {
+      emailEnabled: true,
+      digestCadenceHours: 24,
+      digestLastSentAt: lastSent,
+    });
+
+    const status = await getDigestStatus(new Date("2026-05-05T00:00:00Z"));
+
+    expect(status.schedulerEnabled).toBe(true);
+    expect(status.overdue).toBe(true);
+  });
+
+  it("returns nextTickAt=null and schedulerEnabled=false when paused", async () => {
+    setSettings([{ email: "instant@example.com", mode: "instant" }], {
+      emailEnabled: true,
+    });
+    process.env["SENDGRID_API_KEY"] = "sg-test-key";
+
+    const status = await getDigestStatus(new Date("2026-05-05T00:00:00Z"));
+
+    expect(status.schedulerEnabled).toBe(false);
+    expect(status.nextTickAt).toBeNull();
+    expect(status.overdue).toBe(false);
+    expect(status.digestRecipientCount).toBe(0);
+  });
+
+  it("uses now+cadence as the first nextTickAt when no digest has been sent", async () => {
+    process.env["SENDGRID_API_KEY"] = "sg-test-key";
+    setSettings([{ email: "digest@example.com", mode: "digest" }], {
+      emailEnabled: true,
+      digestCadenceHours: 12,
+      digestLastSentAt: null,
+    });
+
+    const now = new Date("2026-05-05T00:00:00Z");
+    const status = await getDigestStatus(now);
+
+    expect(status.lastSentAt).toBeNull();
+    expect(status.nextTickAt?.toISOString()).toBe(
+      new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString(),
+    );
   });
 });
 
