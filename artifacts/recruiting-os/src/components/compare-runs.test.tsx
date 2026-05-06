@@ -1,19 +1,110 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render as rtlRender, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Router } from "wouter";
+import { memoryLocation } from "wouter/memory-location";
 import type { ReactElement } from "react";
 import type {
   JobRunSummary,
   SourcingStats,
   VariantCriteria,
 } from "@workspace/api-client-react";
-import { CompareRuns } from "./compare-runs";
+
+// ── Saved-comparison hook mocks ─────────────────────────────────────────────
+// These let the new save/load/delete tests drive the saved-comparison list and
+// observe what the component asks the API to do, without touching real fetch.
+type SavedComparison = {
+  id: number;
+  jobId: number;
+  name: string;
+  runAId: number;
+  runBId: number;
+  runCId: number | null;
+  createdAt: string;
+};
+
+const savedState: { list: SavedComparison[] } = { list: [] };
+const createMutate = vi.fn(
+  (
+    _vars: {
+      jobId: number;
+      data: {
+        name: string;
+        runAId: number;
+        runBId: number;
+        runCId: number | null;
+      };
+    },
+    opts?: { onSuccess?: () => void },
+  ) => {
+    opts?.onSuccess?.();
+  },
+);
+const deleteMutate = vi.fn(
+  (
+    _vars: { jobId: number; comparisonId: number },
+    opts?: { onSuccess?: () => void },
+  ) => {
+    opts?.onSuccess?.();
+  },
+);
+
+vi.mock("@workspace/api-client-react", async (importOriginal) => {
+  // Preserve every other export from the real module so unrelated tests
+  // that import e.g. `usePreviewNotificationDigest` from this same package
+  // are not broken by our partial override.
+  const actual =
+    await importOriginal<typeof import("@workspace/api-client-react")>();
+  return {
+    ...actual,
+    useListSavedRunComparisons: (_jobId: number) => ({
+      data: savedState.list,
+      isLoading: false,
+      error: null,
+    }),
+    useCreateSavedRunComparison: () => ({
+      mutate: createMutate,
+      isPending: false,
+    }),
+    useDeleteSavedRunComparison: () => ({
+      mutate: deleteMutate,
+      isPending: false,
+    }),
+    getListSavedRunComparisonsQueryKey: (jobId: number) => [
+      "saved-run-comparisons",
+      jobId,
+    ],
+  };
+});
+
+// Import AFTER the mock so the component picks up the mocked module.
+const { CompareRuns } = await import("./compare-runs");
+
+beforeEach(() => {
+  savedState.list = [];
+  createMutate.mockClear();
+  deleteMutate.mockClear();
+});
 
 function render(ui: ReactElement) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return rtlRender(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
+
+function renderWithRouter(ui: ReactElement, initialPath = "/") {
+  const loc = memoryLocation({ path: initialPath, record: true });
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const utils = rtlRender(
+    <QueryClientProvider client={qc}>
+      <Router hook={loc.hook}>{ui}</Router>
+    </QueryClientProvider>,
+  );
+  return { ...utils, loc };
 }
 
 // Mirror of STAT_SPECS inside compare-runs.tsx. Kept inline (not exported from
@@ -361,6 +452,174 @@ describe("CompareRuns - variant criteria diffing", () => {
       expect(rowFor("Seniority").className).not.toMatch(/bg-amber/);
       expect(rowFor("Must-have skills").className).not.toMatch(/bg-amber/);
       expect(rowFor("Focus note").className).not.toMatch(/bg-amber/);
+    },
+  );
+});
+
+describe("CompareRuns - Save / load / delete saved comparisons", () => {
+  it(
+    "calls the create endpoint with the current A/B/C IDs when the user " +
+      "names and confirms a new saved comparison",
+    async () => {
+      const user = userEvent.setup();
+      const runs = [
+        makeRun({ id: 1, stats: fullStats(10), saved: 1 }),
+        makeRun({ id: 2, stats: fullStats(10), saved: 1 }),
+        makeRun({ id: 3, stats: fullStats(10), saved: 1 }),
+      ];
+      renderWithRouter(
+        <CompareRuns runs={runs} jobId={42} />,
+        "/?compareA=1&compareB=2&compareC=3",
+      );
+
+      await user.click(screen.getByTestId("button-save-comparison"));
+      const input = await screen.findByTestId("input-comparison-name");
+      await user.type(input, "Q3 baseline vs loosened filters");
+      await user.click(screen.getByTestId("button-confirm-save-comparison"));
+
+      expect(createMutate).toHaveBeenCalledTimes(1);
+      const [vars] = createMutate.mock.calls[0];
+      expect(vars).toEqual({
+        jobId: 42,
+        data: {
+          name: "Q3 baseline vs loosened filters",
+          runAId: 1,
+          runBId: 2,
+          runCId: 3,
+        },
+      });
+    },
+  );
+
+  it(
+    "loads a saved comparison by rewriting compareA / compareB / compareC " +
+      "URL params when the user clicks its chip",
+    async () => {
+      const user = userEvent.setup();
+      const runs = [
+        makeRun({ id: 1, stats: fullStats(10), saved: 1 }),
+        makeRun({ id: 2, stats: fullStats(10), saved: 1 }),
+        makeRun({ id: 3, stats: fullStats(10), saved: 1 }),
+      ];
+      savedState.list = [
+        {
+          id: 99,
+          jobId: 42,
+          name: "Loaded setup",
+          runAId: 2,
+          runBId: 3,
+          runCId: null,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      const { loc } = renderWithRouter(
+        <CompareRuns runs={runs} jobId={42} />,
+        "/?compareA=1&compareB=2&compareC=3",
+      );
+
+      await user.click(screen.getByTestId("button-load-comparison-99"));
+
+      // memoryLocation records every navigate; the most recent entry is the
+      // one triggered by clicking the saved chip. wouter writes "?a=b" on
+      // top of "/" so the recorded path looks like "/?compareA=...".
+      const last = loc.history?.[loc.history.length - 1] ?? "";
+      const search = last.includes("?") ? last.split("?")[1] : "";
+      const params = new URLSearchParams(search);
+      expect(params.get("compareA")).toBe("2");
+      expect(params.get("compareB")).toBe("3");
+      // runCId was null, so compareC must NOT be present.
+      expect(params.has("compareC")).toBe(false);
+    },
+  );
+
+  it(
+    "removes a saved comparison from the list when the user clicks its " +
+      "trash icon (delete endpoint called with jobId + comparisonId)",
+    async () => {
+      const user = userEvent.setup();
+      const runs = [
+        makeRun({ id: 1, stats: fullStats(10), saved: 1 }),
+        makeRun({ id: 2, stats: fullStats(10), saved: 1 }),
+      ];
+      savedState.list = [
+        {
+          id: 7,
+          jobId: 42,
+          name: "Will be deleted",
+          runAId: 1,
+          runBId: 2,
+          runCId: null,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      const { rerender } = renderWithRouter(
+        <CompareRuns runs={runs} jobId={42} />,
+        "/?compareA=1&compareB=2",
+      );
+
+      expect(screen.getByTestId("saved-comparison-7")).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("button-delete-comparison-7"));
+
+      expect(deleteMutate).toHaveBeenCalledTimes(1);
+      expect(deleteMutate.mock.calls[0][0]).toEqual({
+        jobId: 42,
+        comparisonId: 7,
+      });
+
+      // Simulate the cache invalidation refetch returning an empty list — the
+      // chip should disappear from the rendered list.
+      savedState.list = [];
+      rerender(
+        <QueryClientProvider client={new QueryClient()}>
+          <Router hook={memoryLocation({ path: "/?compareA=1&compareB=2" }).hook}>
+            <CompareRuns runs={runs} jobId={42} />
+          </Router>
+        </QueryClientProvider>,
+      );
+
+      expect(screen.queryByTestId("saved-comparison-7")).not.toBeInTheDocument();
+    },
+  );
+
+  it(
+    "renders a saved comparison referencing a missing run as disabled / " +
+      "strikethrough and refuses to load it",
+    async () => {
+      const user = userEvent.setup();
+      const runs = [
+        makeRun({ id: 1, stats: fullStats(10), saved: 1 }),
+        makeRun({ id: 2, stats: fullStats(10), saved: 1 }),
+      ];
+      savedState.list = [
+        {
+          id: 55,
+          jobId: 42,
+          name: "Stale setup",
+          runAId: 1,
+          runBId: 999, // does not exist in `runs`
+          runCId: null,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      const { loc } = renderWithRouter(
+        <CompareRuns runs={runs} jobId={42} />,
+        "/?compareA=1&compareB=2",
+      );
+
+      const loadBtn = screen.getByTestId(
+        "button-load-comparison-55",
+      ) as HTMLButtonElement;
+
+      // Disabled visually (strikethrough) AND functionally.
+      expect(loadBtn.disabled).toBe(true);
+      expect(loadBtn.className).toMatch(/line-through/);
+      expect(loadBtn.title).toMatch(/no longer exist/i);
+
+      const beforeLen = loc.history?.length ?? 0;
+      await user.click(loadBtn);
+      // Disabled buttons should not navigate — history must not grow.
+      expect(loc.history?.length ?? 0).toBe(beforeLen);
     },
   );
 });
