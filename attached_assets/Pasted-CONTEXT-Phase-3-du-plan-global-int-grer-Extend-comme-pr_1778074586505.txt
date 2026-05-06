@@ -1,0 +1,72 @@
+CONTEXT
+
+Phase 3 du plan global : intégrer Extend comme provider de sourcing 
+dans Daneel. Sous-tâche 3.1 done (Extend a une API publique 
+fonctionnelle). Sous-tâche 3.2 = wrap Extend comme SourcingProvider 
+dans Daneel.
+
+ÉTAT EXTEND (résumé)
+
+- API publique : POST https://extend.aplayer.ai/api/v1/find-similar
+- Auth : Bearer ex_xxx (clés API utilisateur, Premium uniquement)
+- Body : { profile_url, job_context?, search_location?, max_results, 
+  min_results, scoring_criteria? }
+- Réponse 200 : { object, analysis_id, pattern, candidates[], 
+  total_found, below_minimum, search_query, created_at }
+- Format candidate : 
+  { name, linkedinUrl (camelCase), score, scoreReason, ... }
+- Cookie LinkedIn : géré côté Extend uniquement (pas dans le body)
+- Doc API complète : /docs/API.md dans le repo Extend privé
+
+PATTERN À SUIVRE — analogue à Phase 4.2 (CodeMatch)
+
+CodeMatch a été intégré comme EvaluationProvider en Phase 4.2 :
+- Interface dédiée (EvaluationProvider, séparée de SourcingProvider)
+- Provider dans 
+  artifacts/api-server/src/routes/workflows/providers/codematch-provider.ts
+- Marketplace card avec connect flow (paste API key + Save & Test)
+- UI candidat avec rendu des résultats
+- Tests unitaires + tests d'intégration
+
+Extend doit suivre le MÊME pattern, mais comme SourcingProvider 
+(input différent, output différent, mais wrap identique).
+
+ÉTAPE 1 — DIAGNOSTIC AVANT MODIFICATION
+
+Avant toute modification, réponds dans le chat :
+
+1. Cherche l'interface SourcingProvider actuelle dans 
+   artifacts/api-server/src/routes/workflows/providers/. 
+   Donne-moi sa signature exacte (méthodes, types).
+
+2. Liste les providers de sourcing actuellement implémentés 
+   (twin-webhook, twin-agent, github, web-search, apify). Pour 
+   chacun, une ligne sur ce qu'il fait.
+
+3. Comment un provider de sourcing est-il actuellement appelé dans 
+   le workflow engine ? Cherche dans engine.ts, donne-moi le code 
+   exact qui invoque le provider.
+
+4. Comment les sourcing results sont-ils stockés ? Y a-t-il une 
+   table candidates qui reçoit les résultats du sourcing ? Donne-moi 
+   le schéma.
+
+5. Marketplace UI : où est la carte CodeMatch (Phase 4.2) ? J'ai 
+   besoin du fichier exact pour copier le pattern pour Extend.
+
+6. Provider config (clé API stockée chiffrée) : comment CodeMatch 
+   stocke sa clé ? Même mécanisme à utiliser pour Extend.
+
+7. Vérifie si Daneel a déjà un mécanisme de "test connection" lors 
+   du connect flow (utilisé par CodeMatch en Phase 4.2). Si oui, 
+   décris-le.
+
+STOP intermédiaire 1. Affiche ce diagnostic dans le chat. Aucune 
+modification de fichier. Attends mon OK avant l'étape 2.
+
+ÉTAPE 2 — IMPLÉMENTATION (après mon OK)
+
+Implémentation en 5 sections séquentielles. Chaque section a un 
+commit local distinct.
+
+SECTION
