@@ -3,13 +3,16 @@ import { useLocation, useSearch } from "wouter";
 import {
   useListSavedRunComparisons,
   useCreateSavedRunComparison,
+  useUpdateSavedRunComparison,
   useDeleteSavedRunComparison,
   getListSavedRunComparisonsQueryKey,
   type JobRunSummary,
   type SourcingStats,
   type VariantCriteria,
+  type SavedRunComparison,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useCurrentUserId } from "@/lib/current-user";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +23,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowDown, ArrowUp, Bookmark, GitBranch, Minus, Trash2, Zap } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Bookmark,
+  GitBranch,
+  Lock,
+  Minus,
+  Trash2,
+  Users,
+  Zap,
+} from "lucide-react";
 
 type StatKey =
   | "searchTotalCount"
@@ -200,6 +213,90 @@ function RunPicker({
   );
 }
 
+function SavedChip({
+  saved,
+  isStale,
+  onLoad,
+  onToggleVisibility,
+  onDelete,
+  canModify,
+  toggleBusy,
+}: {
+  saved: SavedRunComparison;
+  isStale: boolean;
+  onLoad: () => void;
+  onToggleVisibility: () => void;
+  onDelete: () => void;
+  canModify: boolean;
+  toggleBusy: boolean;
+}) {
+  const creatorLabel = saved.createdByName ?? "Unknown teammate";
+  const visibilityLabel =
+    saved.visibility === "shared" ? "Shared with team" : "Private";
+  const titleParts = [
+    `Saved by ${creatorLabel}`,
+    visibilityLabel,
+    isStale
+      ? "One or more runs in this saved comparison no longer exist"
+      : `Load: A=#${saved.runAId} B=#${saved.runBId}${saved.runCId != null ? ` C=#${saved.runCId}` : ""}`,
+  ];
+  return (
+    <div
+      className="inline-flex items-center gap-1 rounded-full border border-border bg-background pl-2.5 pr-1 py-0.5"
+      data-testid={`saved-comparison-${saved.id}`}
+    >
+      <button
+        type="button"
+        className={`text-xs ${isStale ? "text-muted-foreground line-through" : "hover:underline"}`}
+        disabled={isStale}
+        onClick={onLoad}
+        title={titleParts.join(" • ")}
+        data-testid={`button-load-comparison-${saved.id}`}
+      >
+        {saved.name}
+      </button>
+      <span
+        className="text-[10px] text-muted-foreground"
+        title={`Saved by ${creatorLabel}`}
+        data-testid={`saved-comparison-author-${saved.id}`}
+      >
+        · {creatorLabel.split(" ")[0]}
+      </span>
+      {canModify && (
+        <button
+          type="button"
+          className="rounded-full p-1 text-muted-foreground hover:text-primary hover:bg-primary/10 disabled:opacity-50"
+          onClick={onToggleVisibility}
+          disabled={toggleBusy}
+          title={
+            saved.visibility === "shared"
+              ? "Make private (only visible to you)"
+              : "Share with team"
+          }
+          data-testid={`button-toggle-visibility-${saved.id}`}
+        >
+          {saved.visibility === "shared" ? (
+            <Users className="h-3 w-3" />
+          ) : (
+            <Lock className="h-3 w-3" />
+          )}
+        </button>
+      )}
+      {canModify && (
+        <button
+          type="button"
+          className="rounded-full p-1 text-muted-foreground hover:text-red-700 hover:bg-red-500/10"
+          onClick={onDelete}
+          title="Delete saved comparison"
+          data-testid={`button-delete-comparison-${saved.id}`}
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function CompareRuns({
   runs,
   jobId,
@@ -287,11 +384,16 @@ export function CompareRuns({
 
   // ── Saved comparison setups (hooks must run before any early return) ────
   const qc = useQueryClient();
-  const savedQuery = useListSavedRunComparisons(jobId);
+  const [currentUserId] = useCurrentUserId();
+  const savedQuery = useListSavedRunComparisons(jobId, { userId: currentUserId });
   const createSaved = useCreateSavedRunComparison();
+  const updateSaved = useUpdateSavedRunComparison();
   const deleteSaved = useDeleteSavedRunComparison();
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newVisibility, setNewVisibility] = useState<"private" | "shared">(
+    "private",
+  );
 
   if (sourcingRuns.length < 2) return null;
 
@@ -332,7 +434,9 @@ export function CompareRuns({
   // ── Saved comparison setups ─────────────────────────────────────────────
   const invalidateSaved = () =>
     qc.invalidateQueries({
-      queryKey: getListSavedRunComparisonsQueryKey(jobId),
+      queryKey: getListSavedRunComparisonsQueryKey(jobId, {
+        userId: currentUserId,
+      }),
     });
 
   const validIds = useMemo(
@@ -352,11 +456,14 @@ export function CompareRuns({
           runAId: aId,
           runBId: bId,
           runCId: cId,
+          createdById: currentUserId,
+          visibility: newVisibility,
         },
       },
       {
         onSuccess: () => {
           setNewName("");
+          setNewVisibility("private");
           setShowSaveForm(false);
           invalidateSaved();
         },
@@ -379,7 +486,46 @@ export function CompareRuns({
     );
   };
 
+  const handleToggleVisibility = (saved: SavedRunComparison) => {
+    updateSaved.mutate(
+      {
+        jobId,
+        comparisonId: saved.id,
+        data: {
+          visibility: saved.visibility === "shared" ? "private" : "shared",
+        },
+      },
+      { onSuccess: invalidateSaved },
+    );
+  };
+
   const savedComparisons = savedQuery.data ?? [];
+  const mineComparisons = savedComparisons.filter(
+    (s) => s.createdById === currentUserId,
+  );
+  const sharedComparisons = savedComparisons.filter(
+    (s) => s.visibility === "shared" && s.createdById !== currentUserId,
+  );
+
+  const renderChip = (s: SavedRunComparison) => {
+    const isStale =
+      !validIds.has(s.runAId) ||
+      !validIds.has(s.runBId) ||
+      (s.runCId != null && !validIds.has(s.runCId));
+    const canModify = s.createdById === currentUserId;
+    return (
+      <SavedChip
+        key={s.id}
+        saved={s}
+        isStale={isStale}
+        canModify={canModify}
+        toggleBusy={updateSaved.isPending}
+        onLoad={() => handleLoadSaved(s.runAId, s.runBId, s.runCId ?? null)}
+        onToggleVisibility={() => handleToggleVisibility(s)}
+        onDelete={() => handleDeleteSaved(s.id)}
+      />
+    );
+  };
 
   return (
     <div className="rounded-md border border-border bg-muted/10 p-4 space-y-4">
@@ -407,17 +553,42 @@ export function CompareRuns({
       </div>
 
       {showSaveForm && canSaveCurrent && (
-        <div className="flex items-center gap-2 rounded-md border border-border bg-background p-2">
+        <div className="flex items-center gap-2 rounded-md border border-border bg-background p-2 flex-wrap">
           <Input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder='e.g. "Q3 baseline vs loosened filters"'
-            className="h-8 text-xs"
+            className="h-8 text-xs flex-1 min-w-[200px]"
             data-testid="input-comparison-name"
             onKeyDown={(e) => {
               if (e.key === "Enter") handleSave();
             }}
           />
+          <Select
+            value={newVisibility}
+            onValueChange={(v) =>
+              setNewVisibility(v === "shared" ? "shared" : "private")
+            }
+          >
+            <SelectTrigger
+              className="h-8 text-xs w-[150px]"
+              data-testid="select-new-comparison-visibility"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="private" className="text-xs">
+                <span className="inline-flex items-center gap-1.5">
+                  <Lock className="h-3 w-3" /> Private (only me)
+                </span>
+              </SelectItem>
+              <SelectItem value="shared" className="text-xs">
+                <span className="inline-flex items-center gap-1.5">
+                  <Users className="h-3 w-3" /> Shared with team
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             type="button"
             size="sm"
@@ -436,6 +607,7 @@ export function CompareRuns({
             onClick={() => {
               setShowSaveForm(false);
               setNewName("");
+              setNewVisibility("private");
             }}
           >
             Cancel
@@ -444,51 +616,36 @@ export function CompareRuns({
       )}
 
       {savedComparisons.length > 0 && (
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-            Saved comparisons
-          </p>
-          <div className="flex flex-wrap gap-1.5" data-testid="saved-comparisons-list">
-            {savedComparisons.map((s) => {
-              const isStale =
-                !validIds.has(s.runAId) ||
-                !validIds.has(s.runBId) ||
-                (s.runCId != null && !validIds.has(s.runCId));
-              return (
-                <div
-                  key={s.id}
-                  className="inline-flex items-center gap-1 rounded-full border border-border bg-background pl-2.5 pr-1 py-0.5"
-                  data-testid={`saved-comparison-${s.id}`}
-                >
-                  <button
-                    type="button"
-                    className={`text-xs ${isStale ? "text-muted-foreground line-through" : "hover:underline"}`}
-                    disabled={isStale}
-                    onClick={() =>
-                      handleLoadSaved(s.runAId, s.runBId, s.runCId ?? null)
-                    }
-                    title={
-                      isStale
-                        ? "One or more runs in this saved comparison no longer exist"
-                        : `Load: A=#${s.runAId} B=#${s.runBId}${s.runCId != null ? ` C=#${s.runCId}` : ""}`
-                    }
-                    data-testid={`button-load-comparison-${s.id}`}
-                  >
-                    {s.name}
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-full p-1 text-muted-foreground hover:text-red-700 hover:bg-red-500/10"
-                    onClick={() => handleDeleteSaved(s.id)}
-                    title="Delete saved comparison"
-                    data-testid={`button-delete-comparison-${s.id}`}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+        <div
+          className="space-y-2"
+          data-testid="saved-comparisons-list"
+        >
+          {mineComparisons.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider inline-flex items-center gap-1">
+                <Lock className="h-3 w-3" /> Mine
+              </p>
+              <div
+                className="flex flex-wrap gap-1.5"
+                data-testid="saved-comparisons-mine"
+              >
+                {mineComparisons.map(renderChip)}
+              </div>
+            </div>
+          )}
+          {sharedComparisons.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider inline-flex items-center gap-1">
+                <Users className="h-3 w-3" /> Shared with team
+              </p>
+              <div
+                className="flex flex-wrap gap-1.5"
+                data-testid="saved-comparisons-shared"
+              >
+                {sharedComparisons.map(renderChip)}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -537,6 +694,7 @@ export function CompareRuns({
             : "Pick two different runs to see deltas."}
         </p>
       )}
+
 
       {runA && runB && !duplicates && (
         <>
@@ -591,10 +749,6 @@ export function CompareRuns({
                   const a = statsA?.[spec.key];
                   const b = statsB?.[spec.key];
                   const c = statsC?.[spec.key];
-                  // Only hide a row if EVERY visible side has nothing AND it's
-                  // a drop metric — keeps the table compact while still
-                  // showing every headline metric (search hits / inspected /
-                  // returned).
                   const isHeadline =
                     spec.key === "searchTotalCount" ||
                     spec.key === "consideredCount" ||
@@ -698,7 +852,6 @@ export function CompareRuns({
                       c: runC ? rowsC[i]?.value ?? "—" : "—",
                     })),
                   ].map((row) => {
-                    // A cell is "changed" relative to the baseline (Run A).
                     const changedB = row.a !== row.b;
                     const changedC = showC && row.a !== row.c;
                     const rowChanged = changedB || changedC;

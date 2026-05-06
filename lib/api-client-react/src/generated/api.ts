@@ -64,6 +64,7 @@ import type {
   ListCandidateNotesParams,
   ListEmailStatusChangesParams,
   ListMentionsForMemberParams,
+  ListSavedRunComparisonsParams,
   ListTrashedCandidates200,
   MarkAllEmailStatusChangesRead200,
   MentionEntry,
@@ -89,6 +90,7 @@ import type {
   UpdateBulkJobsSettingsBody,
   UpdateEmailRevalidationSettingsBody,
   UpdateNotificationSettingsBody,
+  UpdateSavedRunComparisonBody,
   UploadUrlRequest,
   UploadUrlResponse,
   UpsertStepSettingBody,
@@ -665,16 +667,32 @@ export function useGetJobApplications<
 /**
  * @summary List saved Compare Runs setups for a job
  */
-export const getListSavedRunComparisonsUrl = (jobId: number) => {
-  return `/api/jobs/${jobId}/saved-comparisons`;
+export const getListSavedRunComparisonsUrl = (
+  jobId: number,
+  params?: ListSavedRunComparisonsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/jobs/${jobId}/saved-comparisons?${stringifiedParams}`
+    : `/api/jobs/${jobId}/saved-comparisons`;
 };
 
 export const listSavedRunComparisons = async (
   jobId: number,
+  params?: ListSavedRunComparisonsParams,
   options?: RequestInit,
 ): Promise<SavedRunComparison[]> => {
   return customFetch<SavedRunComparison[]>(
-    getListSavedRunComparisonsUrl(jobId),
+    getListSavedRunComparisonsUrl(jobId, params),
     {
       ...options,
       method: "GET",
@@ -682,8 +700,14 @@ export const listSavedRunComparisons = async (
   );
 };
 
-export const getListSavedRunComparisonsQueryKey = (jobId: number) => {
-  return [`/api/jobs/${jobId}/saved-comparisons`] as const;
+export const getListSavedRunComparisonsQueryKey = (
+  jobId: number,
+  params?: ListSavedRunComparisonsParams,
+) => {
+  return [
+    `/api/jobs/${jobId}/saved-comparisons`,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getListSavedRunComparisonsQueryOptions = <
@@ -691,6 +715,7 @@ export const getListSavedRunComparisonsQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   jobId: number,
+  params?: ListSavedRunComparisonsParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listSavedRunComparisons>>,
@@ -703,12 +728,12 @@ export const getListSavedRunComparisonsQueryOptions = <
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
   const queryKey =
-    queryOptions?.queryKey ?? getListSavedRunComparisonsQueryKey(jobId);
+    queryOptions?.queryKey ?? getListSavedRunComparisonsQueryKey(jobId, params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof listSavedRunComparisons>>
   > = ({ signal }) =>
-    listSavedRunComparisons(jobId, { signal, ...requestOptions });
+    listSavedRunComparisons(jobId, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -736,6 +761,7 @@ export function useListSavedRunComparisons<
   TError = ErrorType<unknown>,
 >(
   jobId: number,
+  params?: ListSavedRunComparisonsParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof listSavedRunComparisons>>,
@@ -745,7 +771,11 @@ export function useListSavedRunComparisons<
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getListSavedRunComparisonsQueryOptions(jobId, options);
+  const queryOptions = getListSavedRunComparisonsQueryOptions(
+    jobId,
+    params,
+    options,
+  );
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -843,6 +873,121 @@ export const useCreateSavedRunComparison = <
   TContext
 > => {
   return useMutation(getCreateSavedRunComparisonMutationOptions(options));
+};
+
+/**
+ * @summary Update a saved Compare Runs setup (e.g. toggle visibility)
+ */
+export const getUpdateSavedRunComparisonUrl = (
+  jobId: number,
+  comparisonId: number,
+) => {
+  return `/api/jobs/${jobId}/saved-comparisons/${comparisonId}`;
+};
+
+export const updateSavedRunComparison = async (
+  jobId: number,
+  comparisonId: number,
+  updateSavedRunComparisonBody: UpdateSavedRunComparisonBody,
+  options?: RequestInit,
+): Promise<SavedRunComparison> => {
+  return customFetch<SavedRunComparison>(
+    getUpdateSavedRunComparisonUrl(jobId, comparisonId),
+    {
+      ...options,
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...options?.headers },
+      body: JSON.stringify(updateSavedRunComparisonBody),
+    },
+  );
+};
+
+export const getUpdateSavedRunComparisonMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateSavedRunComparison>>,
+    TError,
+    {
+      jobId: number;
+      comparisonId: number;
+      data: BodyType<UpdateSavedRunComparisonBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateSavedRunComparison>>,
+  TError,
+  {
+    jobId: number;
+    comparisonId: number;
+    data: BodyType<UpdateSavedRunComparisonBody>;
+  },
+  TContext
+> => {
+  const mutationKey = ["updateSavedRunComparison"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateSavedRunComparison>>,
+    {
+      jobId: number;
+      comparisonId: number;
+      data: BodyType<UpdateSavedRunComparisonBody>;
+    }
+  > = (props) => {
+    const { jobId, comparisonId, data } = props ?? {};
+
+    return updateSavedRunComparison(jobId, comparisonId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateSavedRunComparisonMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateSavedRunComparison>>
+>;
+export type UpdateSavedRunComparisonMutationBody =
+  BodyType<UpdateSavedRunComparisonBody>;
+export type UpdateSavedRunComparisonMutationError = ErrorType<void>;
+
+/**
+ * @summary Update a saved Compare Runs setup (e.g. toggle visibility)
+ */
+export const useUpdateSavedRunComparison = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateSavedRunComparison>>,
+    TError,
+    {
+      jobId: number;
+      comparisonId: number;
+      data: BodyType<UpdateSavedRunComparisonBody>;
+    },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateSavedRunComparison>>,
+  TError,
+  {
+    jobId: number;
+    comparisonId: number;
+    data: BodyType<UpdateSavedRunComparisonBody>;
+  },
+  TContext
+> => {
+  return useMutation(getUpdateSavedRunComparisonMutationOptions(options));
 };
 
 /**

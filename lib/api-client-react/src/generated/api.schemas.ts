@@ -5,6 +5,14 @@
  * HiringAI API
  * OpenAPI spec version: 0.1.0
  */
+export type SavedRunComparisonVisibility =
+  (typeof SavedRunComparisonVisibility)[keyof typeof SavedRunComparisonVisibility];
+
+export const SavedRunComparisonVisibility = {
+  private: "private",
+  shared: "shared",
+} as const;
+
 export interface SavedRunComparison {
   id: number;
   jobId: number;
@@ -12,6 +20,11 @@ export interface SavedRunComparison {
   runAId: number;
   runBId: number;
   runCId?: number | null;
+  /** Team-roster id of the recruiter who saved this comparison. */
+  createdById?: string | null;
+  /** Resolved display name from the team roster, or null if unknown. */
+  createdByName?: string | null;
+  visibility: SavedRunComparisonVisibility;
   createdAt: string;
 }
 
@@ -21,6 +34,13 @@ export interface CreateSavedRunComparisonBody {
   runAId: number;
   runBId: number;
   runCId?: number | null;
+  /** Team-roster id of the recruiter saving this comparison. */
+  createdById?: string | null;
+  visibility?: SavedRunComparisonVisibility;
+}
+
+export interface UpdateSavedRunComparisonBody {
+  visibility?: SavedRunComparisonVisibility;
 }
 
 export interface HealthStatus {
@@ -1412,6 +1432,16 @@ data instead of hard-coding them.
  */
   availableFilters: TelemetryDashboardAvailableFilters;
 }
+
+export type ListSavedRunComparisonsParams = {
+  /**
+ * Current viewer's team-roster id. Returns all shared comparisons
+plus this user's private ones. When omitted, only shared
+comparisons are returned.
+
+ */
+  userId?: string;
+};
 
 export type ListTrashedCandidates200 = {
   /** Configured retention window in whole days, used by the UI to caption the page. */

@@ -414,6 +414,15 @@ export const ListSavedRunComparisonsParams = zod.object({
   jobId: zod.coerce.number(),
 });
 
+export const ListSavedRunComparisonsQueryParams = zod.object({
+  userId: zod.coerce
+    .string()
+    .optional()
+    .describe(
+      "Current viewer's team-roster id. Returns all shared comparisons\nplus this user's private ones. When omitted, only shared\ncomparisons are returned.\n",
+    ),
+});
+
 export const ListSavedRunComparisonsResponseItem = zod.object({
   id: zod.number(),
   jobId: zod.number(),
@@ -421,6 +430,17 @@ export const ListSavedRunComparisonsResponseItem = zod.object({
   runAId: zod.number(),
   runBId: zod.number(),
   runCId: zod.number().nullish(),
+  createdById: zod
+    .string()
+    .nullish()
+    .describe("Team-roster id of the recruiter who saved this comparison."),
+  createdByName: zod
+    .string()
+    .nullish()
+    .describe(
+      "Resolved display name from the team roster, or null if unknown.",
+    ),
+  visibility: zod.enum(["private", "shared"]),
   createdAt: zod.coerce.date(),
 });
 export const ListSavedRunComparisonsResponse = zod.array(
@@ -439,6 +459,44 @@ export const CreateSavedRunComparisonBody = zod.object({
   runAId: zod.number(),
   runBId: zod.number(),
   runCId: zod.number().nullish(),
+  createdById: zod
+    .string()
+    .nullish()
+    .describe("Team-roster id of the recruiter saving this comparison."),
+  visibility: zod.enum(["private", "shared"]).optional(),
+});
+
+/**
+ * @summary Update a saved Compare Runs setup (e.g. toggle visibility)
+ */
+export const UpdateSavedRunComparisonParams = zod.object({
+  jobId: zod.coerce.number(),
+  comparisonId: zod.coerce.number(),
+});
+
+export const UpdateSavedRunComparisonBody = zod.object({
+  visibility: zod.enum(["private", "shared"]).optional(),
+});
+
+export const UpdateSavedRunComparisonResponse = zod.object({
+  id: zod.number(),
+  jobId: zod.number(),
+  name: zod.string(),
+  runAId: zod.number(),
+  runBId: zod.number(),
+  runCId: zod.number().nullish(),
+  createdById: zod
+    .string()
+    .nullish()
+    .describe("Team-roster id of the recruiter who saved this comparison."),
+  createdByName: zod
+    .string()
+    .nullish()
+    .describe(
+      "Resolved display name from the team roster, or null if unknown.",
+    ),
+  visibility: zod.enum(["private", "shared"]),
+  createdAt: zod.coerce.date(),
 });
 
 /**

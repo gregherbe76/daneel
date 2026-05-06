@@ -1,6 +1,11 @@
-import { pgTable, serial, integer, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { jobsTable } from "./jobs";
 import { agentRunsTable } from "./agent-runs";
+
+export const savedRunComparisonVisibilityEnum = pgEnum(
+  "saved_run_comparison_visibility",
+  ["private", "shared"],
+);
 
 export const savedRunComparisonsTable = pgTable("saved_run_comparisons", {
   id: serial("id").primaryKey(),
@@ -17,6 +22,10 @@ export const savedRunComparisonsTable = pgTable("saved_run_comparisons", {
   runCId: integer("run_c_id").references(() => agentRunsTable.id, {
     onDelete: "cascade",
   }),
+  createdById: text("created_by_id"),
+  visibility: savedRunComparisonVisibilityEnum("visibility")
+    .notNull()
+    .default("private"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
