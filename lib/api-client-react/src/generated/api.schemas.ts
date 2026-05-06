@@ -808,6 +808,34 @@ export interface UpdateBulkJobsSettingsBody {
   retentionDays: number;
 }
 
+/**
+ * Whether the sweep was triggered by the background worker or an admin.
+ */
+export type BulkJobsRunTrigger =
+  (typeof BulkJobsRunTrigger)[keyof typeof BulkJobsRunTrigger];
+
+export const BulkJobsRunTrigger = {
+  scheduled: "scheduled",
+  manual: "manual",
+} as const;
+
+/**
+ * One executed bulk-job retention sweep.
+ */
+export interface BulkJobsRun {
+  id: number;
+  startedAt: string;
+  finishedAt?: string | null;
+  /** Number of terminal bulk-job rows the sweep deleted. */
+  deleted: number;
+  /** Retention window (days) the sweep ran with. */
+  retentionDays: number;
+  /** Whether the sweep was triggered by the background worker or an admin. */
+  trigger: BulkJobsRunTrigger;
+  /** Populated only when the sweep itself crashed before completing. */
+  errorMessage?: string | null;
+}
+
 export interface EmailRevalidationSettings {
   /**
    * Days after which a previously validated email is considered stale.

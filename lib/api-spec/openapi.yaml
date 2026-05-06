@@ -1336,6 +1336,34 @@ paths:
               schema:
                 $ref: "#/components/schemas/BulkJobsSettings"
 
+  /settings/bulk-jobs/runs:
+    get:
+      operationId: listBulkJobsRuns
+      tags: [settings]
+      summary: List recent bulk-job retention sweep runs (newest first)
+      responses:
+        "200":
+          description: Recent sweep runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BulkJobsRun"
+
+  /settings/bulk-jobs/sweep:
+    post:
+      operationId: runBulkJobsSweepNow
+      tags: [settings]
+      summary: Trigger a one-off bulk-job retention sweep immediately
+      responses:
+        "200":
+          description: Sweep completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkJobsRun"
+
   /settings/notifications:
     get:
       operationId: getNotificationSettings
@@ -3164,6 +3192,35 @@ components:
           minimum: 1
           maximum: 365
       required: [retentionDays]
+
+    BulkJobsRun:
+      type: object
+      description: One executed bulk-job retention sweep.
+      properties:
+        id:
+          type: integer
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        deleted:
+          type: integer
+          description: Number of terminal bulk-job rows the sweep deleted.
+        retentionDays:
+          type: integer
+          description: Retention window (days) the sweep ran with.
+        trigger:
+          type: string
+          enum: [scheduled, manual]
+          description: Whether the sweep was triggered by the background worker or an admin.
+        errorMessage:
+          type: string
+          nullable: true
+          description: Populated only when the sweep itself crashed before completing.
+      required: [id, startedAt, deleted, retentionDays, trigger]
 
     EmailRevalidationSettings:
       type: object

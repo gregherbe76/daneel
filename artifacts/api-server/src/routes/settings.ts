@@ -9,6 +9,10 @@ import {
   updateBulkJobsSettings,
 } from "../lib/bulk-jobs-settings";
 import {
+  listRecentBulkJobsRuns,
+  sweepBulkJobRetention,
+} from "../lib/bulk-jobs";
+import {
   getEmailRevalidationSettings,
   updateEmailRevalidationSettings,
   listRecentEmailRevalidationRuns,
@@ -55,6 +59,20 @@ router.put("/settings/bulk-jobs", async (req, res): Promise<void> => {
     "Bulk-job retention settings updated",
   );
   res.json(shapeBulkJobsSettings(updated));
+});
+
+router.get("/settings/bulk-jobs/runs", async (_req, res): Promise<void> => {
+  const runs = await listRecentBulkJobsRuns(10);
+  res.json(runs);
+});
+
+router.post("/settings/bulk-jobs/sweep", async (req, res): Promise<void> => {
+  const run = await sweepBulkJobRetention({ trigger: "manual" });
+  req.log.info(
+    { runId: run.id, deleted: run.deleted, retentionDays: run.retentionDays },
+    "Manual bulk-job retention sweep finished",
+  );
+  res.json(run);
 });
 
 router.get("/settings/email-revalidation", async (_req, res): Promise<void> => {

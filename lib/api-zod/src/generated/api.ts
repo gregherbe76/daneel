@@ -3685,6 +3685,63 @@ export const UpdateBulkJobsSettingsResponse = zod
   .describe("Singleton settings controlling the bulk-job retention sweep.");
 
 /**
+ * @summary List recent bulk-job retention sweep runs (newest first)
+ */
+export const ListBulkJobsRunsResponseItem = zod
+  .object({
+    id: zod.number(),
+    startedAt: zod.coerce.date(),
+    finishedAt: zod.coerce.date().nullish(),
+    deleted: zod
+      .number()
+      .describe("Number of terminal bulk-job rows the sweep deleted."),
+    retentionDays: zod
+      .number()
+      .describe("Retention window (days) the sweep ran with."),
+    trigger: zod
+      .enum(["scheduled", "manual"])
+      .describe(
+        "Whether the sweep was triggered by the background worker or an admin.",
+      ),
+    errorMessage: zod
+      .string()
+      .nullish()
+      .describe(
+        "Populated only when the sweep itself crashed before completing.",
+      ),
+  })
+  .describe("One executed bulk-job retention sweep.");
+export const ListBulkJobsRunsResponse = zod.array(ListBulkJobsRunsResponseItem);
+
+/**
+ * @summary Trigger a one-off bulk-job retention sweep immediately
+ */
+export const RunBulkJobsSweepNowResponse = zod
+  .object({
+    id: zod.number(),
+    startedAt: zod.coerce.date(),
+    finishedAt: zod.coerce.date().nullish(),
+    deleted: zod
+      .number()
+      .describe("Number of terminal bulk-job rows the sweep deleted."),
+    retentionDays: zod
+      .number()
+      .describe("Retention window (days) the sweep ran with."),
+    trigger: zod
+      .enum(["scheduled", "manual"])
+      .describe(
+        "Whether the sweep was triggered by the background worker or an admin.",
+      ),
+    errorMessage: zod
+      .string()
+      .nullish()
+      .describe(
+        "Populated only when the sweep itself crashed before completing.",
+      ),
+  })
+  .describe("One executed bulk-job retention sweep.");
+
+/**
  * @summary Get the current outbound notification preferences
  */
 

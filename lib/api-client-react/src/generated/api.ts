@@ -26,6 +26,7 @@ import type {
   BulkCandidateActionBody,
   BulkCandidateActionResult,
   BulkCandidateJob,
+  BulkJobsRun,
   BulkJobsSettings,
   Candidate,
   CandidateComment,
@@ -5488,6 +5489,162 @@ export const useUpdateBulkJobsSettings = <
   TContext
 > => {
   return useMutation(getUpdateBulkJobsSettingsMutationOptions(options));
+};
+
+/**
+ * @summary List recent bulk-job retention sweep runs (newest first)
+ */
+export const getListBulkJobsRunsUrl = () => {
+  return `/api/settings/bulk-jobs/runs`;
+};
+
+export const listBulkJobsRuns = async (
+  options?: RequestInit,
+): Promise<BulkJobsRun[]> => {
+  return customFetch<BulkJobsRun[]>(getListBulkJobsRunsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListBulkJobsRunsQueryKey = () => {
+  return [`/api/settings/bulk-jobs/runs`] as const;
+};
+
+export const getListBulkJobsRunsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listBulkJobsRuns>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listBulkJobsRuns>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListBulkJobsRunsQueryKey();
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listBulkJobsRuns>>
+  > = ({ signal }) => listBulkJobsRuns({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listBulkJobsRuns>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListBulkJobsRunsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listBulkJobsRuns>>
+>;
+export type ListBulkJobsRunsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List recent bulk-job retention sweep runs (newest first)
+ */
+
+export function useListBulkJobsRuns<
+  TData = Awaited<ReturnType<typeof listBulkJobsRuns>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listBulkJobsRuns>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListBulkJobsRunsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Trigger a one-off bulk-job retention sweep immediately
+ */
+export const getRunBulkJobsSweepNowUrl = () => {
+  return `/api/settings/bulk-jobs/sweep`;
+};
+
+export const runBulkJobsSweepNow = async (
+  options?: RequestInit,
+): Promise<BulkJobsRun> => {
+  return customFetch<BulkJobsRun>(getRunBulkJobsSweepNowUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRunBulkJobsSweepNowMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runBulkJobsSweepNow>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof runBulkJobsSweepNow>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["runBulkJobsSweepNow"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof runBulkJobsSweepNow>>,
+    void
+  > = () => {
+    return runBulkJobsSweepNow(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RunBulkJobsSweepNowMutationResult = NonNullable<
+  Awaited<ReturnType<typeof runBulkJobsSweepNow>>
+>;
+
+export type RunBulkJobsSweepNowMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Trigger a one-off bulk-job retention sweep immediately
+ */
+export const useRunBulkJobsSweepNow = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runBulkJobsSweepNow>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof runBulkJobsSweepNow>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getRunBulkJobsSweepNowMutationOptions(options));
 };
 
 /**

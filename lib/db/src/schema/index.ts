@@ -12,6 +12,7 @@ export * from "./email-revalidation-runs";
 export * from "./notification-settings";
 export * from "./bulk-jobs";
 export * from "./bulk-jobs-settings";
+export * from "./bulk-jobs-runs";
 export * from "./deliberations";
 export * from "./scout-connect-states";
 export * from "./saved-run-comparisons";

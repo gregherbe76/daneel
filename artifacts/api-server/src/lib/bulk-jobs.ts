@@ -2,9 +2,11 @@ import { and, eq, inArray, desc, or, lt, sql } from "drizzle-orm";
 import {
   db,
   bulkJobsTable,
+  bulkJobsRunsTable,
   candidatesTable,
   applicationsTable,
   type BulkJob,
+  type BulkJobsRun,
 } from "@workspace/db";
 import { revalidateCandidateEmail } from "./email-revalidation";
 import { getBulkJobsSettings } from "./bulk-jobs-settings";
@@ -55,26 +57,74 @@ let lastRetentionSweepAt = 0;
  * Delete completed/failed/canceled bulk-job rows older than the retention
  * window. Uses `finishedAt` (falling back to `updatedAt` for safety) so we
  * never trim a row that is still in flight.
+ *
+ * Records a row in `bulk_jobs_runs` so admins can see the sweep is firing
+ * and how many rows each pass removed. The `trigger` column distinguishes
+ * background sweeps from admin-requested ones.
  */
-export async function sweepBulkJobRetention(now: Date = new Date()): Promise<number> {
+export async function sweepBulkJobRetention(
+  options: { trigger?: "scheduled" | "manual"; now?: Date } = {},
+): Promise<BulkJobsRun> {
+  const trigger = options.trigger ?? "scheduled";
+  const now = options.now ?? new Date();
   const days = await retentionDays();
-  const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-  const deleted = await db
-    .delete(bulkJobsTable)
-    .where(
-      and(
-        inArray(bulkJobsTable.status, ["completed", "failed", "canceled"]),
-        lt(sql`coalesce(${bulkJobsTable.finishedAt}, ${bulkJobsTable.updatedAt})`, cutoff),
-      ),
-    )
-    .returning({ id: bulkJobsTable.id });
-  if (deleted.length > 0) {
-    logger.info(
-      { count: deleted.length, cutoff: cutoff.toISOString() },
-      "Bulk-job retention sweep deleted old rows",
-    );
+
+  const [runRow] = await db
+    .insert(bulkJobsRunsTable)
+    .values({ trigger, retentionDays: days })
+    .returning();
+
+  let deletedCount = 0;
+  let errorMessage: string | null = null;
+
+  try {
+    const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const deleted = await db
+      .delete(bulkJobsTable)
+      .where(
+        and(
+          inArray(bulkJobsTable.status, ["completed", "failed", "canceled"]),
+          lt(sql`coalesce(${bulkJobsTable.finishedAt}, ${bulkJobsTable.updatedAt})`, cutoff),
+        ),
+      )
+      .returning({ id: bulkJobsTable.id });
+    deletedCount = deleted.length;
+    if (deletedCount > 0) {
+      logger.info(
+        { count: deletedCount, cutoff: cutoff.toISOString(), trigger },
+        "Bulk-job retention sweep deleted old rows",
+      );
+    }
+  } catch (err) {
+    errorMessage = err instanceof Error ? err.message : String(err);
+    logger.error({ err: errorMessage, trigger }, "Bulk-job retention sweep crashed");
   }
-  return deleted.length;
+
+  const [finished] = await db
+    .update(bulkJobsRunsTable)
+    .set({
+      finishedAt: new Date(),
+      deleted: deletedCount,
+      errorMessage,
+    })
+    .where(eq(bulkJobsRunsTable.id, runRow.id))
+    .returning();
+
+  return finished ?? runRow;
+}
+
+/**
+ * Return the most recent retention sweeps, newest first. Used by the settings
+ * UI to render a "Recent activity" panel.
+ */
+export async function listRecentBulkJobsRuns(
+  limit = 10,
+): Promise<BulkJobsRun[]> {
+  return db
+    .select()
+    .from(bulkJobsRunsTable)
+    .orderBy(desc(bulkJobsRunsTable.startedAt))
+    .limit(limit);
 }
 
 async function maybeRunRetentionSweep(): Promise<void> {
@@ -82,7 +132,7 @@ async function maybeRunRetentionSweep(): Promise<void> {
   if (now - lastRetentionSweepAt < RETENTION_SWEEP_INTERVAL_MS) return;
   lastRetentionSweepAt = now;
   try {
-    await sweepBulkJobRetention(new Date(now));
+    await sweepBulkJobRetention({ now: new Date(now), trigger: "scheduled" });
   } catch (err) {
     logger.error(
       { err: err instanceof Error ? err.message : String(err) },
