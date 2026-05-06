@@ -131,7 +131,8 @@ export default function MentionsPage() {
       </div>
 
       {/* Email regressions section */}
-      {regressionsQuery.isLoading ? null : (
+      {regressionsQuery.isLoading ||
+      (regressions.length === 0 && !unnotifiedOnly && mentions.length === 0) ? null : (
         <section className="mb-6">
           <div className="flex items-center justify-between gap-3 mb-2">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
