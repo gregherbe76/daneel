@@ -138,3 +138,125 @@ describe("ScoutMarketplaceCard – auto-assign toggle", () => {
     },
   );
 });
+
+describe("ScoutMarketplaceCard – connect failure toast", () => {
+  async function startConnectFlow() {
+    issueStateSpy.mockResolvedValue({
+      connectUrl: "https://scout.example/connect?state=err",
+      state: "err",
+    });
+    renderCard();
+    await userEvent.click(
+      screen.getByRole("button", { name: /connect scout/i }),
+    );
+    await waitFor(() => expect(issueStateSpy).toHaveBeenCalled());
+  }
+
+  function findFailureToast() {
+    return toastSpy.mock.calls.find(
+      ([arg]) =>
+        (arg as { title?: string }).title === "Scout connection failed",
+    );
+  }
+
+  it(
+    "renders a destructive toast carrying the error string when the callback " +
+      "broadcasts ok:false via postMessage",
+    async () => {
+      await startConnectFlow();
+
+      await act(async () => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: {
+              source: "daneel-scout-connect",
+              ok: false,
+              error: "boom",
+            },
+          }),
+        );
+      });
+
+      await waitFor(() => expect(findFailureToast()).toBeTruthy());
+      const payload = findFailureToast()![0] as {
+        description: string;
+        variant: string;
+      };
+      expect(payload.description).toBe("boom");
+      expect(payload.variant).toBe("destructive");
+    },
+  );
+
+  it(
+    "renders the same destructive toast when the failure arrives over the " +
+      "BroadcastChannel transport",
+    async () => {
+      await startConnectFlow();
+
+      await act(async () => {
+        const bc = new BroadcastChannel("daneel:scout-connect");
+        bc.postMessage({ ok: false, error: "boom" });
+        bc.close();
+        // Let the BroadcastChannel microtask flush.
+        await new Promise((r) => setTimeout(r, 0));
+      });
+
+      await waitFor(() => expect(findFailureToast()).toBeTruthy());
+      const payload = findFailureToast()![0] as {
+        description: string;
+        variant: string;
+      };
+      expect(payload.description).toBe("boom");
+      expect(payload.variant).toBe("destructive");
+    },
+  );
+
+  it(
+    "renders the same destructive toast when the failure arrives over the " +
+      "localStorage `storage` event transport",
+    async () => {
+      await startConnectFlow();
+
+      await act(async () => {
+        window.dispatchEvent(
+          new StorageEvent("storage", {
+            key: "daneel.scoutConnect",
+            newValue: JSON.stringify({ ok: false, error: "boom" }),
+          }),
+        );
+      });
+
+      await waitFor(() => expect(findFailureToast()).toBeTruthy());
+      const payload = findFailureToast()![0] as {
+        description: string;
+        variant: string;
+      };
+      expect(payload.description).toBe("boom");
+      expect(payload.variant).toBe("destructive");
+    },
+  );
+
+  it(
+    "falls back to 'Unknown error' in the destructive toast description " +
+      "when the callback omits an error string",
+    async () => {
+      await startConnectFlow();
+
+      await act(async () => {
+        window.dispatchEvent(
+          new MessageEvent("message", {
+            data: { source: "daneel-scout-connect", ok: false },
+          }),
+        );
+      });
+
+      await waitFor(() => expect(findFailureToast()).toBeTruthy());
+      const payload = findFailureToast()![0] as {
+        description: string;
+        variant: string;
+      };
+      expect(payload.description).toBe("Unknown error");
+      expect(payload.variant).toBe("destructive");
+    },
+  );
+});
