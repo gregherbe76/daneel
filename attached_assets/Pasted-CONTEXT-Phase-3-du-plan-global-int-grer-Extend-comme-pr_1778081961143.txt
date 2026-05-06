@@ -1,0 +1,175 @@
+CONTEXT
+
+Phase 3 du plan global : intégrer Extend comme provider de sourcing 
+dans Daneel. Sous-tâches 3.1 et 3.1bis done : Extend a une API 
+publique complète (POST /v1/find-similar async, GET /v1/find-similar/:id 
+polling, POST /v1/refine refinement loop) déployée sur 
+https://extend.aplayer.ai.
+
+Sous-tâche 3.2 = wrap Extend comme SourcingProvider dans Daneel.
+
+ÉTAT EXTEND API CONFIRMÉ
+
+Endpoints publics (Bearer ex_xxx, Premium uniquement) :
+- POST /api/v1/find-similar
+  Body : { profile_urls: string[] (1-10), job_context?, 
+           search_location?, max_results?, min_results?, 
+           scoring_criteria? }
+  Retour : 202 + { analysis_id, status: "running", poll_url, 
+           created_at }
+- GET /api/v1/find-similar/:id
+  Retour : 200 + { status: "running" | "completed" | "failed", ... }
+  Si completed : reference_profile_urls, patterns, stats, 
+  profile_syntheses, candidates, total_found, below_minimum, 
+  is_refined, refined_from_id
+- POST /api/v1/refine
+  Body : { analysis_id, feedback: [{candidate_url, verdict, 
+           comment?}] }
+  Retour : 202 + { analysis_id (nouveau), refined_from_id, 
+           poll_url, status: "running" }
+
+Cookie LinkedIn géré côté Extend (pas dans le body), config 
+strictement BDD en prod (fix sécurité).
+
+PATTERN À SUIVRE — analogue à Phase 4.2 (CodeMatch)
+
+CodeMatch a été intégré comme EvaluationProvider en Phase 4.2 
+selon le pattern :
+- Provider TypeScript dans 
+  artifacts/api-server/src/routes/workflows/providers/codematch-provider.ts
+- Marketplace card dans catalog.ts + dialog dans marketplace.tsx
+- API key chiffrée dans agentProvidersTable.apiKeyEncryptedPlaceholder
+- validateConnection() pour le "Save & Test" du connect flow
+- Tests unitaires
+- Documentation /docs/providers/codematch.md
+
+Extend doit suivre le MÊME pattern, mais comme SourcingProvider 
+(via interface AgentProvider générique selon le diagnostic 
+Phase 3.2 précédent).
+
+DÉCISIONS DESIGN ARBITRÉES
+
+D1. Type provider : "extend" ajouté au providerTypeEnum, suit 
+    le contrat AgentProvider générique (PAS d'interface dédiée 
+    EvaluationProvider — Extend reste un sourcing provider 
+    classique avec input job + résultat candidates)
+
+D2. Profile URLs comme input job-level :
+    - Nouvelle colonne jobs.exampleProfileUrls : text[] nullable
+    - Page config job : nouveau champ "Example profiles 
+      (for Extend)" multi-input (1 à 10 URLs)
+    - Si Extend sélectionné comme sourcing provider mais 
+      exampleProfileUrls vide : workflow échoue avec message 
+      "Extend requires example profile URLs"
+
+D3. Refinement loop : SKIP pour la v1 de l'intégration
+    - On expose seulement POST /v1/find-similar + polling
+    - Le refinement loop d'Extend reste accessible via Extend 
+      standalone uniquement
+    - Documentation : "For pattern refinement based on candidate 
+      feedback, use Extend directly at extend.aplayer.ai"
+    - Justification : intégrer le refinement dans Daneel demande 
+      une UX multi-tours qui dépasse le scope. À ré-évaluer en 
+      Sous-tâche 3.4 si signal utilisateur
+
+D4. Async polling côté Daneel :
+    - Le provider Extend appelle POST /v1/find-similar (202 + 
+      analysis_id)
+    - Puis polle GET /v1/find-similar/:id toutes les 10 secondes 
+      jusqu'à status "completed" ou "failed"
+    - Timeout côté Daneel : 12 minutes (Extend a un watchdog 10 
+      min côté serveur, on prend une marge)
+    - Si timeout : retourner sourced: false, error: "timeout"
+
+D5. Mapping candidates Extend → format Daneel SourcingCandidate
+    - Extend retourne candidates avec : { name, linkedinUrl, 
+      score, scoreReason, hiringSignal?, ... }
+    - Daneel SourcingCandidate attend : { name, headline, 
+      location, currentCompany, email, linkedinUrl, githubUrl, 
+      username, confidence, emailSource, skills, summary, 
+      evidence, potentialRisks, source }
+    - Mapping :
+      - name → name (direct)
+      - linkedinUrl → linkedinUrl (direct, mais camelCase Extend → 
+        snake_case Daneel selon la convention Daneel)
+      - score (0-10 chez Extend) → confidence (0-1 chez Daneel) 
+        après /10
+      - scoreReason → summary (concaténation des bullets)
+      - source → "Extend pattern-match"
+      - email, githubUrl, username : null (Extend ne les fournit 
+        pas)
+      - emailSource : null
+      - skills : extraire depuis le pattern si possible, sinon []
+      - evidence : linkedinUrl
+      - potentialRisks : "" (Extend ne flag pas explicitement)
+      - headline, location, currentCompany : extraire depuis 
+        scoreReason si parsable, sinon ""
+
+ÉTAPE 1 — DIAGNOSTIC AVANT MODIFICATION
+
+Avant toute modification, réponds dans le chat :
+
+1. Confirme le pattern AgentProvider actuel pour les sourcing 
+   providers existants. Donne-moi un exemple concret du fichier 
+   artifacts/api-server/src/routes/workflows/providers/twin-agent.ts 
+   ou apify.ts (le plus représentatif) :
+   - Constructor signature
+   - Méthode run() — comment elle est implémentée pour un 
+     sourcing provider type
+   - Méthode validateConnection() — pattern utilisé pour le 
+     test connection
+
+2. Localise le fichier 
+   artifacts/recruiting-os/src/pages/settings/marketplace/catalog.ts 
+   (Phase 4.2). Donne-moi l'entrée CodeMatch exacte (les 14 lignes 
+   environ) pour que je voie le pattern à dupliquer pour Extend.
+
+3. Localise marketplace.tsx (le composant principal) :
+   - Le dialog de connect existe-t-il déjà comme composant 
+     factorisé, ou chaque provider a son propre sub-dialog 
+     (genre lignes 985-1030 pour CodeMatch comme dans le 
+     diagnostic Phase 3.2 antérieur) ?
+   - Si chaque provider a son sub-dialog : où ajouter celui 
+     d'Extend ?
+
+4. Vérifie le providerTypeEnum dans 
+   lib/db/src/schema/agent-providers.ts. Liste toutes les valeurs 
+   actuelles. La migration ajouter "extend" est-elle mécanique 
+   ou y a-t-il des contraintes (FK à d'autres tables, etc.) ?
+
+5. La table jobs dans lib/db/src/schema/jobs.ts (ou wherever 
+   c'est défini) : 
+   - A-t-elle déjà des colonnes pour des inputs custom par 
+     provider de sourcing (genre searchKeywords, filters) ?
+   - Comment l'UI page job actuelle expose-t-elle ces inputs 
+     conditionnellement selon le provider sélectionné ?
+   - Pour ajouter exampleProfileUrls (text[]) : pattern existant 
+     à suivre ?
+
+6. La fonction resolveSourcingProvider mentionnée dans le 
+   diagnostic Phase 3.2 antérieur : 
+   - Où est-elle définie ?
+   - Comment décide-t-elle quel provider utiliser ?
+   - La variable isTwin (mal nommée selon le diagnostic) doit-elle 
+     être renommée pour ajouter Extend ? Donne-moi le code exact 
+     concerné dans engine.ts.
+
+7. Tests unitaires existants pour codematch-provider.ts (Phase 4.2) : 
+   - Combien de tests ?
+   - Pattern utilisé (mocks fetch, vitest, etc.) ?
+   - Localisation exacte du fichier de test
+
+CONTRAINTES
+
+- Aucune modification de fichier
+- Aucun push
+- Juste un rapport texte dans le chat
+
+DELIVERABLE
+
+Diagnostic complet sur les 7 points dans le chat.
+
+STOP
+
+Après ce diagnostic, j'arbitre et je donne le brief Étape 2 
+(implémentation en sections séquentielles avec STOP intermédiaires).
