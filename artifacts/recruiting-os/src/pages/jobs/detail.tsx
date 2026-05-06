@@ -977,6 +977,22 @@ export default function JobDetailPage() {
                         (stats?.droppedInvalid ?? 0) +
                         (stats?.droppedNoProfile ?? 0) +
                         (stats?.droppedFabricated ?? 0);
+                      // Search-style providers (Web Search, Apify) report
+                      // searchTotalCount = 0 when the upstream search returned
+                      // zero organic results. In that case every other counter
+                      // is also 0, so showing a row of "0 search hits / 0
+                      // inspected / 0 returned" badges is just noise — surface
+                      // a plain-English explanation instead.
+                      // Gate on searchTotalCount being explicitly present so
+                      // non-search providers that omit the field aren't
+                      // misclassified as "empty search".
+                      const isEmptySearch =
+                        stats != null &&
+                        stats.searchTotalCount != null &&
+                        stats.searchTotalCount === 0 &&
+                        (stats.returnedCount ?? 0) === 0 &&
+                        (stats.extractedCount ?? 0) === 0 &&
+                        totalDropped === 0;
                       return (
                         <div className={`rounded-md border p-4 flex items-start gap-3 ${
                           sourcingLog.status === "completed"
@@ -991,7 +1007,9 @@ export default function JobDetailPage() {
                           <div className="flex-1">
                             <p className="text-sm font-medium">
                               {sourcingLog.status === "completed"
-                                ? `Sourcing complete — ${output?.saved ?? 0} new candidates generated`
+                                ? isEmptySearch
+                                  ? "Sourcing complete — no organic results"
+                                  : `Sourcing complete — ${output?.saved ?? 0} new candidates generated`
                                 : "Sourcing step failed"}
                               {providerName && (
                                 <span
@@ -1010,7 +1028,14 @@ export default function JobDetailPage() {
                                 All profiles are AI-generated mock candidates and clearly labelled.
                               </p>
                             )}
-                            {sourcingLog.status === "completed" && stats && (
+                            {sourcingLog.status === "completed" && stats && isEmptySearch && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                The upstream search returned no organic results for this query.
+                                Try widening the job's must-have skills, loosening the location filter,
+                                or adjusting your provider's target sites and extra keywords.
+                              </p>
+                            )}
+                            {sourcingLog.status === "completed" && stats && !isEmptySearch && (
                               <div className="mt-2 space-y-1.5">
                                 <div className="flex flex-wrap gap-1.5 text-[11px]">
                                   {stats.searchTotalCount != null && (
@@ -1111,6 +1136,13 @@ export default function JobDetailPage() {
                                 (stats?.droppedInvalid ?? 0) +
                                 (stats?.droppedNoProfile ?? 0) +
                                 (stats?.droppedFabricated ?? 0);
+                              const isEmptySearch =
+                                stats != null &&
+                                stats.searchTotalCount != null &&
+                                stats.searchTotalCount === 0 &&
+                                (stats.returnedCount ?? 0) === 0 &&
+                                (stats.extractedCount ?? 0) === 0 &&
+                                totalDropped === 0;
                               const date = new Date(r.createdAt).toLocaleString(
                                 "en-US",
                                 { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" },
@@ -1166,7 +1198,11 @@ export default function JobDetailPage() {
                                   {status === "failed" && r.sourcingError && (
                                     <p className="text-[11px] text-destructive">{r.sourcingError}</p>
                                   )}
-                                  {stats ? (
+                                  {stats && isEmptySearch ? (
+                                    <p className="text-[11px] text-muted-foreground">
+                                      No organic results returned for this query.
+                                    </p>
+                                  ) : stats ? (
                                     <div className="flex flex-wrap gap-1.5 text-[11px]">
                                       {stats.searchTotalCount != null && (
                                         <Badge variant="outline" className="bg-background">
