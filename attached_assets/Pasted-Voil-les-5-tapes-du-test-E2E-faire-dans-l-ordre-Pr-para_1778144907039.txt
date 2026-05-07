@@ -1,0 +1,127 @@
+Voilà les 5 étapes du test E2E. À faire dans l'ordre.
+
+## Préparation (avant les 5 étapes)
+
+→ **Lance Daneel en local** : terminal Replit Daneel, `pnpm dev` (ou la commande dev habituelle du projet)
+→ **Ouvre Daneel dans le navigateur** : probablement `http://localhost:5173` ou `http://localhost:3000`
+→ **Aie ta vraie clé Extend prête** : la clé `ex_xxx` que tu as générée sur extend.aplayer.ai (clé "daneel-test"). Garde-la dans ton presse-papier ou un fichier note local.
+→ **Aie tes 3 URLs LinkedIn de référence prêtes** : 3 profils cohérents que tu colleras dans le job de test
+
+## Étape 1 — Marketplace : Test du Save & Test avec une fausse clé
+
+But : valider que validateConnection appelle bien GET /v1/me et rejette les clés invalides.
+
+→ Settings → Marketplace
+→ Onglet Sourcing
+→ Tu vois la nouvelle carte "Extend" avec badge `[byo-key]`
+→ Clique "Connect"
+→ Dans le sub-dialog, colle une fausse clé : `ex_FAKE_KEY_FOR_TESTING`
+→ Clique Save
+
+**Attendu** : toast rouge avec un message du genre "Connection test failed: Invalid API key"
+
+Si tu obtiens un toast vert ou aucun toast → bug dans validateConnection à signaler.
+
+## Étape 2 — Marketplace : Connect avec ta vraie clé
+
+But : valider que la connexion réussie active Extend.
+
+→ Re-clique "Connect" (ou "Reconnect") sur la carte Extend
+→ Colle ta vraie clé `ex_xxx` (clé "daneel-test")
+→ Clique Save
+
+**Attendu** : 
+- Toast vert "Extend connected — Wired up to the Sourcing step. Connection test: OK."
+- La carte Extend passe à l'état "Connected"
+
+Si tu obtiens un toast rouge avec ta vraie clé → vérifie que :
+- La clé est bien Premium (gh@a-player.co est en `tier=pro`)
+- La clé n'est pas révoquée
+- Le déploiement Extend prod inclut bien `/v1/me`
+
+## Étape 3 — Vérifier l'auto-assign Extend au step Sourcing
+
+But : comprendre l'impact sur tes autres jobs.
+
+→ Settings → Workflow Step Assignments
+→ Regarde la valeur actuelle du sourcing step
+
+**Attendu** : Le sourcing step est maintenant assigné à Extend (auto-assign).
+
+**Décision à prendre** :
+- Si tu acceptes que tes anciens jobs basculent sur Extend → laisse tel quel
+- Si tu veux préserver les anciens jobs → re-assigne sourcing à Twin Agent (ou autre provider que tu utilisais avant)
+
+Pour le test E2E, **garde Extend assigné** pour que le job de test utilise bien Extend en Étape 5.
+
+## Étape 4 — Créer un NOUVEAU job avec exampleProfileUrls
+
+But : valider la persistance du nouveau champ et la validation client.
+
+→ Jobs → New
+→ Titre : "Test Extend integration"
+→ Description courte (genre "Looking for senior PM founders in B2B SaaS")
+→ Location : "Europe" ou autre selon tes URLs
+→ Scroll vers le bas
+→ Toggle "▸ Advanced sourcing inputs" → clique pour ouvrir
+→ Tu vois le champ "Example LinkedIn profile URLs"
+→ Colle ta première URL LinkedIn → clique +
+→ Colle la deuxième URL → clique +
+→ Colle la troisième URL
+→ Vérifie que les 3 URLs apparaissent en chips (`in/<slug>` raccourci)
+→ Save le job
+
+**Test bonus de validation client** :
+→ Tente d'ajouter une URL non-LinkedIn (ex: `https://github.com/torvalds`) → doit afficher erreur inline rouge
+→ Tente d'ajouter une 11e URL → bouton + doit être désactivé
+
+**Test de persistance** :
+→ Recharge la page edit du job
+→ Vérifie que les 3 URLs sont toujours là dans Advanced sourcing inputs
+
+## Étape 5 — Lancer le workflow et observer
+
+But : valider le pipeline complet end-to-end Daneel → Extend → résultats.
+
+→ Sur le job "Test Extend integration"
+→ Clique "Run workflow" (ou équivalent)
+→ Observe la timeline d'exécution
+
+**Attendu** :
+- Step "sourcing" devient "running"
+- Source affichée : "Extend"
+- Pipeline prend 2-5 minutes (polling Extend en arrière-plan)
+- Step "sourcing" passe à "completed"
+- Quand tout est fini, vérifie la shortlist
+
+**Vérifications dans la shortlist** :
+- Tu vois N candidats (au moins 3-5 normalement)
+- Chaque candidat a `source: "Extend pattern-match"`
+- Chaque candidat a une `confidence` entre 0 et 1 (genre 0.7, 0.85)
+- Les noms et URLs LinkedIn sont valides
+
+**Vérification BDD bonus** (depuis terminal Replit Daneel) :
+```bash
+psql $DATABASE_URL -c "SELECT id, name, source, sourcing_confidence FROM candidates WHERE source = 'Extend pattern-match' ORDER BY id DESC LIMIT 10;"
+```
+
+Doit montrer les candidats Extend récents.
+
+## Ce qui peut clocher pendant le test
+
+→ **Étape 1** : si la fausse clé n'est pas refusée → bug validateConnection
+→ **Étape 2** : si ta vraie clé est refusée → vérifie déploiement /v1/me et tier pro
+→ **Étape 3** : si Extend n'apparaît pas en Sourcing assignment → l'auto-assign n'a pas marché
+→ **Étape 4** : si validation client casse → bug regex LinkedIn
+→ **Étape 4** : si URLs ne persistent pas après save → bug backend `jobs.ts` (POST/PUT)
+→ **Étape 5** : si timeout 12 min sans réponse → bug polling Daneel
+→ **Étape 5** : candidats vides ou mal mappés → bug Section B.4 (mapping)
+
+## Reviens-moi avec
+
+→ ✅ "Tests E2E pass, push fait" si les 5 étapes passent + push fait
+→ ❌ "Erreur à l'étape X : [message exact]" + screenshot si possible
+
+Et **clique tâche #98 → AWAITING_INPUT** quand tu seras dans le panneau Tasks Replit (30 secondes).
+
+Vas-y. Je suis en stand-by.
