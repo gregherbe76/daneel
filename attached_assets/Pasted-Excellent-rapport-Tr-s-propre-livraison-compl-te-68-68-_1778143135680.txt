@@ -1,0 +1,62 @@
+Excellent rapport. Très propre, livraison complète, 68/68 tests verts, description visuelle détaillée des 2 nouvelles UI (carte marketplace + toggle Advanced sourcing inputs). L'agent a même proposé un plan E2E que tu peux suivre.
+Quatre points à noter avant que tu testes.
+Point 1 — La précision sur les commits/auto-checkpoints
+L'agent confirme ce qu'on avait déjà compris : il ne peut pas faire git commit directement, la plateforme fait des auto-checkpoints. Donc tu as 3 SHAs (1f7a8b6, e73ae87, 71b5f95) qui couvrent A→F.
+Le message commit "propre" qu'il a préparé dans .local/.commit_message ne sera pas appliqué automatiquement. Tu auras 3 commits avec messages auto-générés Replit en historique GitHub.
+Tu peux squash-merge avant push si tu veux un historique propre, ou pousser tel quel. Mon vote : pousse tel quel. L'historique commit n'est pas une vitrine, c'est de la traçabilité technique. 3 commits valent mieux qu'un squash forcé.
+Point 2 — La détection automatique de l'auto-assign sourcing
+J'ai vu un détail important dans ton rapport, section 4a : "Au clic Save → l'agent enchaîne automatiquement : POST /providers, POST /provider-step-settings (auto-assign Sourcing step)..."
+Cette auto-assignation est risquée. Si tu connectes Extend dans le marketplace, ça va automatiquement mettre Extend comme provider sourcing global pour TOUS tes jobs Daneel. Y compris les jobs existants qui n'ont pas d'exampleProfileUrls configuré.
+Conséquence : tes anciens jobs vont essayer d'utiliser Extend au prochain workflow run, échouer avec no_profile_urls, et tu vas voir des shortlists vides.
+À mitiger lors du test E2E : après avoir connecté Extend, va immédiatement dans Settings → Workflow Step Assignments et vérifie ce qui est assigné à sourcing. Si l'auto-assign s'est fait et que tu veux le défaire pour préserver le comportement ancien, tu dois manuellement re-assigner Twin/Scout/etc.
+Soit tu acceptes que tous tes jobs basculent sur Extend, soit tu dois gérer manuellement après connexion.
+Point 3 — La tâche #98 toujours pas formellement en AWAITING_INPUT
+L'agent t'a expliqué qu'il n'a pas le droit de muter cet état via SDK. Il a mis un marqueur [PARKED — 2026-05-07] dans la description.
+C'est OK comme workaround temporaire. Mais quand tu seras dans Replit pour le test E2E, prends 30 secondes pour cliquer la tâche #98 et la passer manuellement en AWAITING_INPUT. Ça évitera la confusion du validator pour les futures sous-tâches.
+Point 4 — Tu as TOUT pour pousser, mais teste d'abord
+Avant push GitHub, fais le test E2E. L'agent t'a proposé 7 étapes. Je vais les simplifier à 5 étapes critiques.
+Test E2E — Le plan minimal
+Étape 1 — Marketplace : Connect Extend avec une fausse clé (test du Save & Test)
+→ Settings → Marketplace → onglet Sourcing
+→ Carte Extend → bouton "Connect"
+→ Colle une fausse clé : ex_FAKE_KEY_FOR_TESTING
+→ Save
+→ Attendu : toast rouge "Connection test failed: Invalid API key" (preuve que validateConnection appelle bien GET /v1/me)
+Étape 2 — Marketplace : Connect Extend avec ta vraie clé
+→ Re-clique "Connect" sur la carte Extend (ou "Reconnect")
+→ Colle ta vraie clé ex_xxx (ta clé "daneel-test")
+→ Save
+→ Attendu : toast vert "Extend connected — Wired up to the Sourcing step. Connection test: OK."
+→ La carte passe à "Connected"
+Étape 3 — Vérifier (et possiblement annuler) l'auto-assign
+→ Settings → Workflow Step Assignments
+→ Regarde la valeur du sourcing step
+→ Si tu veux préserver les anciens jobs : re-assigne sourcing à Twin Agent ou autre
+→ Si tu acceptes que tous tes jobs Daneel basculent sur Extend : laisse tel quel
+Étape 4 — Créer un job de test
+→ Jobs → New
+→ Titre : "Test Extend integration"
+→ Description courte
+→ Toggle "Advanced sourcing inputs" → ouvrir
+→ Colle 3 URLs LinkedIn de référence (tes 3 founders/PM/etc.)
+→ Save
+→ Recharge la page → vérifie que les URLs persistent
+Étape 5 — Lancer le workflow et observer
+→ Sur le job créé en Étape 4
+→ Run workflow
+→ Observe la timeline : tu dois voir step "sourcing" avec source "Extend"
+→ Pipeline va prendre 2-5 minutes (polling Extend)
+→ Quand fini, vérifie shortlist : candidats avec source "Extend pattern-match" et confidence (score/10)
+Vérification BDD bonus :
+bashpsql $DATABASE_URL -c "SELECT id, name, source, sourcing_confidence FROM candidates WHERE source = 'Extend pattern-match' ORDER BY id DESC LIMIT 5;"
+Ce qui peut clocher pendant le test
+→ Étape 1 fail : si la fausse clé n'est pas refusée avec "Invalid API key", c'est que validateConnection ne fait pas vraiment l'appel GET /v1/me. Bug à fixer avant push.
+→ Étape 2 fail : si ta vraie clé est refusée alors qu'elle marche en curl direct, c'est probablement que Daneel n'envoie pas correctement le header Authorization Bearer. Bug à fixer.
+→ Étape 5 timeout : si le workflow timeout à 12 min sans réponse, c'est que le polling côté Daneel ne fonctionne pas (ou que l'API Extend prod a un problème). Investigate.
+→ Candidats vides ou mal mappés : si tu vois des candidats dans la shortlist mais sans confidence, sans nom, ou avec scoreReason mal formaté, le mapping Section B.4 est cassé. Bug à fixer.
+Ce que tu fais
+
+Teste E2E (15-20 min en suivant les 5 étapes)
+Si tout passe : push GitHub Daneel + reviens-moi avec "Tests E2E pass, push fait"
+Si quelque chose casse : copie l'erreur exacte, on debug avant push
+En passant : clique tâche #98 dans Replit Tasks → AWAITING_INPUT (30 secondes)
