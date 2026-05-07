@@ -1128,16 +1128,16 @@ function ConnectDialog({
               <p className="text-xs text-muted-foreground">
                 {existing?.apiKeyLast4
                   ? "Leave blank to keep the existing key. Paste a new key to rotate."
-                  : "Get your key from extend.aplayer.ai → Account → API. Sent as Authorization: Bearer …"}
+                  : "Get your key from pattern.aplayer.ai → Account → API. Sent as Authorization: Bearer …"}
               </p>
               <a
-                href="https://extend.aplayer.ai/account"
+                href="https://pattern.aplayer.ai/account"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-primary hover:underline inline-block"
                 data-testid="extend-signup-link"
               >
-                Don't have a key yet? Get one at extend.aplayer.ai/account →
+                Don't have a key yet? Get one at pattern.aplayer.ai/account →
               </a>
             </div>
 
@@ -1158,7 +1158,7 @@ function ConnectDialog({
                 <div className="space-y-1.5">
                   <Label>Base URL override</Label>
                   <Input
-                    placeholder="https://extend.aplayer.ai/api/v1"
+                    placeholder="https://pattern.aplayer.ai/api/v1"
                     value={extendBaseUrl}
                     onChange={(e) => setExtendBaseUrl(e.target.value)}
                     data-testid="extend-base-url"

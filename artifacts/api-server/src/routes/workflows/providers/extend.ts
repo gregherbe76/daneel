@@ -7,7 +7,7 @@ import type {
 import type { ExtendProviderConfig } from "@workspace/db";
 import { logger } from "../../../lib/logger";
 
-const DEFAULT_BASE_URL = "https://extend.aplayer.ai/api/v1";
+const DEFAULT_BASE_URL = "https://pattern.aplayer.ai/api/v1";
 const REQUEST_TIMEOUT_MS = 8_000;
 const VALIDATE_TIMEOUT_MS = 8_000;
 const POLL_INITIAL_DELAY_MS = 30_000;
@@ -78,7 +78,7 @@ const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
  * ExtendSourcingProvider
  *
  * Sourcing provider that delegates pattern-matching from example LinkedIn
- * profiles to Extend (https://extend.aplayer.ai). Async by design:
+ * profiles to Extend (https://pattern.aplayer.ai). Async by design:
  *   1. POST /v1/find-similar → 202 with analysis_id
  *   2. Wait 30s (Extend pipeline is 60-150s on average)
  *   3. Poll GET /v1/find-similar/:id every 10s until completed/failed

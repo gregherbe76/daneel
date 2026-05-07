@@ -76,7 +76,7 @@ export type CodeMatchProviderConfig = {
 export type ExtendProviderConfig = {
   /**
    * Override for the Extend backend base URL. Defaults to the hosted
-   * production deployment (`https://extend.aplayer.ai/api/v1`) when omitted.
+   * production deployment (`https://pattern.aplayer.ai/api/v1`) when omitted.
    * The API key flows through the existing `apiKeyEncryptedPlaceholder`
    * column on the provider row (sent as `Authorization: Bearer <key>`).
    */

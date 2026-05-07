@@ -624,7 +624,7 @@ provider. The Extend API key flows through the existing
 
  */
 export interface ExtendProviderConfig {
-  /** Override for the Extend backend base URL. Defaults to the hosted production deployment (`https://extend.aplayer.ai/api/v1`) when omitted. */
+  /** Override for the Extend backend base URL. Defaults to the hosted production deployment (`https://pattern.aplayer.ai/api/v1`) when omitted. */
   baseUrl?: string | null;
 }
 

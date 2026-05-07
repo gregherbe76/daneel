@@ -2,7 +2,7 @@
 
 ## What it does
 
-Extend (https://extend.aplayer.ai) is a **pattern-matching sourcing provider**.
+Extend (https://pattern.aplayer.ai) is a **pattern-matching sourcing provider**.
 You give it 1-10 LinkedIn profiles of people you already love (your A-players,
 ideal hires, top performers). Extend's pipeline crawls LinkedIn for look-alikes,
 scores each match against your example pattern, and returns ranked candidates
@@ -14,8 +14,8 @@ ideal hires are best described by example rather than by a keyword search.
 
 ## How to connect
 
-1. Create an account at https://extend.aplayer.ai
-2. Upgrade to **Premium** (`$29/mo` at https://extend.aplayer.ai/account)
+1. Create an account at https://pattern.aplayer.ai
+2. Upgrade to **Premium** (`$29/mo` at https://pattern.aplayer.ai/account)
 3. Configure your **LinkedIn cookie** in Extend's settings (required for
    crawling — Extend handles this server-side)
 4. Generate an **API key** from Extend's Account → API page
@@ -28,7 +28,7 @@ the result in the toast (OK or the upstream error).
 
 ## Pricing
 
-- `$29/mo` at https://extend.aplayer.ai/account
+- `$29/mo` at https://pattern.aplayer.ai/account
 - All quota and rate-limit enforcement happens on Extend's side. Daneel
   forwards your key as `Authorization: Bearer <key>` on every call.
 
@@ -73,10 +73,10 @@ sourcing step in the run timeline:
 |---|---|---|
 | `no_profile_urls` | The job has no `exampleProfileUrls` | Add 1-10 URLs in Advanced sourcing inputs |
 | `auth_failed` | API key missing or upstream `401`/`403` | Re-paste the key in the marketplace |
-| `premium_required` | Upstream `402` (account not on Premium) | Upgrade at extend.aplayer.ai/account |
+| `premium_required` | Upstream `402` (account not on Premium) | Upgrade at pattern.aplayer.ai/account |
 | `linkedin_cookie_required` | Upstream `412` / `428` | Refresh the LinkedIn cookie in Extend's settings |
 | `extend_timeout` | POST aborted at 8s, or polling exceeds 12 min | Retry the run; Extend may be under load |
-| `pipeline_failed` | Poll returned `status: "failed"` | Inspect `extend_analysis_id` on extend.aplayer.ai |
+| `pipeline_failed` | Poll returned `status: "failed"` | Inspect `extend_analysis_id` on pattern.aplayer.ai |
 | `server_error` | Upstream `5xx` or `429` | Retry the run |
 | `network_error` | Generic fetch rejection | Check Daneel's outbound network access |
 | `invalid_response` | POST returned no `analysis_id` | File a bug — likely an API contract drift |
@@ -89,7 +89,7 @@ sourcing step in the run timeline:
 - **No refinement loop** — Extend's standalone product supports a feedback
   loop where you flag good/bad results and the pattern auto-tightens.
   This is **not implemented** in Daneel for now. Use Extend's standalone
-  UI directly (https://extend.aplayer.ai) if you need refinement.
+  UI directly (https://pattern.aplayer.ai) if you need refinement.
 - **LinkedIn-only output** — Extend returns no email, no GitHub username,
   no current-company field. Configure an enrichment provider downstream
   if you need those.

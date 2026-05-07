@@ -236,7 +236,7 @@ export const CATALOG: CatalogEntry[] = [
     category: "sourcing",
     oneLiner:
       "Pattern-match net-new candidates from 1-10 example LinkedIn profiles you already love. Extend's pipeline crawls LinkedIn for look-alikes and scores each match.",
-    pricing: "Premium — $29/mo at extend.aplayer.ai/account",
+    pricing: "Premium — $29/mo at pattern.aplayer.ai/account",
     badges: ["byo-key"],
     connectType: "extend",
     helper:

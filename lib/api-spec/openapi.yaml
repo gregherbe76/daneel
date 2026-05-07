@@ -2961,7 +2961,7 @@ components:
         baseUrl:
           type: string
           nullable: true
-          description: Override for the Extend backend base URL. Defaults to the hosted production deployment (`https://extend.aplayer.ai/api/v1`) when omitted.
+          description: Override for the Extend backend base URL. Defaults to the hosted production deployment (`https://pattern.aplayer.ai/api/v1`) when omitted.
 
     AgentProviderConfig:
       type: object

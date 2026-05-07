@@ -221,7 +221,7 @@ describe("ExtendSourcingProvider.run", () => {
     await provider.run(makeInput());
 
     const [postUrl, postInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(postUrl).toBe("https://extend.aplayer.ai/api/v1/find-similar");
+    expect(postUrl).toBe("https://pattern.aplayer.ai/api/v1/find-similar");
     expect(postInit.method).toBe("POST");
     const headers = postInit.headers as Record<string, string>;
     expect(headers["Authorization"]).toBe("Bearer ex_sk_test");

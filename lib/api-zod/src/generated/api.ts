@@ -2009,7 +2009,7 @@ export const ListProvidersResponseItem = zod.object({
             .string()
             .nullish()
             .describe(
-              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/pattern.aplayer.ai\/api\/v1`) when omitted.",
             ),
         })
         .optional()
@@ -2201,7 +2201,7 @@ export const CreateProviderBody = zod.object({
             .string()
             .nullish()
             .describe(
-              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/pattern.aplayer.ai\/api\/v1`) when omitted.",
             ),
         })
         .optional()
@@ -2438,7 +2438,7 @@ export const GetProviderResponse = zod.object({
             .string()
             .nullish()
             .describe(
-              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/pattern.aplayer.ai\/api\/v1`) when omitted.",
             ),
         })
         .optional()
@@ -2633,7 +2633,7 @@ export const UpdateProviderBody = zod.object({
             .string()
             .nullish()
             .describe(
-              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/pattern.aplayer.ai\/api\/v1`) when omitted.",
             ),
         })
         .optional()
@@ -2825,7 +2825,7 @@ export const UpdateProviderResponse = zod.object({
             .string()
             .nullish()
             .describe(
-              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/pattern.aplayer.ai\/api\/v1`) when omitted.",
             ),
         })
         .optional()
@@ -3037,7 +3037,7 @@ export const ToggleProviderResponse = zod.object({
             .string()
             .nullish()
             .describe(
-              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/pattern.aplayer.ai\/api\/v1`) when omitted.",
             ),
         })
         .optional()
@@ -3251,7 +3251,7 @@ export const ReplaceProviderKeyResponse = zod.object({
             .string()
             .nullish()
             .describe(
-              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+              "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/pattern.aplayer.ai\/api\/v1`) when omitted.",
             ),
         })
         .optional()
@@ -3568,7 +3568,7 @@ export const ListProviderStepSettingsResponseItem = zod.object({
               .string()
               .nullish()
               .describe(
-                "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+                "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/pattern.aplayer.ai\/api\/v1`) when omitted.",
               ),
           })
           .optional()
@@ -3798,7 +3798,7 @@ export const UpsertProviderStepSettingResponse = zod.object({
               .string()
               .nullish()
               .describe(
-                "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/extend.aplayer.ai\/api\/v1`) when omitted.",
+                "Override for the Extend backend base URL. Defaults to the hosted production deployment (`https:\/\/pattern.aplayer.ai\/api\/v1`) when omitted.",
               ),
           })
           .optional()
