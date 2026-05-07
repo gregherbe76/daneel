@@ -67,7 +67,8 @@ export type ConnectProviderType =
   | "twin_agent"
   | "scout"
   | "council"
-  | "codematch";
+  | "codematch"
+  | "extend";
 
 /** Twin's brand yellow — used as the marketplace card accent and badge fill. */
 export const TWIN_YELLOW = "#FEDA3D";
@@ -227,6 +228,20 @@ export const CATALOG: CatalogEntry[] = [
     helper:
       "Connecting auto-assigns CodeMatch to the optional Technical Evaluation step. Each shortlisted candidate must have a public GitHub username on file. Premium-gated per CodeMatch's pricing.",
     logoMark: "Cm",
+  },
+  {
+    kind: "connect",
+    id: "extend",
+    name: "Extend",
+    category: "sourcing",
+    oneLiner:
+      "Pattern-match net-new candidates from 1-10 example LinkedIn profiles you already love. Extend's pipeline crawls LinkedIn for look-alikes and scores each match.",
+    pricing: "Premium — $29/mo at extend.aplayer.ai/account",
+    badges: ["byo-key"],
+    connectType: "extend",
+    helper:
+      "Connecting auto-assigns Extend to the Sourcing workflow step. Each job needs 1-10 example LinkedIn profile URLs (set on the job edit page → Advanced sourcing inputs). Extend pipelines run async — typical sourcing run is 2-5 minutes.",
+    logoMark: "Ex",
   },
   {
     kind: "connect",

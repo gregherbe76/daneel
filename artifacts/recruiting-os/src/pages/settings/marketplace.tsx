@@ -6,6 +6,7 @@ import {
   useCreateProvider,
   useUpdateProvider,
   useUpsertProviderStepSetting,
+  useTestProviderConnection,
   getListProvidersQueryKey,
   getListProviderStepSettingsQueryKey,
 } from "@workspace/api-client-react";
@@ -71,6 +72,7 @@ type ProviderRecord = {
     apify?: ApifyProviderConfig | null;
     council?: { baseUrl?: string | null } | null;
     codematch?: { baseUrl?: string | null } | null;
+    extend?: { baseUrl?: string | null } | null;
   } | null;
 };
 
@@ -136,11 +138,13 @@ const APPLICABLE_STEPS: Record<ConnectProviderType, WorkflowStep[]> = {
   github: ["sourcing"],
   twin_agent: ["sourcing"],
   apify: ["sourcing"],
-  // Scout, Council, CodeMatch manage their own step assignment in their
-  // connect flow, so they hide the inline step picker on the marketplace card.
+  // Scout, Council, CodeMatch, Extend manage their own step assignment in
+  // their connect flow, so they hide the inline step picker on the
+  // marketplace card.
   scout: [],
   council: [],
   codematch: [],
+  extend: [],
 };
 
 /** Maps a marketplace connectType to the underlying provider `type` column. */
@@ -152,6 +156,7 @@ function providerTypeFor(connectType: ConnectProviderType): string | null {
   if (connectType === "twin_agent") return "twin_agent";
   if (connectType === "council") return "council";
   if (connectType === "codematch") return "codematch";
+  if (connectType === "extend") return "extend";
   // scout uses twin_webhook + the magic name "A-Player Scout"; handled inline.
   return null;
 }
@@ -217,6 +222,11 @@ function deriveState(entry: ConnectProvider, providers: ProviderRecord[]): ConnS
   }
   if (entry.connectType === "codematch") {
     const p = providers.find((x) => x.type === "codematch");
+    if (!p) return "disconnected";
+    return p.enabled ? "connected" : "action_required";
+  }
+  if (entry.connectType === "extend") {
+    const p = providers.find((x) => x.type === "extend");
     if (!p) return "disconnected";
     return p.enabled ? "connected" : "action_required";
   }
@@ -384,6 +394,7 @@ function ConnectDialog({
   const create = useCreateProvider();
   const update = useUpdateProvider();
   const upsertStep = useUpsertProviderStepSetting();
+  const testConnection = useTestProviderConnection();
   const [webhookUrl, setWebhookUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -394,6 +405,9 @@ function ConnectDialog({
 
   // CodeMatch tuning
   const [codematchBaseUrl, setCodematchBaseUrl] = useState("");
+
+  // Extend tuning
+  const [extendBaseUrl, setExtendBaseUrl] = useState("");
 
   // GitHub Agent tuning
   const [ghExtraKeywords, setGhExtraKeywords] = useState("");
@@ -472,6 +486,9 @@ function ConnectDialog({
     }
     if (entry.connectType === "codematch") {
       setCodematchBaseUrl(existing?.config?.codematch?.baseUrl ?? "");
+    }
+    if (entry.connectType === "extend") {
+      setExtendBaseUrl(existing?.config?.extend?.baseUrl ?? "");
     }
   }, [open, entry, existing]);
 
@@ -681,6 +698,68 @@ function ConnectDialog({
           description: stepAssigned
             ? "Wired up to the Technical Evaluation step. Enable it per-job from the job edit page."
             : "Saved, but couldn't auto-assign the Technical Evaluation step — wire it up from the Advanced section.",
+        });
+      } else if (entry.connectType === "extend") {
+        const baseUrl = extendBaseUrl.trim();
+        const payload = {
+          name: "Extend",
+          type: "extend" as const,
+          webhookUrl: null,
+          baseUrl: null,
+          apiKeyPlaceholder: apiKey
+            ? apiKey
+            : existing?.apiKeyPlaceholder ?? null,
+          config: baseUrl ? { extend: { baseUrl } } : null,
+          enabled: true,
+        };
+        let providerId: number;
+        if (existing) {
+          await update.mutateAsync({ id: existing.id, data: payload });
+          providerId = existing.id;
+        } else {
+          const created = (await create.mutateAsync({ data: payload })) as {
+            id: number;
+          };
+          providerId = created.id;
+        }
+        await qc.invalidateQueries({ queryKey: getListProvidersQueryKey() });
+        // Auto-assign Extend to the sourcing step — the only step it can run.
+        let stepAssigned = false;
+        try {
+          await upsertStep.mutateAsync({
+            data: {
+              workflowStep: "sourcing",
+              providerId,
+              enabled: true,
+            },
+          });
+          await qc.invalidateQueries({
+            queryKey: getListProviderStepSettingsQueryKey(),
+          });
+          stepAssigned = true;
+        } catch {
+          /* non-fatal — admin can wire it from the Advanced section */
+        }
+        // Save & Test: probe GET /v1/me via the test-connection endpoint
+        // so the recruiter learns immediately whether the key is valid.
+        let testNote = "";
+        try {
+          const testResult = (await testConnection.mutateAsync({
+            id: providerId,
+          })) as { ok: boolean; error?: string };
+          testNote = testResult.ok
+            ? " Connection test: OK."
+            : ` Connection test failed: ${testResult.error ?? "unknown error"}.`;
+        } catch (err) {
+          testNote = ` Connection test failed: ${err instanceof Error ? err.message : String(err)}.`;
+        }
+        toast({
+          title: "Extend connected",
+          description:
+            (stepAssigned
+              ? "Wired up to the Sourcing step. Add 1-10 example LinkedIn profile URLs per job to seed pattern matching."
+              : "Saved, but couldn't auto-assign the Sourcing step — wire it up from the Advanced section.") +
+            testNote,
         });
       } else if (entry.connectType === "apify") {
         const apifyConfig: ApifyProviderConfig = {
@@ -1026,6 +1105,67 @@ function ConnectDialog({
                   <p className="text-xs text-muted-foreground">
                     Leave blank for the hosted production deployment. Override only when self-hosting
                     or pointing at a CodeMatch staging environment.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {entry.connectType === "extend" && (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="extend-key">Extend API key</Label>
+              <Input
+                id="extend-key"
+                type="password"
+                placeholder={existing?.apiKeyLast4 ? `•••• ${existing.apiKeyLast4}` : "ex_…"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                autoComplete="new-password"
+                data-testid="extend-key"
+              />
+              <p className="text-xs text-muted-foreground">
+                {existing?.apiKeyLast4
+                  ? "Leave blank to keep the existing key. Paste a new key to rotate."
+                  : "Get your key from extend.aplayer.ai → Account → API. Sent as Authorization: Bearer …"}
+              </p>
+              <a
+                href="https://extend.aplayer.ai/account"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline inline-block"
+                data-testid="extend-signup-link"
+              >
+                Don't have a key yet? Get one at extend.aplayer.ai/account →
+              </a>
+            </div>
+
+            <div className="rounded-md bg-muted/40 border border-border p-3 text-xs text-muted-foreground">
+              Connecting auto-assigns Extend to the <strong>Sourcing</strong> step. Each
+              job needs 1-10 example LinkedIn profile URLs (set on the job edit page →
+              <em> Advanced sourcing inputs</em>). Pipelines run async — typical sourcing
+              run is 2-5 minutes.
+            </div>
+
+            <AdvancedToggle open={advancedOpen} onToggle={setAdvancedOpen} />
+
+            {advancedOpen && (
+              <div
+                className="space-y-3 rounded-md border border-border p-3"
+                data-testid="extend-advanced"
+              >
+                <div className="space-y-1.5">
+                  <Label>Base URL override</Label>
+                  <Input
+                    placeholder="https://extend.aplayer.ai/api/v1"
+                    value={extendBaseUrl}
+                    onChange={(e) => setExtendBaseUrl(e.target.value)}
+                    data-testid="extend-base-url"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave blank for the hosted production deployment. Override only when
+                    pointing at an Extend staging environment.
                   </p>
                 </div>
               </div>

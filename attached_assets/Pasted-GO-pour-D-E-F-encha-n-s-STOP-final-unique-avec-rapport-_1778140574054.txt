@@ -1,0 +1,53 @@
+GO pour D → E → F enchaînés. STOP final unique avec rapport 
+complet avant push GitHub.
+
+Rappels critiques pour les 3 sections :
+
+D (Marketplace UI) :
+- Suis exactement le pattern CodeMatch (Phase 4.2) pour le 
+  sub-dialog : champ API key + section Advanced (baseUrl override) 
+  + Save & Test
+- Le bouton "Don't have a key yet?" pointe vers 
+  https://extend.aplayer.ai/account (target="_blank" 
+  rel="noopener")
+- Save & Test doit appeler validateConnection() qui fait GET /v1/me
+
+E (Page job exampleProfileUrls) :
+- Toggle <details> "Advanced sourcing inputs" fermé par défaut
+- Helper text exact : "Used by Extend (pattern-matching) if 
+  assigned to the sourcing step in Settings → Workflow Step 
+  Assignments. Ignored by other sourcing providers."
+- ProfileUrlsMultiInput : validation client URLs LinkedIn 
+  /^https?:\/\/(www\.)?linkedin\.com\/in\//
+- Backend handler accepte exampleProfileUrls dans body POST/PUT 
+  /jobs
+
+F (Tests + docs) :
+- Tests unitaires utilisent vi.useFakeTimers + injection des 
+  hooks sleep/now (déjà prévu Section B)
+- 7+ tests minimum couvrant :
+  * validateConnection 200 / 401 / timeout
+  * run() exampleProfileUrls vide → no_profile_urls
+  * run() polling complet → mapped candidates
+  * run() pipeline failed → error
+  * run() timeout 12 min → extend_timeout
+- docs/providers/extend.md : sections What it does / How to 
+  connect / Pricing / Workflow integration / Error states / 
+  Limitations (refinement loop NON disponible dans Daneel)
+
+CONTRAINTES :
+- Si tu rencontres un cas non anticipé, ARRÊTE et signale 
+  (notamment si un truc bizarre dans le pattern CodeMatch 
+  marketplace.tsx te bloque)
+- Aucune dépendance npm ajoutée sans demander
+- Le push GitHub sera fait par moi
+
+DELIVERABLE FINAL :
+1. 3 commits locaux distincts (D, E, F) avec messages exacts
+2. Liste complète des fichiers modifiés/créés
+3. Output des tests unitaires (devrait être 60+/60+ pass : 54 
+   existants + 7+ nouveaux)
+4. Description visuelle de la nouvelle carte Extend dans le 
+   marketplace + nouveau toggle Advanced sourcing inputs
+
+STOP final. Attends ma confirmation avant tout push GitHub.

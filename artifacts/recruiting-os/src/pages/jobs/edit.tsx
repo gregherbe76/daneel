@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { ScoringWeightsEditor, sumWeights } from "@/components/scoring-weights-editor";
 import { DEFAULT_SCORING_WEIGHTS } from "@/components/score-breakdown";
+import { ProfileUrlsMultiInput } from "@/components/profile-urls-multi-input";
 
 const weightsSchema = z.object({
   autonomy: z.number().int().min(0).max(100),
@@ -45,6 +46,7 @@ const formSchema = z.object({
     message: "Scoring weights must add up to 100%",
   }),
   technicalEvaluationEnabled: z.boolean().optional(),
+  exampleProfileUrls: z.array(z.string()).max(10).optional().nullable(),
 });
 
 export default function EditJobPage() {
@@ -70,6 +72,7 @@ export default function EditJobPage() {
       mustHaveSkills: [],
       scoringWeights: { ...DEFAULT_SCORING_WEIGHTS },
       technicalEvaluationEnabled: false,
+      exampleProfileUrls: [],
     },
   });
 
@@ -83,6 +86,7 @@ export default function EditJobPage() {
         mustHaveSkills: job.mustHaveSkills,
         scoringWeights: job.scoringWeights ?? { ...DEFAULT_SCORING_WEIGHTS },
         technicalEvaluationEnabled: job.technicalEvaluationEnabled ?? false,
+        exampleProfileUrls: job.exampleProfileUrls ?? [],
       });
     }
   }, [job, form]);
@@ -283,6 +287,35 @@ export default function EditJobPage() {
                           data-testid="job-technical-evaluation-switch"
                         />
                       </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="border-t pt-6">
+                <FormField
+                  control={form.control}
+                  name="exampleProfileUrls"
+                  render={({ field }) => (
+                    <FormItem className="mb-6">
+                      <details data-testid="advanced-sourcing-inputs">
+                        <summary className="cursor-pointer text-sm font-medium select-none">
+                          Advanced sourcing inputs
+                        </summary>
+                        <div className="mt-3 space-y-2">
+                          <FormLabel>Example LinkedIn profile URLs</FormLabel>
+                          <ProfileUrlsMultiInput
+                            value={field.value ?? []}
+                            onChange={(next) => field.onChange(next)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Used by Extend (pattern-matching) if assigned to the sourcing
+                            step in Settings → Workflow Step Assignments. Ignored by other
+                            sourcing providers.
+                          </p>
+                        </div>
+                      </details>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />

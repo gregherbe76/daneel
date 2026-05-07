@@ -41,6 +41,9 @@ router.post("/jobs", async (req, res) => {
       ...(typeof body.technicalEvaluationEnabled === "boolean"
         ? { technicalEvaluationEnabled: body.technicalEvaluationEnabled }
         : {}),
+      ...(body.exampleProfileUrls !== undefined
+        ? { exampleProfileUrls: body.exampleProfileUrls }
+        : {}),
     })
     .returning();
   const realSourcingAvailable = await hasRealSourcingProvider();
@@ -82,6 +85,9 @@ router.put("/jobs/:id", async (req, res) => {
       ...(body.scoringWeights ? { scoringWeights: body.scoringWeights } : {}),
       ...(typeof body.technicalEvaluationEnabled === "boolean"
         ? { technicalEvaluationEnabled: body.technicalEvaluationEnabled }
+        : {}),
+      ...(body.exampleProfileUrls !== undefined
+        ? { exampleProfileUrls: body.exampleProfileUrls }
         : {}),
       updatedAt: new Date(),
     })
